@@ -27,14 +27,17 @@ class Contract:
     """A minimal Contract identity plus executable admission rules.
 
     Source-backed World BASE assertions remain the default. A Contract must
-    explicitly list construction origins it accepts without SOURCE grounding;
-    semantic-reference relations additionally need explicit permission.
+    explicitly list construction origins it accepts without SOURCE grounding.
+    An application may additionally name the relation vocabulary that those
+    semantic origins may populate; semantic-reference relations separately
+    need explicit permission.
     """
 
     contract_id: str
     contract_revision: str
     semantic_origins: frozenset[str] = field(default_factory=frozenset)
     allow_semantic_reference_relations: bool = False
+    semantic_relations: frozenset[str] = field(default_factory=frozenset)
 
     def __post_init__(self) -> None:
         identity = str(self.contract_id or "").strip()
@@ -50,6 +53,15 @@ class Contract:
                 str(item.value if hasattr(item, "value") else item).strip()
                 for item in self.semantic_origins
                 if str(item.value if hasattr(item, "value") else item).strip()
+            ),
+        )
+        object.__setattr__(
+            self,
+            "semantic_relations",
+            frozenset(
+                str(item).strip()
+                for item in self.semantic_relations
+                if str(item).strip()
             ),
         )
 
@@ -124,15 +136,30 @@ class Contract:
                 f"relation {relation_name!r}"
             )
 
-        if has_source_grounding:
-            return
-
         if origin_name in self.semantic_origins:
+            # An empty allow-list preserves the first kernel slice's
+            # origin-level behavior. A non-empty list lets an application
+            # Contract name the semantic decision vocabulary it admits.
+            if (
+                self.semantic_relations
+                and not references
+                and relation_name not in self.semantic_relations
+            ):
+                raise ContractAdmissionError(
+                    f"Contract {self.contract_id!r} does not authorize semantic "
+                    f"relation {relation_name!r}",
+                    reason="semantic_relation_not_authorized",
+                )
+            if has_source_grounding:
+                return
             if not has_construction_method:
                 raise ContractAdmissionError(
                     f"Contract {self.contract_id!r} requires a construction method "
                     f"for semantic assertion {relation_name!r}"
                 )
+            return
+
+        if has_source_grounding:
             return
 
         raise ContractAdmissionError(
