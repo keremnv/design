@@ -10,12 +10,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from ontology_author.world.core.contract import Contract, ContractAdmissionError
 from ontology_author.world.core.model import (
     Completeness,
     CompletenessStatus,
     RelationMode,
     Role,
     RoleType,
+    SemanticRefKind,
 )
 
 from ontology_author.world.core.origins import ConstructionOrigin
@@ -24,7 +26,7 @@ from ontology_author.world.runtime.commit import (
     RunResult,
     discard_candidate,
     _replace_candidate,
-    validate_world_base_source,
+    validate_contract_admission,
     write_sidecars,
 )
 from ontology_author.world.runtime.purpose import Purpose, ensure_failure_relation
@@ -39,7 +41,14 @@ WORLD_ID = "v0"
 
 
 class Project:
-    def __init__(self, root: Path | str, *, project_root: Path | str | None = None) -> None:
+    def __init__(
+        self,
+        root: Path | str,
+        *,
+        project_root: Path | str | None = None,
+        contract: Contract | None = None,
+        constructor_authority: Any | None = None,
+    ) -> None:
         self.root = Path(root)
         self.project_root = (
             Path(project_root)
@@ -48,6 +57,8 @@ class Project:
         )
         self.candidate_dir = self.root / "candidate"
         self.world_dir = self.root / "world"
+        self.contract = contract or Contract.default()
+        self.constructor_authority = constructor_authority
 
     @staticmethod
     def _infer_project_root(root: Path) -> Path:
@@ -68,13 +79,18 @@ class Project:
         discard_candidate(self.candidate_dir)
         self.candidate_dir.mkdir(parents=True)
         db_path = self.candidate_dir / "world.sqlite"
-        world = ConstructionWorld.create(db_path, world_id=WORLD_ID)
+        world = ConstructionWorld.create(
+            db_path,
+            world_id=WORLD_ID,
+            contract=self.contract,
+            constructor_authority=self.constructor_authority,
+        )
         purpose: Purpose | None = None
         try:
             ensure_failure_relation(world)
             purpose = Purpose(world, text=purpose_text)
             source = Source(self.project_root)
-            namespace = _construction_namespace(source, world, purpose)
+            namespace = _construction_namespace(source, world, purpose, self.contract)
             if not construction_path.exists():
                 raise ConstructionError("construction.py missing")
             code = construction_path.read_text(encoding="utf-8")
@@ -95,7 +111,7 @@ class Project:
                     except ValueError:
                         pass
             write_sidecars(world, purpose.payload())
-            report = validate_world_base_source(world)
+            report = validate_contract_admission(world)
             world.close()
             world = None  # type: ignore[assignment]
             if not report.ok:
@@ -109,17 +125,37 @@ class Project:
                 )
             _replace_candidate(self.candidate_dir, self.world_dir)
             return RunResult(succeeded=True, world_dir=self.world_dir)
-        except (GroundingError, ConstructionError, Exception) as exc:
+        except GroundingError as exc:
             if world is not None:
                 try:
                     world.close()
                 except Exception:
                     pass
             discard_candidate(self.candidate_dir)
-            if isinstance(exc, GroundingError):
-                return RunResult(succeeded=False, reason="ungrounded_world_base", errors=(str(exc),))
-            if isinstance(exc, ConstructionError):
-                return RunResult(succeeded=False, reason="construction_error", errors=(str(exc),))
+            return RunResult(succeeded=False, reason="ungrounded_world_base", errors=(str(exc),))
+        except ContractAdmissionError as exc:
+            if world is not None:
+                try:
+                    world.close()
+                except Exception:
+                    pass
+            discard_candidate(self.candidate_dir)
+            return RunResult(succeeded=False, reason=exc.reason, errors=(str(exc),))
+        except ConstructionError as exc:
+            if world is not None:
+                try:
+                    world.close()
+                except Exception:
+                    pass
+            discard_candidate(self.candidate_dir)
+            return RunResult(succeeded=False, reason="construction_error", errors=(str(exc),))
+        except Exception as exc:
+            if world is not None:
+                try:
+                    world.close()
+                except Exception:
+                    pass
+            discard_candidate(self.candidate_dir)
             return RunResult(
                 succeeded=False,
                 reason="construction_error",
@@ -132,14 +168,23 @@ class Project:
         return ConstructionWorld.open(self.world_path, world_id=WORLD_ID)
 
 
-def _construction_namespace(source: Source, world: ConstructionWorld, purpose: Purpose) -> dict[str, Any]:
+def _construction_namespace(
+    source: Source,
+    world: ConstructionWorld,
+    purpose: Purpose,
+    contract: Contract,
+) -> dict[str, Any]:
     return {
         "Source": Source,
         "source": source,
         "world": world,
         "purpose": purpose,
+        "Contract": Contract,
+        "contract": contract,
+        "constructor_authority": world.constructor_authority,
         "Role": Role,
         "RoleType": RoleType,
+        "SemanticRefKind": SemanticRefKind,
         "RelationMode": RelationMode,
         "ConstructionOrigin": ConstructionOrigin,
         "AssertionGrounding": AssertionGrounding,

@@ -6,6 +6,7 @@ import json
 import shutil
 from pathlib import Path
 
+from ontology_author.world.core.contract import Contract
 from ontology_author.world.runtime.commit import RunResult
 from ontology_author.world.runtime.project import Project
 
@@ -33,10 +34,15 @@ def create(workspace: Path | str, *, purpose: str | Path | None = None) -> Path:
     return root
 
 
-def rebuild(workspace: Path | str, *, construction: Path | str | None = None) -> RunResult:
+def rebuild(
+    workspace: Path | str,
+    *,
+    construction: Path | str | None = None,
+    contract: Contract | None = None,
+) -> RunResult:
     """Construct, validate, and replace this World's sealed bundle."""
 
-    project = Project(workspace)
+    project = Project(workspace, contract=contract)
     result = project.run(construction)
     payload = {
         "succeeded": bool(result.succeeded),

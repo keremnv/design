@@ -38,42 +38,23 @@ def source_kinds_for_assertion(world: ConstructionWorld, assertion_id: str) -> l
     )
 
 
-def validate_world_base_source(world: ConstructionWorld) -> ValidationReport:
-    """WORLD BASE tuples need SOURCE grounding. PURPOSE tuples do not."""
+def validate_contract_admission(world: ConstructionWorld) -> ValidationReport:
+    """Validate every asserted BASE tuple against the bound Contract."""
 
-    ungrounded: list[dict[str, Any]] = []
-    for relation, scope in world.admission.items():
-        if scope != "WORLD":
-            continue
-        schema = world.relation_schema(relation)
-        if schema["mode"] != "BASE":
-            continue
-        rows = world.query(
-            "SELECT assertion_id FROM _world_assertions WHERE relation_name = ?",
-            (relation,),
-        )
-        for row in rows:
-            assertion_id = row["assertion_id"]
-            grounds = source_kinds_for_assertion(world, assertion_id)
-            has_source = any(
-                str(item["kind"]) == "SOURCE" and str(item["reference"] or "").strip()
-                for item in grounds
-            )
-            if not has_source:
-                ungrounded.append(
-                    {
-                        "assertion_id": assertion_id,
-                        "relation": relation,
-                        "scope": scope,
-                    }
-                )
-    if ungrounded:
+    rejected = world.admission_errors()
+    if rejected:
         return ValidationReport(
             ok=False,
-            ungrounded=ungrounded,
-            reason="ungrounded_world_base",
+            ungrounded=rejected,
+            reason=str(rejected[0].get("reason") or "contract_admission"),
         )
     return ValidationReport(ok=True)
+
+
+def validate_world_base_source(world: ConstructionWorld) -> ValidationReport:
+    """Compatibility name for the Contract-backed publication validator."""
+
+    return validate_contract_admission(world)
 
 
 def write_sidecars(world: ConstructionWorld, purpose_payload: dict[str, Any]) -> None:

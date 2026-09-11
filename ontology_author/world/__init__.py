@@ -1,5 +1,6 @@
 """The generic World runtime and read-only inspection surface."""
 
+from ontology_author.world.core.contract import Contract, ContractAdmissionError
 from .runtime import (
     ConstructionError,
     ConstructionWorld,
@@ -15,6 +16,8 @@ from .runtime import (
 from .workspaces import WorldRef, WorldSelectionError, discover, select, world_ref
 
 __all__ = [
+    "Contract",
+    "ContractAdmissionError",
     "ConstructionError",
     "ConstructionWorld",
     "GroundingError",

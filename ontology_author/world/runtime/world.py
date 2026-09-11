@@ -12,6 +12,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal
 
+from ontology_author.world.core.contract import Contract, ContractAdmissionError
 from ontology_author.world.core.model import Completeness, RelationMode, Role, RoleType
 
 from ontology_author.world.core.kernel import SemanticWorld
@@ -55,24 +56,68 @@ def has_source_grounding(grounding: AssertionGrounding | None) -> bool:
     return False
 
 
-class ConstructionWorld:
-    """SemanticWorld plus relation scope and WORLD-BASE SOURCE enforcement."""
+def has_construction_method(grounding: AssertionGrounding | None) -> bool:
+    return bool(
+        grounding is not None
+        and str(grounding.construction_method or "").strip()
+    )
 
-    def __init__(self, inner: SemanticWorld) -> None:
+
+class ConstructionWorld:
+    """SemanticWorld plus admission scope and Contract enforcement."""
+
+    def __init__(
+        self,
+        inner: SemanticWorld,
+        contract: Contract | None = None,
+        *,
+        constructor_authority: Any | None = None,
+    ) -> None:
         self._inner = inner
+        stored = inner.contract_identity()
+        selected = contract or Contract.from_identity(stored)
+        if stored is not None and selected.identity() != stored:
+            raise ConstructionError(
+                "Construction Contract identity differs from the World binding"
+            )
+        self.contract = selected
+        self.constructor_authority = constructor_authority
         self.admission: dict[str, Scope] = {}
 
     @classmethod
-    def create(cls, path: Path | str, *, world_id: str) -> "ConstructionWorld":
-        return cls(SemanticWorld(path, world_id=world_id))
+    def create(
+        cls,
+        path: Path | str,
+        *,
+        world_id: str,
+        contract: Contract | None = None,
+        constructor_authority: Any | None = None,
+    ) -> "ConstructionWorld":
+        selected = contract or Contract.default()
+        return cls(
+            SemanticWorld(
+                path,
+                world_id=world_id,
+                contract_id=selected.contract_id,
+                contract_revision=selected.contract_revision,
+            ),
+            selected,
+            constructor_authority=constructor_authority,
+        )
 
     @classmethod
-    def open(cls, path: Path | str, *, world_id: str | None = None) -> "ConstructionWorld":
+    def open(
+        cls,
+        path: Path | str,
+        *,
+        world_id: str | None = None,
+        constructor_authority: Any | None = None,
+    ) -> "ConstructionWorld":
         db_path = Path(path)
         inner = SemanticWorld(
             db_path, world_id=world_id or world_id_of(db_path), read_only=True
         )
-        world = cls(inner)
+        world = cls(inner, constructor_authority=constructor_authority)
         admission_path = db_path.parent / "world.admission.json"
         if admission_path.exists():
             world.load_admission(admission_path)
@@ -85,6 +130,9 @@ class ConstructionWorld:
     @property
     def world_id(self) -> str:
         return self._inner.world_id
+
+    def contract_identity(self) -> dict[str, str] | None:
+        return self._inner.contract_identity()
 
     def close(self) -> None:
         self._inner.close()
@@ -101,6 +149,28 @@ class ConstructionWorld:
         return self._inner.add_referent(
             referent_id, label=label, observations=observations
         )
+
+    def add_obligation(
+        self,
+        obligation_id: str,
+        *,
+        question: str,
+        reason: str = "",
+    ) -> str:
+        if self._inner.read_only:
+            raise ConstructionError("World is read-only")
+        return self._inner.add_obligation(
+            obligation_id, question=question, reason=reason
+        )
+
+    def obligation(self, obligation_id: str) -> dict[str, Any] | None:
+        return self._inner.obligation(obligation_id)
+
+    def obligations(self) -> list[dict[str, Any]]:
+        return self._inner.obligations()
+
+    def semantic_reference_errors(self) -> list[dict[str, str]]:
+        return self._inner.semantic_reference_errors()
 
     def declare_relation(
         self,
@@ -132,18 +202,118 @@ class ConstructionWorld:
         if self._inner.read_only:
             raise ConstructionError("World is read-only")
         scope = self._scope(relation)
-        mode = self._inner._store.relation_schema(relation)["mode"]
+        schema = self._inner.relation_schema(relation)
+        mode = schema["mode"]
         if mode == RelationMode.DERIVED.value:
             raise ConstructionError(
                 f"derived relation {relation!r} cannot be asserted; use register_derivation"
             )
-        if scope == "WORLD" and not has_source_grounding(grounding):
-            raise GroundingError(
-                f"WORLD BASE {relation!r} requires SOURCE grounding with a non-empty reference"
+        reference_kinds = tuple(
+            str(role["reference_kind"])
+            for role in schema["roles"]
+            if role.get("reference_kind")
+        )
+        try:
+            self.contract.admit_assertion(
+                relation=relation,
+                scope=scope,
+                mode=mode,
+                origin=origin,
+                has_source_grounding=has_source_grounding(grounding),
+                has_provenance=True,
+                has_construction_method=has_construction_method(grounding),
+                semantic_reference_kinds=reference_kinds,
+                authority=self.constructor_authority,
             )
+        except ContractAdmissionError as error:
+            if error.reason == "ungrounded_world_base":
+                raise GroundingError(str(error)) from error
+            raise
         return self._inner.assert_tuple(
             relation, values, origin=origin, grounding=grounding
         )
+
+    def warrant_for_assertion(self, assertion_id: str) -> dict[str, Any]:
+        return self._inner.warrant_for_assertion(assertion_id)
+
+    def admission_errors(self) -> list[dict[str, Any]]:
+        """Return Contract admission failures without mutating the World."""
+
+        errors: list[dict[str, Any]] = []
+        for reference_error in self.semantic_reference_errors():
+            errors.append(
+                {
+                    "assertion_id": reference_error["assertion_id"],
+                    "relation": reference_error["relation"],
+                    "scope": self.admission.get(reference_error["relation"]),
+                    "reason": "contract_admission",
+                    "message": (
+                        "semantic reference target is no longer valid: "
+                        f"{reference_error}"
+                    ),
+                }
+            )
+        for relation, scope in self.admission.items():
+            schema = self.relation_schema(relation)
+            if schema["mode"] != RelationMode.BASE.value:
+                continue
+            reference_kinds = tuple(
+                str(role["reference_kind"])
+                for role in schema["roles"]
+                if role.get("reference_kind")
+            )
+            rows = self.query(
+                "SELECT assertion_id FROM _world_assertions "
+                "WHERE relation_name = ? ORDER BY assertion_id",
+                (relation,),
+            )
+            for row in rows:
+                assertion_id = str(row["assertion_id"])
+                grounds = self.query(
+                    "SELECT kind, reference, detail FROM _world_groundings "
+                    "WHERE subject_type = 'ASSERTION' AND subject_id = ?",
+                    (assertion_id,),
+                )
+                try:
+                    origin = self._inner.origin_for_assertion(assertion_id)
+                except Exception as error:
+                    errors.append(
+                        {
+                            "assertion_id": assertion_id,
+                            "relation": relation,
+                            "scope": scope,
+                            "reason": "contract_admission",
+                            "message": str(error),
+                        }
+                    )
+                    continue
+                try:
+                    self.contract.admit_assertion(
+                        relation=relation,
+                        scope=scope,
+                        mode=schema["mode"],
+                        origin=origin,
+                        has_source_grounding=any(
+                            str(item["kind"]) == "SOURCE"
+                            and str(item["reference"] or "").strip()
+                            for item in grounds
+                        ),
+                        has_provenance=bool(grounds),
+                        has_construction_method=_groundings_have_method(grounds),
+                        semantic_reference_kinds=reference_kinds,
+                        authority=self.constructor_authority,
+                    )
+                except ContractAdmissionError as error:
+                    errors.append(
+                        {
+                            "assertion_id": assertion_id,
+                            "relation": relation,
+                            "scope": scope,
+                            "reason": error.reason,
+                            "message": str(error),
+                        }
+                    )
+        return errors
 
     def retract_tuple(self, relation: str, values: Mapping[str, Any]) -> bool:
         if self._inner.read_only:
@@ -209,3 +379,17 @@ def role_text(name: str) -> Role:
 
 def role_referent(name: str) -> Role:
     return Role(name, RoleType.REFERENT)
+
+
+def _groundings_have_method(groundings: Iterable[Mapping[str, Any]]) -> bool:
+    for grounding in groundings:
+        detail = grounding.get("detail")
+        if not detail:
+            continue
+        try:
+            payload = json.loads(detail)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(payload, dict) and str(payload.get("construction_method") or "").strip():
+            return True
+    return False

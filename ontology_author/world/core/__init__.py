@@ -5,11 +5,14 @@ implementation beneath that surface.
 """
 
 from ontology_author.world.core.kernel import SemanticWorld
+from ontology_author.world.core.contract import Contract, ContractAdmissionError
 from ontology_author.world.core.origins import ConstructionOrigin, OriginMetadataError
 from ontology_author.world.core.source import AssertionGrounding, SourceObservation
 
 __all__ = [
     "AssertionGrounding",
+    "Contract",
+    "ContractAdmissionError",
     "ConstructionOrigin",
     "OriginMetadataError",
     "SemanticWorld",

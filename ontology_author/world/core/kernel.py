@@ -103,6 +103,9 @@ class SemanticWorld:
     def obligations(self) -> list[dict[str, Any]]:
         return self._store.obligations()
 
+    def semantic_reference_errors(self) -> list[dict[str, str]]:
+        return self._store.semantic_reference_errors()
+
     # -- Semantic content -------------------------------------------------
 
     def add_referent(

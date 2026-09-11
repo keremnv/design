@@ -95,6 +95,7 @@ class Role:
     name: str
     type: str
     column: str
+    reference_kind: str | None = None
 
     @property
     def referent(self) -> bool:
@@ -171,7 +172,10 @@ class WorldExplorerAdapter:
 
     @staticmethod
     def _roles(record: Mapping[str, Any]) -> list[Role]:
-        return [Role(r["name"], r["type"], r["column"]) for r in record["roles"]]
+        return [
+            Role(r["name"], r["type"], r["column"], r.get("reference_kind"))
+            for r in record["roles"]
+        ]
 
     def _origin(self, assertion_id: str) -> str:
         try:
@@ -272,7 +276,11 @@ class WorldExplorerAdapter:
         construction origins. Nothing that only needs the name should pay for
         that.
         """
-        return {"world_id": self._world.world_id, "revision": self._store.revision}
+        return {
+            "world_id": self._world.world_id,
+            "revision": self._store.revision,
+            "contract": self._world.contract_identity(),
+        }
 
     def overview(self) -> dict[str, Any]:
         described = self._described()
@@ -293,6 +301,7 @@ class WorldExplorerAdapter:
         return {
             "world_id": self._world.world_id,
             "revision": self._store.revision,
+            "contract": self._world.contract_identity(),
             "relations": len(described),
             "referents": counts["referents"],
             "assertions": counts["assertions"],
@@ -345,6 +354,11 @@ class WorldExplorerAdapter:
                         "column": role.column,
                         "referent": role.referent,
                         "kinds": [],
+                        **(
+                            {"reference_kind": role.reference_kind}
+                            if role.reference_kind
+                            else {}
+                        ),
                     }
                     for role in roles
                 ],
@@ -655,7 +669,16 @@ class WorldExplorerAdapter:
             "relation": relation,
             "arity": len(roles),
             "roles": [
-                {"name": role.name, "type": role.type, "referent": role.referent}
+                {
+                    "name": role.name,
+                    "type": role.type,
+                    "referent": role.referent,
+                    **(
+                        {"reference_kind": role.reference_kind}
+                        if role.reference_kind
+                        else {}
+                    ),
+                }
                 for role in roles
             ],
             "tuples": [self._row_out(roles, row) for row in rows],
@@ -791,6 +814,7 @@ class WorldExplorerAdapter:
                 for role in roles
             ],
             "values": values,
+            "commitment_id": assertion_id,
             # The product's origin (who decided this), not the store's
             # (how it got into the table). Both are reported, because a reader
             # asking "why is this here" is served by neither alone.
@@ -800,6 +824,7 @@ class WorldExplorerAdapter:
             "relation_stale": record["stale"],
             "completeness": self._completeness_out(record["completeness"]),
             "grounding": self._grounding("ASSERTION", assertion_id),
+            "warrant": self._world.warrant_for_assertion(assertion_id),
         }
         if record["mode"] == "DERIVED":
             out["derivation"] = {
@@ -1041,6 +1066,69 @@ class WorldExplorerAdapter:
         """
         return self._purpose_frontier()
 
+    def _contract_frontier(self) -> list[dict[str, Any]]:
+        obligations: list[dict[str, Any]] = []
+        for item in self._world.obligations():
+            obligation_id = str(item["obligation_id"])
+            obligations.append(
+                {
+                    "obligation_id": obligation_id,
+                    "question": item["question"],
+                    "relation": None,
+                    "values": {},
+                    "reason": item["reason"] or None,
+                    "demanded_by": {
+                        "kind": "contract",
+                        "name": obligation_id,
+                        "contract_id": item["contract_id"],
+                        "contract_revision": item["contract_revision"],
+                    },
+                    "state": item["state"],
+                    "assertion_id": None,
+                    "record_id": None,
+                    "grounding_ref": None,
+                    "contract_id": item["contract_id"],
+                    "contract_revision": item["contract_revision"],
+                    "candidates": self._contract_candidates(obligation_id),
+                }
+            )
+        return obligations
+
+    def _contract_candidates(self, obligation_id: str) -> list[dict[str, Any]]:
+        candidates: list[dict[str, Any]] = []
+        for record in self._described():
+            obligation_roles = [
+                role
+                for role in record["roles"]
+                if role.get("reference_kind") == "OBLIGATION"
+            ]
+            commitment_roles = [
+                role
+                for role in record["roles"]
+                if role.get("reference_kind") == "COMMITMENT"
+            ]
+            if len(obligation_roles) != 1 or len(commitment_roles) != 1:
+                continue
+            obligation_role = obligation_roles[0]
+            commitment_role = commitment_roles[0]
+            relation = _quote_identifier(record["name"])
+            obligation_column = _quote_identifier(obligation_role["column"])
+            commitment_column = _quote_identifier(commitment_role["column"])
+            rows = self._store.query(
+                f"SELECT _assertion_id, {commitment_column} AS commitment_id "
+                f"FROM {relation} WHERE {obligation_column} = ?",
+                (obligation_id,),
+            )
+            candidates.extend(
+                {
+                    "relation": record["name"],
+                    "assertion_id": row["_assertion_id"],
+                    "commitment_id": row["commitment_id"],
+                }
+                for row in rows
+            )
+        return candidates
+
     def _purpose_frontier(self) -> dict[str, Any] | None:
         """The same frontier, read off a world rebuilt by the v1 boundary.
 
@@ -1052,11 +1140,12 @@ class WorldExplorerAdapter:
         delta answers, not something a single world can be asked.
         """
         rows = self._failure_rows()
+        contract_obligations = self._contract_frontier()
         document = self._purpose_document
-        if document is None and not rows:
+        if document is None and not rows and not contract_obligations:
             return None
         requirements = list((document or {}).get("requirements", []))
-        obligations = []
+        obligations = list(contract_obligations)
         for row in rows:
             subject = self._failure_subject(row["subject_json"])
             # `reason` is prose the constructor wrote about why this is
@@ -1088,11 +1177,11 @@ class WorldExplorerAdapter:
             failures_by_requirement[name] = failures_by_requirement.get(name, 0) + 1
         return {
             "purpose": {"statement": str((document or {}).get("text", "")).strip()},
+            "contract": self._world.contract_identity(),
             "rule": None,
-            # What the purpose asked for, at the granularity this lineage asks
-            # it: one entry per declared requirement, preserving the
-            # construction's requested granularity.
-            "demanded": len(requirements) or len(obligations),
+            # Purpose requirements and Contract obligations are separate
+            # demand sources; neither is silently treated as the other.
+            "demanded": (len(requirements) or len(rows)) + len(contract_obligations),
             "obligations": obligations,
             # Relation-level, and additive: the declarations themselves, each
             # carrying how many tuples failed it. An obligation says a tuple is
@@ -1134,6 +1223,10 @@ class WorldExplorerAdapter:
         except (TypeError, ValueError):
             return {"subject": raw}
         return parsed if isinstance(parsed, dict) else {"subject": parsed}
+
+
+def _quote_identifier(value: str) -> str:
+    return '"' + str(value).replace('"', '""') + '"'
 
 
 def open_world(path: Path | str, *, world_id: str | None = None) -> WorldExplorerAdapter:
