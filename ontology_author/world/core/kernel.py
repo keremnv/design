@@ -13,16 +13,14 @@ from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from ontology_author.world.core.contract_store import ContractWorldStore
 from ontology_author.world.core.model import (
     Completeness,
     Grounding,
     GroundingKind,
     RelationMode,
     Role,
-    RoleType,
 )
-from ontology_author.world.core.store import WorldStore
-
 from ontology_author.world.core.origins import ConstructionOrigin, OriginMetadataError
 from ontology_author.world.core.source import AssertionGrounding, SourceObservation
 
@@ -34,7 +32,15 @@ def _origin_path(db_path: Path) -> Path:
 class SemanticWorld:
     """One versioned semantic World backed by SQLite storage."""
 
-    def __init__(self, path: Path | str, *, world_id: str, read_only: bool = False) -> None:
+    def __init__(
+        self,
+        path: Path | str,
+        *,
+        world_id: str,
+        read_only: bool = False,
+        contract_id: str = "",
+        contract_revision: str = "",
+    ) -> None:
         self.path = Path(path)
         self.world_id = world_id
         self.read_only = read_only
@@ -43,7 +49,13 @@ class SemanticWorld:
             original_mode = stat.S_IMODE(self.path.stat().st_mode)
             self.path.chmod(original_mode | stat.S_IWUSR)
         try:
-            self._store = WorldStore(self.path, world_id=world_id, purpose_ref="")
+            self._store = ContractWorldStore(
+                self.path,
+                world_id=world_id,
+                purpose_ref="",
+                contract_id=contract_id,
+                contract_revision=contract_revision,
+            )
         finally:
             if original_mode is not None:
                 self.path.chmod(original_mode)
@@ -69,6 +81,30 @@ class SemanticWorld:
             encoding="utf-8",
         )
 
+    # -- Contract / obligation state -------------------------------------
+
+    def contract_identity(self) -> dict[str, str] | None:
+        return self._store.contract_identity()
+
+    def add_obligation(
+        self,
+        obligation_id: str,
+        *,
+        question: str,
+        reason: str = "",
+    ) -> str:
+        return self._store.add_obligation(
+            obligation_id, question=question, reason=reason
+        )
+
+    def obligation(self, obligation_id: str) -> dict[str, Any] | None:
+        return self._store.obligation(obligation_id)
+
+    def obligations(self) -> list[dict[str, Any]]:
+        return self._store.obligations()
+
+    # -- Semantic content -------------------------------------------------
+
     def add_referent(
         self,
         referent_id: str,
@@ -93,6 +129,9 @@ class SemanticWorld:
         return self._store.declare_relation(
             name, roles, mode=mode, description=description
         )
+
+    def relation_schema(self, relation: str) -> dict[str, Any]:
+        return self._store.relation_schema(relation)
 
     def assert_tuple(
         self,
@@ -162,6 +201,55 @@ class SemanticWorld:
         assertion_id = self._store.assertion_id_for_tuple(relation, values)
         detail["construction_origin"] = self.origin_for_assertion(assertion_id)
         return detail
+
+    def warrant_for_assertion(self, assertion_id: str) -> dict[str, Any]:
+        """Read the current provenance machinery as a provisional Warrant view.
+
+        This intentionally adds no warrant storage yet. It makes the existing
+        axes coherent and queryable while preserving their distinctions.
+        """
+
+        rows = self._store.query(
+            "SELECT relation_name, origin, created_revision "
+            "FROM _world_assertions WHERE assertion_id = ?",
+            (assertion_id,),
+        )
+        if not rows:
+            raise KeyError(f"no assertion {assertion_id!r}")
+        row = rows[0]
+        bases: list[dict[str, Any]] = []
+        observed_origins: set[str] = set()
+        for grounding in self._store.groundings("ASSERTION", assertion_id):
+            item: dict[str, Any] = {
+                "kind": grounding["kind"],
+                "reference": grounding["reference"],
+            }
+            detail = grounding.get("detail") or ""
+            if detail:
+                try:
+                    parsed = json.loads(detail)
+                except (TypeError, ValueError):
+                    item["detail_text"] = detail
+                else:
+                    item["detail"] = parsed
+                    if isinstance(parsed, dict) and parsed.get("construction_origin"):
+                        observed_origins.add(str(parsed["construction_origin"]))
+            bases.append(item)
+        try:
+            recorded_origin = self.origin_for_assertion(assertion_id)
+        except OriginMetadataError:
+            recorded_origin = "UNKNOWN"
+        if recorded_origin != "UNKNOWN":
+            observed_origins.add(recorded_origin)
+        return {
+            "commitment_id": assertion_id,
+            "relation": row["relation_name"],
+            "assertion_origin": row["origin"],
+            "recorded_construction_origin": recorded_origin,
+            "construction_origins": sorted(observed_origins),
+            "created_revision": int(row["created_revision"]),
+            "bases": bases,
+        }
 
     def origin_for_assertion(self, assertion_id: str) -> str:
         if assertion_id in self._origins:

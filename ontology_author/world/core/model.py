@@ -18,6 +18,13 @@ class RoleType(StrEnum):
     BOOLEAN = "BOOLEAN"
 
 
+class SemanticRefKind(StrEnum):
+    """Addressable system-plane semantic identities usable as relation values."""
+
+    COMMITMENT = "COMMITMENT"
+    OBLIGATION = "OBLIGATION"
+
+
 class RelationMode(StrEnum):
     BASE = "BASE"
     DERIVED = "DERIVED"
@@ -48,10 +55,17 @@ class GroundingKind(StrEnum):
     DERIVATION = "DERIVATION"
 
 
+class ObligationState(StrEnum):
+    """The first slice intentionally has no resolution transition yet."""
+
+    UNRESOLVED = "UNRESOLVED"
+
+
 @dataclass(frozen=True)
 class Role:
     name: str
     type: RoleType
+    reference_kind: SemanticRefKind | None = None
 
 
 @dataclass(frozen=True)
