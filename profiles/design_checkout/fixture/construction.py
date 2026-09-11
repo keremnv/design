@@ -1,3 +1,9 @@
+from profiles.design_checkout.structure import (
+    extract_frontend_structure,
+    write_structure_artifact,
+)
+
+
 def construct(source, world, purpose):
     requirements = source.read_text("checkout-requirements.md")
     implementation = source.read_text("Checkout.tsx")
@@ -7,8 +13,23 @@ def construct(source, world, purpose):
         raise ValueError("the constructor needs the order-summary evidence")
     if 'data-region="payment-entry"' not in implementation:
         raise ValueError("the constructor needs the payment-entry evidence")
+    if governance is None:
+        raise ValueError("the checkout constructor needs an explicit Governance Law")
 
-    referents = {
+    structure = extract_frontend_structure(
+        implementation,
+        source_name="Checkout.tsx",
+        source_revision=source.file_hash("Checkout.tsx"),
+    )
+    generated_obligations = governance.enumerate_obligations(structure)
+    relevant_referents = governance.referents_for(structure)
+    write_structure_artifact(
+        world.path.parent,
+        structure,
+        relevant_ids=relevant_referents,
+    )
+
+    referent_labels = {
         "mobile_checkout": "Mobile checkout",
         "checkout_commitment": "Checkout commitment point",
         "order_total": "Order total",
@@ -17,24 +38,17 @@ def construct(source, world, purpose):
         "payment_entry": "Payment entry",
         "purchase_confidence": "Confident purchase",
     }
-    for referent_id, label in referents.items():
-        world.add_referent(referent_id, label=label)
-
-    world.add_obligation(
-        "O7",
-        question="What should dominate visual hierarchy at checkout commitment?",
-        reason="A candidate is recorded, but no resolver runs in this slice.",
-    )
-    world.add_obligation(
-        "O8",
-        question="What critical order information must remain available during payment entry?",
-        reason="A candidate is recorded, but no resolver runs in this slice.",
-    )
-    world.add_obligation(
-        "O9",
-        question="What should support confident purchase at checkout commitment?",
-        reason="A candidate is recorded, but no resolver runs in this slice.",
-    )
+    for referent_id in relevant_referents:
+        world.add_referent(
+            referent_id,
+            label=referent_labels.get(referent_id, referent_id.replace("_", " ")),
+        )
+    for obligation in generated_obligations:
+        world.add_obligation(
+            obligation.obligation_id,
+            question=obligation.question,
+            reason=obligation.reason,
+        )
 
     design_roles = {
         "relative_prominence": [
@@ -81,54 +95,66 @@ def construct(source, world, purpose):
         "order-summary and payment-entry regions",
     )
 
-    available = world.assert_tuple(
-        "remains_available_during",
-        {
-            "subject": "order_summary",
-            "activity": "payment_entry",
-            "context": "mobile_checkout",
-        },
-        origin=ConstructionOrigin.MECHANICAL,
-        grounding=AssertionGrounding(
-            observations=(requirements_basis,),
-            construction_method="encoded from an explicit checkout requirement",
-        ),
-    )
-
-    prominent = world.assert_tuple(
-        "relative_prominence",
-        {
-            "more": "order_total",
-            "less": "promo_code",
-            "context": "checkout_commitment",
-        },
-        origin=ConstructionOrigin.SEMANTIC,
-        grounding=AssertionGrounding(
-            observations=(requirements_basis, implementation_basis),
-            construction_method=(
-                "agent design judgment: make the amount due more prominent than "
-                "the optional promo action at the commitment point"
-            ),
-            extra={"basis": "requirements plus checkout structure"},
-        ),
-    )
-
-    supports_confidence = world.assert_tuple(
-        "supports",
-        {
-            "subject": "order_summary",
-            "goal": "purchase_confidence",
-            "context": "checkout_commitment",
-        },
-        origin=ConstructionOrigin.SEMANTIC,
-        grounding=AssertionGrounding(
-            observations=(requirements_basis, implementation_basis),
-            construction_method=(
-                "agent design judgment: visible order summary supports confident purchase"
-            ),
-            extra={"basis": "requirements plus checkout structure"},
-        ),
-    )
+    commitments = {}
+    for obligation in generated_obligations:
+        values = obligation.binding_map
+        if obligation.dimension == "availability":
+            commitments[obligation.obligation_id] = world.assert_tuple(
+                "remains_available_during",
+                {
+                    "subject": values["subject"],
+                    "activity": values["activity"],
+                    "context": values["context"],
+                },
+                origin=ConstructionOrigin.MECHANICAL,
+                grounding=AssertionGrounding(
+                    observations=(requirements_basis, implementation_basis),
+                    construction_method=(
+                        "candidate encoded from the explicit requirement; current "
+                        "frontend structure is evidence, not law"
+                    ),
+                    extra={
+                        "basis": "requirements plus current structural model",
+                        "current_present_during": list(structure.present_during),
+                    },
+                ),
+            )
+        elif obligation.dimension == "priority":
+            commitments[obligation.obligation_id] = world.assert_tuple(
+                "relative_prominence",
+                {
+                    "more": values["more"],
+                    "less": values["less"],
+                    "context": values["context"],
+                },
+                origin=ConstructionOrigin.SEMANTIC,
+                grounding=AssertionGrounding(
+                    observations=(requirements_basis, implementation_basis),
+                    construction_method=(
+                        "agent design judgment: make the amount due more prominent "
+                        "than the optional promo action at the commitment point"
+                    ),
+                    extra={"basis": "requirements plus current structural model"},
+                ),
+            )
+        elif obligation.dimension == "goal_support":
+            commitments[obligation.obligation_id] = world.assert_tuple(
+                "supports",
+                {
+                    "subject": values["subject"],
+                    "goal": values["goal"],
+                    "context": values["context"],
+                },
+                origin=ConstructionOrigin.SEMANTIC,
+                grounding=AssertionGrounding(
+                    observations=(requirements_basis, implementation_basis),
+                    construction_method=(
+                        "agent design judgment: visible order summary supports "
+                        "confident purchase"
+                    ),
+                    extra={"basis": "requirements plus current structural model"},
+                ),
+            )
 
     world.declare_relation(
         "candidate_for",
@@ -151,11 +177,7 @@ def construct(source, world, purpose):
         observations=(),
         construction_method="constructor records candidate relationship",
     )
-    for obligation_id, commitment in (
-        ("O7", prominent),
-        ("O8", available),
-        ("O9", supports_confidence),
-    ):
+    for obligation_id, commitment in sorted(commitments.items()):
         world.assert_tuple(
             "candidate_for",
             {

@@ -69,6 +69,26 @@ def _admission_path(db_path: Path) -> Path:
     return db_path.with_suffix(".admission.json")
 
 
+def _governance_path(db_path: Path) -> Path:
+    """`world.sqlite` -> `world.governance.json`, the application law artifact."""
+    return db_path.with_suffix(".governance.json")
+
+
+def _structure_path(db_path: Path) -> Path:
+    """`world.sqlite` -> `world.structure.json`, the bounded model artifact."""
+    return db_path.with_suffix(".structure.json")
+
+
+def _read_json_sidecar(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
 def world_id_of(db_path: Path | str) -> str:
     """The WorldStore id a world file already carries.
 
@@ -115,6 +135,8 @@ class WorldExplorerAdapter:
         purpose = _purpose_path(self.path)
         if purpose.exists():
             self._purpose_document = json.loads(purpose.read_text(encoding="utf-8"))
+        self._governance_document = _read_json_sidecar(_governance_path(self.path))
+        self._structure_document = _read_json_sidecar(_structure_path(self.path))
 
     def close(self) -> None:
         """Release the world without writing to it.
@@ -280,7 +302,18 @@ class WorldExplorerAdapter:
             "world_id": self._world.world_id,
             "revision": self._store.revision,
             "contract": self._world.contract_identity(),
+            "governance": (
+                self._governance_document or {}
+            ).get("identity"),
         }
+
+    def governance(self) -> dict[str, Any] | None:
+        """The application Governance Law artifact, when one was published."""
+        return self._governance_document
+
+    def structure(self) -> dict[str, Any] | None:
+        """The bounded descriptive frontend structure, when one was published."""
+        return self._structure_document
 
     def overview(self) -> dict[str, Any]:
         described = self._described()
@@ -302,6 +335,9 @@ class WorldExplorerAdapter:
             "world_id": self._world.world_id,
             "revision": self._store.revision,
             "contract": self._world.contract_identity(),
+            "governance": (
+                self._governance_document or {}
+            ).get("identity"),
             "relations": len(described),
             "referents": counts["referents"],
             "assertions": counts["assertions"],

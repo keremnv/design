@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
+from typing import Any
 
 from ontology_author.world.core.contract import Contract
 from ontology_author.world.runtime.commit import RunResult
@@ -39,10 +40,11 @@ def rebuild(
     *,
     construction: Path | str | None = None,
     contract: Contract | None = None,
+    governance: Any | None = None,
 ) -> RunResult:
     """Construct, validate, and replace this World's sealed bundle."""
 
-    project = Project(workspace, contract=contract)
+    project = Project(workspace, contract=contract, governance=governance)
     result = project.run(construction)
     payload = {
         "succeeded": bool(result.succeeded),

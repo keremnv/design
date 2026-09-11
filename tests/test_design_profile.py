@@ -8,12 +8,14 @@ from ontology_author.world.core.model import Role, RoleType
 from ontology_author.world.core.origins import ConstructionOrigin
 from ontology_author.world.explorer import WorldExplorerAdapter
 from ontology_author.world.runtime.entry import rebuild
+from ontology_author.world.server import build_app
 
 from profiles.design_checkout import (
     DESIGN_CONTRACT,
-    DESIGN_OBLIGATIONS,
+    DESIGN_LAW,
     DESIGN_REFERENTS,
     DESIGN_RELATIONS,
+    extract_frontend_structure,
 )
 
 
@@ -36,9 +38,20 @@ def _assertion_id(world, relation: str) -> str:
     )
 
 
+def _generated_obligations(root: Path):
+    structure = extract_frontend_structure(
+        (root / "Checkout.tsx").read_text(encoding="utf-8")
+    )
+    return {
+        obligation.obligation_id: obligation
+        for obligation in DESIGN_LAW.enumerate_obligations(structure)
+    }
+
+
 def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
     root = _copy_fixture(tmp_path)
-    result = rebuild(root, contract=DESIGN_CONTRACT)
+    expected_obligations = _generated_obligations(root)
+    result = rebuild(root, contract=DESIGN_CONTRACT, governance=DESIGN_LAW)
     assert result.succeeded, result.errors
 
     world = Project(root).open_world()
@@ -50,18 +63,15 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
         assert {
             row["id"] for row in world.query("SELECT id FROM _world_referents")
         } == set(DESIGN_REFERENTS)
-        assert world.obligations() == [
-            {
-                "obligation_id": obligation_id,
-                "question": question,
-                "state": "UNRESOLVED",
-                "reason": "A candidate is recorded, but no resolver runs in this slice.",
-                "contract_id": "design-mobile-checkout",
-                "contract_revision": "1",
-                "created_revision": world.obligation(obligation_id)["created_revision"],
-            }
-            for obligation_id, question in sorted(DESIGN_OBLIGATIONS.items())
-        ]
+        actual_obligations = {item["obligation_id"]: item for item in world.obligations()}
+        assert set(actual_obligations) == set(expected_obligations)
+        for obligation_id, generated in expected_obligations.items():
+            actual = actual_obligations[obligation_id]
+            assert actual["question"] == generated.question
+            assert actual["reason"] == generated.reason
+            assert actual["state"] == "UNRESOLVED"
+            assert actual["contract_id"] == "design-mobile-checkout"
+            assert actual["contract_revision"] == "1"
 
         assert world.relation_rows("relative_prominence") == [
             {
@@ -89,7 +99,7 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
         available_id = _assertion_id(world, "remains_available_during")
         supports_id = _assertion_id(world, "supports")
         candidate_rows = world.relation_rows("candidate_for")
-        assert {row["obligation"] for row in candidate_rows} == set(DESIGN_OBLIGATIONS)
+        assert {row["obligation"] for row in candidate_rows} == set(expected_obligations)
         assert {row["commitment"] for row in candidate_rows} == {
             prominent_id,
             available_id,
@@ -115,7 +125,7 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
             "WORLD",
         }
         assert any(
-            "explicit checkout requirement"
+            "explicit requirement"
             in str(base.get("detail", {}).get("construction_method", ""))
             for base in available_warrant["bases"]
             if base["kind"] == "WORLD"
@@ -130,6 +140,8 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
             "contract_id": "design-mobile-checkout",
             "contract_revision": "1",
         }
+        assert explorer.identity()["governance"] == DESIGN_LAW.identity()
+        assert explorer.governance()["identity"] == DESIGN_LAW.identity()
         assert {item["id"] for item in explorer.referents()} == set(DESIGN_REFERENTS)
 
         schema = {item["name"]: item for item in explorer.schema()}
@@ -157,12 +169,48 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
 
         demand = explorer.demand()
         assert demand is not None
-        assert demand["demanded"] == len(DESIGN_OBLIGATIONS)
-        assert len(demand["obligations"]) == len(DESIGN_OBLIGATIONS)
+        assert demand["demanded"] == len(expected_obligations)
+        assert len(demand["obligations"]) == len(expected_obligations)
         for obligation in demand["obligations"]:
             assert obligation["state"] == "UNRESOLVED"
             assert obligation["reason"]
             assert len(obligation["candidates"]) == 1
+
+        structure = explorer.structure()
+        assert structure is not None
+        assert structure["parser"]["kind"] == "bounded-react-jsx-attribute-adapter"
+        assert {node["id"] for node in structure["nodes"]} >= {
+            "mobile_checkout",
+            "checkout_commitment",
+            "order_summary",
+            "payment_entry",
+            "order_total",
+            "promo_code",
+        }
+        assert {
+            (item["subject"], item["context"])
+            for item in structure["present_during"]
+        } >= {
+            ("order_summary", "checkout_commitment"),
+            ("payment_entry", "checkout_commitment"),
+        }
+        assert ("order_summary", "payment_entry") not in {
+            (item["subject"], item["context"])
+            for item in structure["present_during"]
+        }
+
+        # Current structure is evidence for the availability candidate; it does
+        # not transition the generated question out of UNRESOLVED.
+        availability_id = next(
+            item_id
+            for item_id, item in expected_obligations.items()
+            if item.dimension == "availability"
+        )
+        assert next(
+            item["obligation_id"]
+            for item in demand["obligations"]
+            if item["obligation_id"] == availability_id
+        ) == availability_id
 
         prominent_id = explorer.rows("relative_prominence")["rows"][0]["assertion_id"]
         commitment = explorer.assertion(prominent_id)
@@ -173,7 +221,15 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
             "context": "checkout_commitment",
         }
         assert commitment["warrant"]["recorded_construction_origin"] == "SEMANTIC"
-        assert explorer.rows("candidate_for")["total"] == len(DESIGN_OBLIGATIONS)
+        assert explorer.rows("candidate_for")["total"] == len(expected_obligations)
+
+    from starlette.testclient import TestClient
+
+    with TestClient(build_app(root / "world" / "world.sqlite")) as client:
+        assert client.get("/world/governance").json()["identity"] == DESIGN_LAW.identity()
+        assert client.get("/world/structure").json()["parser"]["kind"] == (
+            "bounded-react-jsx-attribute-adapter"
+        )
 
 
 def test_design_contract_rejects_unlisted_semantic_decisions(tmp_path):

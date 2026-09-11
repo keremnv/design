@@ -47,6 +47,7 @@ class Project:
         *,
         project_root: Path | str | None = None,
         contract: Contract | None = None,
+        governance: Any | None = None,
         constructor_authority: Any | None = None,
     ) -> None:
         self.root = Path(root)
@@ -58,6 +59,7 @@ class Project:
         self.candidate_dir = self.root / "candidate"
         self.world_dir = self.root / "world"
         self.contract = contract or Contract.default()
+        self.governance = governance
         self.constructor_authority = constructor_authority
 
     @staticmethod
@@ -90,7 +92,9 @@ class Project:
             ensure_failure_relation(world)
             purpose = Purpose(world, text=purpose_text)
             source = Source(self.project_root)
-            namespace = _construction_namespace(source, world, purpose, self.contract)
+            namespace = _construction_namespace(
+                source, world, purpose, self.contract, self.governance
+            )
             if not construction_path.exists():
                 raise ConstructionError("construction.py missing")
             code = construction_path.read_text(encoding="utf-8")
@@ -110,7 +114,11 @@ class Project:
                         sys.path.remove(path)
                     except ValueError:
                         pass
-            write_sidecars(world, purpose.payload())
+            write_sidecars(
+                world,
+                purpose.payload(),
+                _governance_payload(self.governance),
+            )
             report = validate_contract_admission(world)
             world.close()
             world = None  # type: ignore[assignment]
@@ -173,6 +181,7 @@ def _construction_namespace(
     world: ConstructionWorld,
     purpose: Purpose,
     contract: Contract,
+    governance: Any | None,
 ) -> dict[str, Any]:
     return {
         "Source": Source,
@@ -181,6 +190,7 @@ def _construction_namespace(
         "purpose": purpose,
         "Contract": Contract,
         "contract": contract,
+        "governance": governance,
         "constructor_authority": world.constructor_authority,
         "Role": Role,
         "RoleType": RoleType,
@@ -194,6 +204,20 @@ def _construction_namespace(
         "GroundingError": GroundingError,
         "ConstructionError": ConstructionError,
     }
+
+
+def _governance_payload(governance: Any | None) -> dict[str, Any] | None:
+    if governance is None:
+        return None
+    inspector = getattr(governance, "inspection_payload", None)
+    if not callable(inspector):
+        raise ConstructionError(
+            "governance must provide inspection_payload() for sealed-world inspection"
+        )
+    payload = inspector()
+    if not isinstance(payload, dict):
+        raise ConstructionError("governance inspection_payload() must return a mapping")
+    return payload
 
 
 __all__ = ["Project", "WORLD_ID"]

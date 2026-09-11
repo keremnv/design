@@ -11,6 +11,13 @@ from __future__ import annotations
 from ontology_author.world import Contract
 from ontology_author.world.core.origins import ConstructionOrigin
 
+from .governance import (
+    GovernanceBinding,
+    GovernanceProfile,
+    GovernedDimension,
+)
+from .structure import NodeSelector
+
 
 DESIGN_REFERENTS = (
     "mobile_checkout",
@@ -36,11 +43,76 @@ DESIGN_RELATIONS = {
 DESIGN_RELATION_NAMES = tuple(DESIGN_RELATIONS)
 
 
-DESIGN_OBLIGATIONS = {
-    "O7": "What should dominate visual hierarchy at checkout commitment?",
-    "O8": "What critical order information must remain available during payment entry?",
-    "O9": "What should support confident purchase at checkout commitment?",
-}
+DESIGN_LAW = GovernanceProfile(
+    "design-mobile-checkout-law",
+    "1",
+    dimensions=(
+        GovernedDimension(
+            "availability",
+            bindings=(
+                GovernanceBinding(
+                    "subject",
+                    selector=NodeSelector("data-region", "order-summary", "region"),
+                ),
+                GovernanceBinding(
+                    "activity",
+                    selector=NodeSelector("data-region", "payment-entry", "region"),
+                ),
+                GovernanceBinding(
+                    "context",
+                    selector=NodeSelector("data-screen", "mobile-checkout", "surface"),
+                ),
+            ),
+            question_template=(
+                "What availability relationship should hold between {subject} "
+                "and {activity} in {context}?"
+            ),
+        ),
+        GovernedDimension(
+            "priority",
+            bindings=(
+                GovernanceBinding(
+                    "more",
+                    selector=NodeSelector("data-field", "order-total", "element"),
+                ),
+                GovernanceBinding(
+                    "less",
+                    selector=NodeSelector("data-action", "promo-code", "interaction"),
+                ),
+                GovernanceBinding(
+                    "context",
+                    selector=NodeSelector(
+                        "data-context", "checkout-commitment", "context"
+                    ),
+                ),
+            ),
+            question_template=(
+                "What should dominate visual hierarchy between {more} and {less} "
+                "at {context}?"
+            ),
+        ),
+        GovernedDimension(
+            "goal_support",
+            bindings=(
+                GovernanceBinding(
+                    "subject",
+                    selector=NodeSelector("data-region", "order-summary", "region"),
+                ),
+                GovernanceBinding("goal", fixed_value="purchase_confidence"),
+                GovernanceBinding(
+                    "context",
+                    selector=NodeSelector(
+                        "data-context", "checkout-commitment", "context"
+                    ),
+                ),
+            ),
+            question_template=(
+                "What should support {goal} at {context}, and how should "
+                "{subject} contribute?"
+            ),
+        ),
+    ),
+)
 
 
 DESIGN_CONTRACT = Contract(

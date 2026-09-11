@@ -57,7 +57,11 @@ def validate_world_base_source(world: ConstructionWorld) -> ValidationReport:
     return validate_contract_admission(world)
 
 
-def write_sidecars(world: ConstructionWorld, purpose_payload: dict[str, Any]) -> None:
+def write_sidecars(
+    world: ConstructionWorld,
+    purpose_payload: dict[str, Any],
+    governance_payload: dict[str, Any] | None = None,
+) -> None:
     directory = world.path.parent
     (directory / "world.admission.json").write_text(
         json.dumps(world.admission_payload(), indent=2, sort_keys=True) + "\n",
@@ -67,6 +71,11 @@ def write_sidecars(world: ConstructionWorld, purpose_payload: dict[str, Any]) ->
         json.dumps(purpose_payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    if governance_payload is not None:
+        (directory / "world.governance.json").write_text(
+            json.dumps(governance_payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
 
 
 def _replace_candidate(candidate: Path, world: Path) -> None:
