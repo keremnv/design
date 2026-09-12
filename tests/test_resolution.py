@@ -12,7 +12,12 @@ from ontology_author.world.runtime.commit import fingerprint_world
 from ontology_author.world.runtime.entry import rebuild
 from ontology_author.world.server import build_app
 
-from profiles.design_checkout import DESIGN_CONTRACT, DESIGN_LAW
+from profiles.design_checkout import (
+    DESIGN_CONTRACT,
+    DESIGN_EVIDENCE_AUTHORITY,
+    DESIGN_LAW,
+    load_evidence_authority,
+)
 
 
 FIXTURE = Path(__file__).parents[1] / "profiles" / "design_checkout" / "fixture"
@@ -56,28 +61,44 @@ def construct(source, world, purpose):
             "activity": "payment_entry",
             "context": "mobile_checkout",
         }
-        authorities = candidate.get("authorities", [candidate["authority"]])
+        supports = candidate.get("supports")
+        if supports is None:
+            supports = [candidate.get("support", "agent")]
         commitment = None
-        for authority in authorities:
+        for support in supports:
             observations = ()
-            if authority == "APPROVED_REQUIREMENT":
+            if support == "approved_requirement":
                 observations = (
                     SourceObservation(
-                        provider="fixture",
+                        provider="file",
                         native_handle="checkout-requirements.md",
-                        source_revision="requirements-r1",
+                        source_revision=source.file_hash("checkout-requirements.md"),
                         native_location="approved availability requirement",
                     ),
                 )
-            elif authority == "IMPLEMENTATION_OBSERVATION":
+            elif support == "implementation":
                 observations = (
                     SourceObservation(
-                        provider="fixture",
+                        provider="file",
                         native_handle="Checkout.tsx",
-                        source_revision="checkout-r1",
+                        source_revision=source.file_hash("Checkout.tsx"),
                         native_location="current availability manifestation",
                     ),
                 )
+            elif support == "unbound":
+                observations = (
+                    SourceObservation(
+                        provider="file",
+                        native_handle="unbound-evidence.md",
+                        source_revision="unbound-r1",
+                        native_location="unbound evidence",
+                    ),
+                )
+            elif support != "agent":
+                raise ValueError(f"unknown scenario support {support!r}")
+            extra = {"interpretation": "bounded resolution scenario fixture"}
+            if candidate.get("claimed_authority"):
+                extra["claimed_authority"] = candidate["claimed_authority"]
             commitment = world.assert_tuple(
                 relation,
                 values,
@@ -85,7 +106,7 @@ def construct(source, world, purpose):
                 grounding=AssertionGrounding(
                     observations=observations,
                     construction_method="bounded resolution scenario fixture",
-                    extra={"resolution_authority": authority},
+                    extra=extra,
                 ),
             )
         commitments.append(commitment.assertion_id)
@@ -131,22 +152,27 @@ def _scenario_root(tmp_path: Path, *, candidates: list[dict]) -> Path:
 
 
 def _evaluate(root: Path):
-    result = rebuild(root, contract=DESIGN_CONTRACT, governance=DESIGN_LAW)
+    result = rebuild(
+        root,
+        contract=DESIGN_CONTRACT,
+        governance=DESIGN_LAW,
+        evidence_authority=DESIGN_EVIDENCE_AUTHORITY,
+    )
     assert result.succeeded, result.errors
     world = Project(root).open_world()
     return result, world
 
 
 @pytest.mark.parametrize(
-    ("authority", "expected_status"),
+    ("support", "expected_status"),
     [
-        ("IMPLEMENTATION_OBSERVATION", "INSUFFICIENT_WARRANT"),
-        ("AGENT_JUDGMENT", "INSUFFICIENT_WARRANT"),
+        ("implementation", "INSUFFICIENT_WARRANT"),
+        ("agent", "INSUFFICIENT_WARRANT"),
     ],
 )
 def test_admitted_candidate_without_authoritative_warrant_stays_unresolved(
     tmp_path: Path,
-    authority: str,
+    support: str,
     expected_status: str,
 ):
     root = _scenario_root(
@@ -154,7 +180,7 @@ def test_admitted_candidate_without_authoritative_warrant_stays_unresolved(
         candidates=[
             {
                 "relation": "remains_available_during",
-                "authority": authority,
+                "support": support,
             }
         ],
     )
@@ -178,7 +204,7 @@ def test_authoritative_requirement_resolves_and_survives_reopen_and_read_surface
         candidates=[
             {
                 "relation": "remains_available_during",
-                "authority": "APPROVED_REQUIREMENT",
+                "support": "approved_requirement",
             }
         ],
     )
@@ -190,6 +216,14 @@ def test_authoritative_requirement_resolves_and_survives_reopen_and_read_surface
         assert resolution["status"] == "RESOLVED"
         assert resolution["selected_commitment_id"] == commitment_id
         assert resolution["candidate_assessments"][0]["status"] == "SUFFICIENT"
+        assessment = resolution["candidate_assessments"][0]
+        assert assessment["warrant_authorities"] == ["APPROVED_REQUIREMENT"]
+        assert assessment["authority_basis"][0]["source_id"] == (
+            "file://checkout-requirements.md"
+        )
+        assert assessment["authority_basis"][0]["authority_id"] == (
+            "design-mobile-checkout-evidence"
+        )
     finally:
         world.close()
 
@@ -199,6 +233,20 @@ def test_authoritative_requirement_resolves_and_survives_reopen_and_read_surface
         assert item["resolution"]["status"] == "RESOLVED"
         assert item["resolution"]["selected_commitment_id"] == commitment_id
         assert explorer.resolution("O7")["status"] == "RESOLVED"
+        assert explorer.evidence_authority()["identity"] == {
+            "authority_id": "design-mobile-checkout-evidence",
+            "revision": "1",
+        }
+        assert explorer.evidence_authority()["bindings"] == [
+            {
+                "authority": "APPROVED_REQUIREMENT",
+                "source_id": "file://checkout-requirements.md",
+            },
+            {
+                "authority": "IMPLEMENTATION_OBSERVATION",
+                "source_id": "file://Checkout.tsx",
+            },
+        ]
 
     from starlette.testclient import TestClient
 
@@ -207,6 +255,112 @@ def test_authoritative_requirement_resolves_and_survives_reopen_and_read_surface
         assert payload["status"] == "RESOLVED"
         obligations = client.get("/world/obligations").json()
         assert obligations["resolutions"]["O7"]["status"] == "RESOLVED"
+        assert client.get("/world/evidence-authority").json()["identity"] == {
+            "authority_id": "design-mobile-checkout-evidence",
+            "revision": "1",
+        }
+
+
+def test_removing_external_authority_binding_changes_the_same_candidate_to_insufficient(
+    tmp_path: Path,
+):
+    root = _scenario_root(
+        tmp_path,
+        candidates=[
+            {
+                "relation": "remains_available_during",
+                "support": "approved_requirement",
+            }
+        ],
+    )
+    _result, world = _evaluate(root)
+    try:
+        commitment_id = world.relation_rows("candidate_for")[0]["commitment"]
+        warrant_before = world.warrant_for_assertion(commitment_id)
+        assert world.resolution("O7")["status"] == "RESOLVED"
+    finally:
+        world.close()
+
+    manifest_path = root / "evidence-authorities.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["bindings"] = [
+        item
+        for item in manifest["bindings"]
+        if item["source_id"] != "file://checkout-requirements.md"
+    ]
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    reduced_authority = load_evidence_authority(root)
+    result = rebuild(
+        root,
+        contract=DESIGN_CONTRACT,
+        governance=DESIGN_LAW,
+        evidence_authority=reduced_authority,
+    )
+    assert result.succeeded, result.errors
+    world = Project(root).open_world()
+    try:
+        assert world.relation_rows("candidate_for")[0]["commitment"] == commitment_id
+        assert world.warrant_for_assertion(commitment_id) == warrant_before
+        resolution = world.resolution("O7")
+        assert resolution["status"] == "INSUFFICIENT_WARRANT"
+        assert resolution["candidate_assessments"][0]["authority_basis"] == []
+        assert resolution["candidate_assessments"][0]["warrant_authorities"] == []
+    finally:
+        world.close()
+
+
+def test_constructor_claimed_authority_cannot_create_sufficient_evidence(
+    tmp_path: Path,
+):
+    root = _scenario_root(
+        tmp_path,
+        candidates=[
+            {
+                "relation": "remains_available_during",
+                "support": "agent",
+                "claimed_authority": "APPROVED_REQUIREMENT",
+            }
+        ],
+    )
+    _result, world = _evaluate(root)
+    try:
+        commitment_id = world.relation_rows("candidate_for")[0]["commitment"]
+        resolution = world.resolution("O7")
+        assert resolution["status"] == "INSUFFICIENT_WARRANT"
+        assert resolution["candidate_assessments"][0]["authority_basis"] == []
+        warrant = world.warrant_for_assertion(commitment_id)
+        world_bases = [item for item in warrant["bases"] if item["kind"] == "WORLD"]
+        assert world_bases[0]["detail"]["extra"]["claimed_authority"] == (
+            "APPROVED_REQUIREMENT"
+        )
+    finally:
+        world.close()
+
+
+def test_unbound_evidence_remains_inspectable_but_is_insufficient(tmp_path: Path):
+    root = _scenario_root(
+        tmp_path,
+        candidates=[
+            {
+                "relation": "remains_available_during",
+                "support": "unbound",
+            }
+        ],
+    )
+    _result, world = _evaluate(root)
+    try:
+        commitment_id = world.relation_rows("candidate_for")[0]["commitment"]
+        resolution = world.resolution("O7")
+        assert resolution["status"] == "INSUFFICIENT_WARRANT"
+        assert resolution["candidate_assessments"][0]["authority_basis"] == []
+        warrant = world.warrant_for_assertion(commitment_id)
+        assert any(
+            base["kind"] == "SOURCE"
+            and base["detail"]["native_handle"] == "unbound-evidence.md"
+            for base in warrant["bases"]
+        )
+    finally:
+        world.close()
 
 
 def test_no_candidate_is_a_persisted_unresolved_resolution(tmp_path: Path):
@@ -234,11 +388,11 @@ def test_two_sufficient_incompatible_answers_are_conflict_without_selection(
         candidates=[
             {
                 "relation": "remains_available_during",
-                "authority": "APPROVED_REQUIREMENT",
+                "support": "approved_requirement",
             },
             {
                 "relation": "does_not_remain_available_during",
-                "authority": "APPROVED_REQUIREMENT",
+                "support": "approved_requirement",
             },
         ],
     )
@@ -263,11 +417,11 @@ def test_sufficient_answer_is_not_defeated_by_incompatible_weak_candidate(
         candidates=[
             {
                 "relation": "remains_available_during",
-                "authority": "APPROVED_REQUIREMENT",
+                "support": "approved_requirement",
             },
             {
                 "relation": "does_not_remain_available_during",
-                "authority": "IMPLEMENTATION_OBSERVATION",
+                "support": "implementation",
             },
         ],
     )
@@ -292,8 +446,7 @@ def test_same_proposition_with_multiple_support_paths_has_one_commitment(
         candidates=[
             {
                 "relation": "remains_available_during",
-                "authority": "AGENT_JUDGMENT",
-                "authorities": ["AGENT_JUDGMENT", "APPROVED_REQUIREMENT"],
+                "supports": ["agent", "approved_requirement"],
             }
         ],
     )
@@ -322,11 +475,16 @@ def test_resolution_failure_preserves_previous_sealed_world(tmp_path: Path):
         candidates=[
             {
                 "relation": "remains_available_during",
-                "authority": "APPROVED_REQUIREMENT",
+                "support": "approved_requirement",
             }
         ],
     )
-    assert rebuild(root, contract=DESIGN_CONTRACT, governance=DESIGN_LAW).succeeded
+    assert rebuild(
+        root,
+        contract=DESIGN_CONTRACT,
+        governance=DESIGN_LAW,
+        evidence_authority=DESIGN_EVIDENCE_AUTHORITY,
+    ).succeeded
     before = fingerprint_world(root / "world")
 
     broken = (root / "construction.py").read_text(encoding="utf-8")
@@ -335,6 +493,11 @@ def test_resolution_failure_preserves_previous_sealed_world(tmp_path: Path):
         '"obligation": "missing", "commitment": commitment_id',
     )
     (root / "construction.py").write_text(broken, encoding="utf-8")
-    result = rebuild(root, contract=DESIGN_CONTRACT, governance=DESIGN_LAW)
+    result = rebuild(
+        root,
+        contract=DESIGN_CONTRACT,
+        governance=DESIGN_LAW,
+        evidence_authority=DESIGN_EVIDENCE_AUTHORITY,
+    )
     assert not result.succeeded
     assert fingerprint_world(root / "world") == before

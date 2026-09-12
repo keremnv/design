@@ -10,6 +10,7 @@ from ontology_author.world.runtime.entry import rebuild
 
 from profiles.design_checkout import (
     DESIGN_CONTRACT,
+    DESIGN_EVIDENCE_AUTHORITY,
     DESIGN_LAW,
     adopt_governance_law,
     compile_governance_law,
@@ -190,11 +191,17 @@ def test_same_frontend_different_law_produces_different_obligation_sets(tmp_path
     reduced_root = tmp_path / "reduced"
     shutil.copytree(FIXTURE, full_root)
     shutil.copytree(FIXTURE, reduced_root)
-    assert rebuild(full_root, contract=DESIGN_CONTRACT, governance=DESIGN_LAW).succeeded
+    assert rebuild(
+        full_root,
+        contract=DESIGN_CONTRACT,
+        governance=DESIGN_LAW,
+        evidence_authority=DESIGN_EVIDENCE_AUTHORITY,
+    ).succeeded
     assert rebuild(
         reduced_root,
         contract=DESIGN_CONTRACT,
         governance=without_availability,
+        evidence_authority=DESIGN_EVIDENCE_AUTHORITY,
     ).succeeded
     full_world = Project(full_root).open_world()
     reduced_world = Project(reduced_root).open_world()

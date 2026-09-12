@@ -123,7 +123,6 @@ def construct(source, world, purpose):
                     ),
                     extra={
                         "basis": "requirements plus current structural model",
-                        "resolution_authority": "APPROVED_REQUIREMENT",
                         "current_present_during": list(structure.present_during),
                     },
                 ),
@@ -138,14 +137,18 @@ def construct(source, world, purpose):
                 },
                 origin=ConstructionOrigin.SEMANTIC,
                 grounding=AssertionGrounding(
-                    observations=(requirements_basis, implementation_basis),
+                    # The requirements explicitly leave priority to design
+                    # judgment.  Only the current implementation is evidence
+                    # for this candidate; the approved requirement source does
+                    # not support a priority answer.
+                    observations=(implementation_basis,),
                     construction_method=(
                         "agent design judgment: make the amount due more prominent "
                         "than the optional promo action at the commitment point"
                     ),
                     extra={
                         "basis": "requirements plus current structural model",
-                        "resolution_authority": "AGENT_JUDGMENT",
+                        "interpretation": "agent semantic judgment",
                     },
                 ),
             )
@@ -159,14 +162,18 @@ def construct(source, world, purpose):
                 },
                 origin=ConstructionOrigin.SEMANTIC,
                 grounding=AssertionGrounding(
-                    observations=(requirements_basis, implementation_basis),
+                    # The requirements do not establish this means-to-goal
+                    # determination either.  Keep the implementation as
+                    # observational evidence without laundering it into an
+                    # approved requirement.
+                    observations=(implementation_basis,),
                     construction_method=(
                         "agent design judgment: visible order summary supports "
                         "confident purchase"
                     ),
                     extra={
                         "basis": "requirements plus current structural model",
-                        "resolution_authority": "AGENT_JUDGMENT",
+                        "interpretation": "agent semantic judgment",
                     },
                 ),
             )

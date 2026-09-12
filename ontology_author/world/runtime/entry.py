@@ -41,10 +41,16 @@ def rebuild(
     construction: Path | str | None = None,
     contract: Contract | None = None,
     governance: Any | None = None,
+    evidence_authority: Any | None = None,
 ) -> RunResult:
     """Construct, validate, and replace this World's sealed bundle."""
 
-    project = Project(workspace, contract=contract, governance=governance)
+    project = Project(
+        workspace,
+        contract=contract,
+        governance=governance,
+        evidence_authority=evidence_authority,
+    )
     result = project.run(construction)
     payload = {
         "succeeded": bool(result.succeeded),

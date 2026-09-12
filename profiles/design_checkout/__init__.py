@@ -2,12 +2,18 @@
 
 from .profile import (
     DESIGN_CONTRACT,
+    DESIGN_EVIDENCE_AUTHORITY,
     DESIGN_LAW,
     DESIGN_REFERENTS,
     DESIGN_RELATIONS,
     DESIGN_RELATION_NAMES,
     design_commitments_conflict,
     load_design_law,
+)
+from .authority import (
+    EvidenceAuthorityBinding,
+    EvidenceAuthorityConfiguration,
+    load_evidence_authority,
 )
 from .governance import (
     AuthoritativeLawSources,
@@ -33,12 +39,16 @@ from .structure import (
 
 __all__ = [
     "DESIGN_CONTRACT",
+    "DESIGN_EVIDENCE_AUTHORITY",
     "DESIGN_LAW",
     "DESIGN_REFERENTS",
     "DESIGN_RELATIONS",
     "DESIGN_RELATION_NAMES",
     "design_commitments_conflict",
     "load_design_law",
+    "EvidenceAuthorityBinding",
+    "EvidenceAuthorityConfiguration",
+    "load_evidence_authority",
     "AuthoritativeLawSources",
     "COMPILER_ID",
     "FrontendStructure",

@@ -84,6 +84,11 @@ def _obligations_path(db_path: Path) -> Path:
     return db_path.with_suffix(".obligations.json")
 
 
+def _evidence_authority_path(db_path: Path) -> Path:
+    """`world.sqlite` -> the selected evidence-authority configuration."""
+    return db_path.with_suffix(".evidence-authority.json")
+
+
 def _read_json_sidecar(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
@@ -143,6 +148,9 @@ class WorldExplorerAdapter:
         self._governance_document = _read_json_sidecar(_governance_path(self.path))
         self._structure_document = _read_json_sidecar(_structure_path(self.path))
         self._obligations_document = _read_json_sidecar(_obligations_path(self.path))
+        self._evidence_authority_document = _read_json_sidecar(
+            _evidence_authority_path(self.path)
+        )
 
     def close(self) -> None:
         """Release the world without writing to it.
@@ -304,7 +312,7 @@ class WorldExplorerAdapter:
         construction origins. Nothing that only needs the name should pay for
         that.
         """
-        return {
+        payload: dict[str, Any] = {
             "world_id": self._world.world_id,
             "revision": self._store.revision,
             "contract": self._world.contract_identity(),
@@ -312,10 +320,19 @@ class WorldExplorerAdapter:
                 self._governance_document or {}
             ).get("identity"),
         }
+        if self._evidence_authority_document is not None:
+            payload["evidence_authority"] = (
+                self._evidence_authority_document.get("identity")
+            )
+        return payload
 
     def governance(self) -> dict[str, Any] | None:
         """The application Governance Law artifact, when one was published."""
         return self._governance_document
+
+    def evidence_authority(self) -> dict[str, Any] | None:
+        """The externally selected evidence-authority artifact, when published."""
+        return self._evidence_authority_document
 
     def structure(self) -> dict[str, Any] | None:
         """The bounded descriptive frontend structure, when one was published."""
@@ -352,7 +369,7 @@ class WorldExplorerAdapter:
             if record["completeness"]
             and record["completeness"]["status"] != "COMPLETE"
         ]
-        return {
+        payload: dict[str, Any] = {
             "world_id": self._world.world_id,
             "revision": self._store.revision,
             "contract": self._world.contract_identity(),
@@ -367,6 +384,11 @@ class WorldExplorerAdapter:
             "incomplete": incomplete,
             "demand": self._demand_overview(),
         }
+        if self._evidence_authority_document is not None:
+            payload["evidence_authority"] = (
+                self._evidence_authority_document.get("identity")
+            )
+        return payload
 
     def _demand_overview(self) -> dict[str, Any] | None:
         frontier = self._purpose_frontier()

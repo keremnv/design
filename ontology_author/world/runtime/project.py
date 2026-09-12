@@ -53,6 +53,7 @@ class Project:
         contract: Contract | None = None,
         governance: Any | None = None,
         constructor_authority: Any | None = None,
+        evidence_authority: Any | None = None,
     ) -> None:
         self.root = Path(root)
         self.project_root = (
@@ -65,6 +66,10 @@ class Project:
         self.contract = contract or Contract.default()
         self.governance = governance
         self.constructor_authority = constructor_authority
+        # This is intentionally not exposed to construction.py.  It is an
+        # external runtime binding used only after the candidate has recorded
+        # its Warrant bases.
+        self.evidence_authority = evidence_authority
 
     @staticmethod
     def _infer_project_root(root: Path) -> Path:
@@ -122,6 +127,7 @@ class Project:
                 world,
                 purpose.payload(),
                 _governance_payload(self.governance),
+                _evidence_authority_payload(self.evidence_authority),
             )
             report = validate_contract_admission(world)
             if not report.ok:
@@ -140,6 +146,7 @@ class Project:
                     world,
                     self.contract,
                     conflict_checker=_resolution_conflict_checker(self.governance),
+                    evidence_authority=self.evidence_authority,
                 )
             world.close()
             world = None  # type: ignore[assignment]
@@ -249,6 +256,22 @@ def _resolution_conflict_checker(governance: Any | None) -> Any | None:
         return None
     checker = getattr(governance, "conflict_checker", None)
     return checker if callable(checker) else None
+
+
+def _evidence_authority_payload(authority: Any | None) -> dict[str, Any] | None:
+    if authority is None:
+        return None
+    inspector = getattr(authority, "inspection_payload", None)
+    if not callable(inspector):
+        raise ConstructionError(
+            "evidence_authority must provide inspection_payload() for sealed-world inspection"
+        )
+    payload = inspector()
+    if not isinstance(payload, dict):
+        raise ConstructionError(
+            "evidence_authority inspection_payload() must return a mapping"
+        )
+    return payload
 
 
 __all__ = ["Project", "WORLD_ID"]

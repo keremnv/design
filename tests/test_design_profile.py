@@ -12,6 +12,7 @@ from ontology_author.world.server import build_app
 
 from profiles.design_checkout import (
     DESIGN_CONTRACT,
+    DESIGN_EVIDENCE_AUTHORITY,
     DESIGN_LAW,
     DESIGN_REFERENTS,
     DESIGN_RELATIONS,
@@ -53,7 +54,12 @@ def _generated_obligations(root: Path):
 def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
     root = _copy_fixture(tmp_path)
     expected_obligations, law = _generated_obligations(root)
-    result = rebuild(root, contract=DESIGN_CONTRACT, governance=law)
+    result = rebuild(
+        root,
+        contract=DESIGN_CONTRACT,
+        governance=law,
+        evidence_authority=DESIGN_EVIDENCE_AUTHORITY,
+    )
     assert result.succeeded, result.errors
 
     world = Project(root).open_world()
@@ -154,7 +160,15 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
             "contract_revision": "1",
         }
         assert explorer.identity()["governance"] == law.identity()
+        assert explorer.identity()["evidence_authority"] == {
+            "authority_id": "design-mobile-checkout-evidence",
+            "revision": "1",
+        }
         assert explorer.governance()["identity"] == law.identity()
+        assert explorer.evidence_authority()["identity"] == {
+            "authority_id": "design-mobile-checkout-evidence",
+            "revision": "1",
+        }
         assert explorer.governance()["state"] == "EFFECTIVE"
         assert explorer.governance()["source_selection"]["sources"][0]["source_id"] == (
             "checkout-design-governance"
@@ -262,6 +276,11 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
             "context": "checkout_commitment",
         }
         assert commitment["warrant"]["recorded_construction_origin"] == "SEMANTIC"
+        assert all(
+            "resolution_authority"
+            not in base.get("detail", {}).get("extra", {})
+            for base in commitment["warrant"]["bases"]
+        )
         assert explorer.rows("candidate_for")["total"] == len(expected_obligations)
 
     from starlette.testclient import TestClient
@@ -273,6 +292,10 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
         )
         generated = client.get("/world/obligations").json()
         assert set(generated["obligations"]) == set(expected_obligations)
+        assert client.get("/world/evidence-authority").json()["identity"] == {
+            "authority_id": "design-mobile-checkout-evidence",
+            "revision": "1",
+        }
 
 
 def test_design_contract_rejects_unlisted_semantic_decisions(tmp_path):

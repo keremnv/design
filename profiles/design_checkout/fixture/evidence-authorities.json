@@ -1,0 +1,14 @@
+{
+  "authority_id": "design-mobile-checkout-evidence",
+  "revision": "1",
+  "bindings": [
+    {
+      "source_id": "file://checkout-requirements.md",
+      "authority": "APPROVED_REQUIREMENT"
+    },
+    {
+      "source_id": "file://Checkout.tsx",
+      "authority": "IMPLEMENTATION_OBSERVATION"
+    }
+  ]
+}

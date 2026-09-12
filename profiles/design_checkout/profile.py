@@ -21,6 +21,7 @@ from .governance import (
     compile_governance_law,
     select_authoritative_sources,
 )
+from .authority import load_evidence_authority
 
 
 DESIGN_REFERENTS = (
@@ -107,6 +108,12 @@ def design_commitments_conflict(
 # The dimensions are not authored here; they come through the explicit source
 # manifest and compiler above.
 DESIGN_LAW = load_design_law(Path(__file__).with_name("fixture"))
+
+
+# Compatibility for callers that want the checked-in fixture's explicitly
+# selected evidence-authority configuration.  This is passed to the runtime
+# resolver, never to ``construction.py``.
+DESIGN_EVIDENCE_AUTHORITY = load_evidence_authority(Path(__file__).with_name("fixture"))
 
 
 DESIGN_CONTRACT = Contract(

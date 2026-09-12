@@ -30,6 +30,7 @@ class CandidateAssessment:
     status: str
     reason: str
     warrant_authorities: tuple[str, ...] = ()
+    authority_basis: tuple[Mapping[str, Any], ...] = ()
 
     def __post_init__(self) -> None:
         value = str(self.status).strip().upper()
@@ -39,8 +40,22 @@ class CandidateAssessment:
         object.__setattr__(
             self,
             "warrant_authorities",
-            tuple(sorted({str(item) for item in self.warrant_authorities if str(item)})),
+            tuple(
+                sorted(
+                    {
+                        str(item).strip().upper()
+                        for item in self.warrant_authorities
+                        if str(item).strip()
+                    }
+                )
+            ),
         )
+        basis: list[Mapping[str, Any]] = []
+        for item in self.authority_basis:
+            if isinstance(item, Mapping):
+                basis.append({str(key): value for key, value in item.items()})
+        basis.sort(key=lambda item: repr(sorted(item.items())))
+        object.__setattr__(self, "authority_basis", tuple(basis))
 
     def as_payload(self) -> dict[str, object]:
         return {
@@ -48,6 +63,7 @@ class CandidateAssessment:
             "status": self.status,
             "reason": self.reason,
             "warrant_authorities": list(self.warrant_authorities),
+            "authority_basis": [dict(item) for item in self.authority_basis],
         }
 
 
@@ -60,8 +76,9 @@ class Contract:
     An application may additionally name the relation vocabulary that those
     semantic origins may populate; semantic-reference relations separately
     need explicit permission. ``resolution_warrant_kinds`` is a separate,
-    conservative standard for deciding which recorded Warrant bases may
-    govern an Obligation; it does not affect admission.
+    conservative standard for deciding which externally assigned
+    evidence-authority classes may govern an Obligation; it does not affect
+    admission.
     """
 
     contract_id: str
@@ -135,17 +152,25 @@ class Contract:
         obligation: Mapping[str, Any],
         commitment: Mapping[str, Any],
         warrant: Mapping[str, Any],
+        warrant_authorities: Iterable[str] = (),
+        authority_basis: Iterable[Mapping[str, Any]] = (),
     ) -> CandidateAssessment:
         """Assess warrant sufficiency for resolution, separately from admission.
 
-        Only structured ``extra.resolution_authority`` values recorded in the
-        provisional Warrant façade are considered. Filenames, prose, origins,
-        and the fact that a candidate was admitted are not authority.
+        ``warrant_authorities`` and ``authority_basis`` are supplied by the
+        runtime after it has joined Warrant source identities to an external
+        evidence-authority configuration. The Contract sees only the resulting
+        authority classes; it never treats Warrant prose, filenames, origins,
+        or constructor metadata as authority.
         """
 
         commitment_id = str(commitment.get("commitment_id") or "")
         obligation_id = str(obligation.get("obligation_id") or "")
-        authorities = _warrant_authorities(warrant)
+        del warrant
+        authorities = tuple(
+            sorted({str(item).strip().upper() for item in warrant_authorities if str(item).strip()})
+        )
+        basis = tuple(authority_basis)
         sufficient = tuple(sorted(set(authorities) & set(self.resolution_warrant_kinds)))
         if sufficient:
             return CandidateAssessment(
@@ -156,6 +181,7 @@ class Contract:
                     f"resolution authority for {obligation_id}: {', '.join(sufficient)}."
                 ),
                 warrant_authorities=authorities,
+                authority_basis=basis,
             )
         if not self.resolution_warrant_kinds:
             reason = (
@@ -171,13 +197,14 @@ class Contract:
         else:
             reason = (
                 f"Commitment {commitment_id} has no structured resolution "
-                "authority in its Warrant."
+                "authority binding for its Warrant evidence."
             )
         return CandidateAssessment(
             commitment_id=commitment_id,
             status="INSUFFICIENT",
             reason=reason,
             warrant_authorities=authorities,
+            authority_basis=basis,
         )
 
     def admit_assertion(
@@ -259,26 +286,3 @@ class Contract:
             f"{self.contract_id!r}",
             reason="ungrounded_world_base",
         )
-
-
-def _warrant_authorities(warrant: Mapping[str, Any]) -> tuple[str, ...]:
-    authorities: set[str] = set()
-    bases = warrant.get("bases", ())
-    if not isinstance(bases, Iterable) or isinstance(bases, (str, bytes, Mapping)):
-        return ()
-    for base in bases:
-        if not isinstance(base, Mapping):
-            continue
-        detail = base.get("detail")
-        if not isinstance(detail, Mapping):
-            continue
-        extra = detail.get("extra")
-        if not isinstance(extra, Mapping):
-            continue
-        value = extra.get("resolution_authority")
-        values = value if isinstance(value, (list, tuple, set, frozenset)) else (value,)
-        for item in values:
-            normalized = str(item or "").strip().upper()
-            if normalized:
-                authorities.add(normalized)
-    return tuple(sorted(authorities))

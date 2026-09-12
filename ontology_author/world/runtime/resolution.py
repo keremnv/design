@@ -25,12 +25,15 @@ def resolve_world(
     contract: Contract,
     *,
     conflict_checker: CommitmentConflictChecker | None = None,
+    evidence_authority: Any | None = None,
 ) -> tuple[Resolution, ...]:
     """Evaluate every durable Contract Obligation in deterministic order.
 
     The resolver reads only the candidate World: obligations, candidate
     relationships, assertion tuples, and recorded Warrant façade data. It
-    never reads project files and never constructs a Commitment.
+    joins the Warrant's source identities to the explicitly supplied evidence
+    authority configuration; it never reads project files and never constructs
+    a Commitment.
     """
 
     bound = world.contract_identity()
@@ -49,11 +52,14 @@ def resolve_world(
             commitment = _commitment(world, commitment_id)
             commitments[commitment_id] = commitment
             warrant = world.warrant_for_assertion(commitment_id)
+            authority = _derive_evidence_authority(evidence_authority, warrant)
             assessments.append(
                 contract.assess_candidate(
                     obligation=obligation,
                     commitment=commitment,
                     warrant=warrant,
+                    warrant_authorities=authority["authority_kinds"],
+                    authority_basis=authority["authority_basis"],
                 )
             )
         assessments.sort(key=lambda item: item.commitment_id)
@@ -130,6 +136,53 @@ def resolve_world(
         )
         results.append(result)
     return tuple(results)
+
+
+def _derive_evidence_authority(
+    configuration: Any | None,
+    warrant: Mapping[str, Any],
+) -> dict[str, tuple[Any, ...]]:
+    """Ask the external authority binding to assess recorded Warrant bases.
+
+    Resolution remains generic: the application supplies a small object with
+    ``assess_warrant``.  No generic source registry or authority ontology is
+    introduced here.  Missing configuration is fail-closed and yields no
+    authority; a malformed supplied configuration is a technical evaluation
+    error rather than an implicit grant.
+    """
+
+    if configuration is None:
+        return {"authority_kinds": (), "authority_basis": ()}
+    assessor = getattr(configuration, "assess_warrant", None)
+    if not callable(assessor):
+        raise ResolutionEvaluationError(
+            "evidence authority configuration must provide assess_warrant(warrant)"
+        )
+    try:
+        result = assessor(warrant)
+    except Exception as error:
+        raise ResolutionEvaluationError(
+            f"evidence authority assessment failed: {error}"
+        ) from error
+    if not isinstance(result, Mapping):
+        raise ResolutionEvaluationError(
+            "evidence authority assessment must return a mapping"
+        )
+    raw_kinds = result.get("authority_kinds", ())
+    raw_basis = result.get("authority_basis", ())
+    if isinstance(raw_kinds, (str, bytes)) or not isinstance(raw_kinds, (list, tuple, set, frozenset)):
+        raise ResolutionEvaluationError(
+            "evidence authority assessment authority_kinds must be a collection"
+        )
+    if not isinstance(raw_basis, (list, tuple)):
+        raise ResolutionEvaluationError(
+            "evidence authority assessment authority_basis must be a sequence"
+        )
+    basis = tuple(item for item in raw_basis if isinstance(item, Mapping))
+    return {
+        "authority_kinds": tuple(str(item).strip().upper() for item in raw_kinds if str(item).strip()),
+        "authority_basis": basis,
+    }
 
 
 def _candidate_ids(world: Any, obligation_id: str) -> tuple[str, ...]:

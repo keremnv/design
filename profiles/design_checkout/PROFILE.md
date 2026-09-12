@@ -42,6 +42,17 @@ current child order, and surface/context containment. The Governance Law then
 selects governed subjects from those descriptive facts; it does not treat the
 current arrangement as the desired answer.
 
+Evidence authority is selected separately in
+`fixture/evidence-authorities.json`. It binds the stable source identities
+`file://checkout-requirements.md` and `file://Checkout.tsx` to
+`APPROVED_REQUIREMENT` and `IMPLEMENTATION_OBSERVATION` respectively. The
+constructor records those sources as Warrant bases but does not receive this
+configuration and cannot write an authority label. The resolver joins recorded
+source identities to the selected configuration, then asks the Contract which
+authority classes are sufficient. The sealed bundle records the authority
+configuration and each candidate assessment records its matched source and
+authority basis.
+
 Governance Law is not authored directly in the constructor or in this module's
 dimension declarations. `fixture/governance-sources.json` explicitly selects
 `fixture/design-governance.md` as law-bearing. The bounded compiler in
