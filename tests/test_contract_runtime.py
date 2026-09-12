@@ -106,7 +106,11 @@ def test_design_contract_constructs_and_publishes_first_slice(tmp_path):
         }
         demand = explorer.demand()
         assert demand is not None
-        assert demand["obligations"] == [
+        assert demand["demanded"] == 0
+        assert demand["obligations"] == []
+
+        governed = explorer.obligations()
+        assert governed["obligations"] == [
             {
                 "obligation_id": "O7",
                 "question": "Determine relative prominence of total versus promo at checkout commitment.",
@@ -128,9 +132,9 @@ def test_design_contract_constructs_and_publishes_first_slice(tmp_path):
                 "candidates": [
                     {
                         "relation": "candidate_for",
-                        "association_id": demand["obligations"][0]["candidates"][0]["association_id"],
-                        "commitment_id": demand["obligations"][0]["candidates"][0]["commitment_id"],
-                        "created_revision": demand["obligations"][0]["candidates"][0]["created_revision"],
+                        "association_id": governed["obligations"][0]["candidates"][0]["association_id"],
+                        "commitment_id": governed["obligations"][0]["candidates"][0]["commitment_id"],
+                        "created_revision": governed["obligations"][0]["candidates"][0]["created_revision"],
                     }
                 ],
             }

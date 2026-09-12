@@ -33,6 +33,7 @@ import {
   type WorldDemand,
   type WorldObligation,
   type WorldObligationInspection,
+  type WorldObligationSummary,
   type WorldOverview,
   type WorldResolutionStatus,
   type WorldReferent,
@@ -64,7 +65,7 @@ import {
 } from "./expansionMachine";
 import {
   FrontierTable,
-  isWorldObligation,
+  GovernedObligationTable,
   type GovernedObligation,
   type Obligation,
 } from "./FrontierTable";
@@ -1058,6 +1059,7 @@ const TABLES_WIDTH_KEY = "ontology-author.worldFrontierWidth";
 type TableView =
   | { kind: "world" }
   | { kind: "frontier" }
+  | { kind: "governed" }
   | {
       kind: "relation";
       relation: string;
@@ -1160,13 +1162,17 @@ export function WorldPage() {
   const [referent, setReferent] = useState<WorldReferent | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   /**
-   * What is open on the left overlay. World is the idle catalogue; frontier
-   * and a relation are subjects you switch to. Closing the handle parks it;
-   * opening it again is the same reading.
+   * What is open on the left overlay. World is the idle catalogue; the legacy
+   * Purpose frontier, governed Obligations, and relations are subjects you
+   * switch to. Closing the handle parks it; opening it again is the same
+   * reading.
    */
   const [table, setTable] = useState<TableView>({ kind: "world" });
-  const [demand, setDemand] = useState<WorldDemand | null>(null);
+  const [legacyDemand, setLegacyDemand] = useState<WorldDemand | null>(null);
   const [demandProblem, setDemandProblem] = useState<string | null>(null);
+  const [governedObligations, setGovernedObligations] = useState<WorldObligationSummary[]>([]);
+  const [governedProblem, setGovernedProblem] = useState<string | null>(null);
+  const frontierRead = useRef(false);
   const [selectedObligation, setSelectedObligation] =
     useState<WorldObligation | null>(null);
   const [obligationInspection, setObligationInspection] =
@@ -1327,18 +1333,24 @@ export function WorldPage() {
   const tableChrome = useMemo<TableChrome>(
     () => ({
       current:
-        table.kind === "world" ||
-        table.kind === "frontier"
+        table.kind === "world"
           ? table.kind
-          : "other",
+          : table.kind === "frontier"
+            ? "frontier"
+            : table.kind === "governed"
+              ? "governed"
+              : "other",
       hasFrontier: Boolean(overview?.demand),
+      hasGovernedObligations: Boolean(overview?.governed_obligations),
       onWorld: () => showTable({ kind: "world" }),
       onFrontier: () => showTable({ kind: "frontier" }),
+      onGoverned: () => showTable({ kind: "governed" }),
       onClose: collapseTables,
     }),
     [
       collapseTables,
       overview?.demand,
+      overview?.governed_obligations,
       showTable,
       table.kind,
     ],
@@ -1614,60 +1626,76 @@ export function WorldPage() {
   }, [placeTuple, table]);
 
   /**
-   * The obligation set, read once and only when it is asked for.
-   *
-   * Not part of the opening fetch: resolving every obligation against the world
-   * is work nobody has asked for until they open the frontier, and the overview
-   * already carries the counts the vocabulary panel prints.
+   * Load the two read contracts together when either obligation surface is
+   * opened. The values remain separate: `/world/demand` is legacy Purpose
+   * demand, while `/world/obligations` is the durable governed set.
    */
   useEffect(() => {
-    if (table?.kind !== "frontier" || demand) return;
+    if (
+      (table?.kind !== "frontier" && table?.kind !== "governed") ||
+      frontierRead.current
+    ) return;
+    frontierRead.current = true;
     let cancelled = false;
     worldApi
       .demand()
-      .then((found) => !cancelled && setDemand(found))
+      .then((found) => !cancelled && setLegacyDemand(found))
       .catch((problem: Error) => !cancelled && setDemandProblem(problem.message));
+    worldApi
+      .obligations()
+      .then((read) => !cancelled && setGovernedObligations(read.obligations))
+      .catch((problem: Error) => !cancelled && setGovernedProblem(problem.message));
     return () => {
       cancelled = true;
     };
-  }, [demand, table]);
+  }, [table?.kind]);
 
   /** Obligations by the key the field knows them under. */
   const obligations = useMemo(() => {
     const out = new Map<string, Obligation>();
-    (demand?.obligations ?? []).filter((item) => !isWorldObligation(item)).forEach((obligation, index) =>
+    (legacyDemand?.obligations ?? []).forEach((obligation, index) =>
       out.set(`demand#${index}`, { ...obligation, key: `demand#${index}` }),
     );
     return out;
-  }, [demand]);
+  }, [legacyDemand]);
+
+  const governed = useMemo(
+    () => governedObligations.map((obligation) => ({
+      ...obligation,
+      key: obligation.obligation_id,
+    })),
+    [governedObligations],
+  );
+
+  /** Read a durable governed Obligation in its semantic inspection panel. */
+  const onFocusGovernedObligation = useCallback(
+    async (obligation: GovernedObligation) => {
+      setSelectedObligation(obligation);
+      setObligationInspection(null);
+      setObligationProblem(null);
+      setReaderOpen(true);
+      setSelection(null);
+      try {
+        const found = await worldApi.obligation(obligation.obligation_id);
+        if (found) setObligationInspection(found);
+        else setObligationProblem("This Obligation is not present in the sealed World.");
+      } catch (problem) {
+        setObligationProblem((problem as Error).message);
+      }
+    },
+    [],
+  );
 
   /**
-   * An obligation is put on the field (§8.7).
+   * A legacy Purpose demand is put on the field (§8.7).
    *
    * Unresolved, it lands as a hollow chip: there is no assertion to read, so
-   * the mark *is* the obligation. Resolved, it is an ordinary assertion and is
-   * drawn as one — the frontier's own record of it is a claim about what a
-   * purpose wanted, not a second kind of tuple — so the assertion is read and
-   * placed exactly as a table row would place it.
+   * the mark *is* the demand. Resolved, it is an ordinary assertion and is
+   * drawn as one. Governed Obligations use the inspection panel above and do
+   * not enter this legacy field state.
    */
-  const onFocusObligation = useCallback(
-    async (obligation: Obligation | GovernedObligation) => {
-      if (isWorldObligation(obligation)) {
-        const durable = obligation as GovernedObligation;
-        setSelectedObligation(durable);
-        setObligationInspection(null);
-        setObligationProblem(null);
-        setReaderOpen(true);
-        setSelection(null);
-        try {
-          const found = await worldApi.obligation(durable.obligation_id);
-          if (found) setObligationInspection(found);
-          else setObligationProblem("This Obligation is not present in the sealed World.");
-        } catch (problem) {
-          setObligationProblem((problem as Error).message);
-        }
-        return;
-      }
+  const onFocusLegacyObligation = useCallback(
+    async (obligation: Obligation) => {
       setSelectedObligation(null);
       setObligationInspection(null);
       const schema = relations.find((item) => item.name === obligation.relation);
@@ -2079,14 +2107,21 @@ export function WorldPage() {
                         });
                       }}
                     />
+                  ) : table.kind === "governed" ? (
+                    <GovernedObligationTable
+                      obligations={governed}
+                      problem={governedProblem}
+                      chrome={tableChrome}
+                      onFocus={onFocusGovernedObligation}
+                    />
                   ) : table.kind === "frontier" ? (
                     <FrontierTable
-                      demand={demand}
+                      demand={legacyDemand}
                       relations={relations}
                       problem={demandProblem}
                       present={present}
                       chrome={tableChrome}
-                      onFocus={onFocusObligation}
+                      onFocus={onFocusLegacyObligation}
                     />
                   ) : table.kind === "relation" && !extension ? (
                     // A subject with nothing behind it still keeps its bar.
@@ -2262,7 +2297,7 @@ export function WorldPage() {
                   ) : onField && selection?.kind === "demand" ? (
                     <DemandPanel
                       obligation={obligations.get(selection.id) ?? null}
-                      demand={demand}
+                      demand={legacyDemand}
                       roles={
                         relations
                           .find(
@@ -2415,8 +2450,8 @@ export function WorldPage() {
                       <div className="world-reader__content">
                         <p className="world__hint">
                           A referent, assertion, or relation names what this
-                          column is about. The world catalogue and the frontier
-                          live in Tables.
+                          column is about. The world catalogue, Purpose
+                          frontier, and governed Obligations live in Tables.
                         </p>
                       </div>
                     </article>

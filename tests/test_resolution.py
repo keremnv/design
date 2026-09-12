@@ -247,8 +247,8 @@ def test_authoritative_requirement_resolves_and_survives_reopen_and_read_surface
         world.close()
 
     with WorldExplorerAdapter(root / "world" / "world.sqlite") as explorer:
-        demand = explorer.demand()
-        item = demand["obligations"][0]
+        governed = explorer.obligations()
+        item = governed["obligations"][0]
         assert item["resolution"]["status"] == "RESOLVED"
         assert item["resolution"]["selected_commitment_id"] == commitment_id
         assert explorer.resolution("O7")["status"] == "RESOLVED"
@@ -273,7 +273,11 @@ def test_authoritative_requirement_resolves_and_survives_reopen_and_read_surface
         payload = client.get("/world/resolution", params={"obligation_id": "O7"}).json()
         assert payload["status"] == "RESOLVED"
         obligations = client.get("/world/obligations").json()
-        assert obligations["resolutions"]["O7"]["status"] == "RESOLVED"
+        assert next(
+            item["resolution"]["status"]
+            for item in obligations["obligations"]
+            if item["obligation_id"] == "O7"
+        ) == "RESOLVED"
         assert client.get("/world/evidence-authority").json()["identity"] == {
             "authority_id": "design-mobile-checkout-evidence",
             "revision": "1",
@@ -394,7 +398,7 @@ def test_no_candidate_is_a_persisted_unresolved_resolution(tmp_path: Path):
         world.close()
 
     with WorldExplorerAdapter(root / "world" / "world.sqlite") as explorer:
-        item = explorer.demand()["obligations"][0]
+        item = explorer.obligations()["obligations"][0]
         assert item["resolution"]["status"] == "NO_CANDIDATE"
         assert item["resolution"]["reason"]
 
@@ -576,7 +580,7 @@ def test_authorized_adjudication_resolves_conflict_without_erasing_candidates(
 
     with WorldExplorerAdapter(root / "world" / "world.sqlite") as explorer:
         assert explorer.adjudication("A1")["selected_commitment_id"] == selected
-        item = explorer.demand()["obligations"][0]
+        item = explorer.obligations()["obligations"][0]
         assert item["resolution"]["status"] == "RESOLVED"
         assert item["resolution"]["resolution_basis"][0]["adjudication_id"] == "A1"
         assert explorer.adjudication_authority()["identity"] == {

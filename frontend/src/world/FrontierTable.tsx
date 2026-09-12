@@ -1,19 +1,20 @@
 /**
- * The shared obligation table: legacy Purpose demand when that is all a World
- * has, or durable governed Obligations when the new semantic read model exists.
+ * The legacy Purpose frontier table.
  *
- * §8.7 makes semantic demand first-class, and the reason it has to be a surface
- * of its own is that unresolved is not a property of the world. It is the join
- * between an obligation set some purpose generated and what the world asserts,
- * so it cannot be read off a relation's extension, and with no purpose loaded
- * there is no such thing as an unresolved obligation — which is a different
- * statement from there being none.
+ * Durable governed Obligations have a separate typed read path and table
+ * (`GovernedObligationTable` below). Keeping the components near one another
+ * shares the table furniture without making either payload pretend to be the
+ * other.
  *
- * The list is a table because obligations are rows, and it shares the
+ * This surface is the old §8.7 Purpose frontier. Its unresolved rows are the
+ * join between what one Purpose demanded and what the world asserted. That is
+ * different from a governed Obligation's Resolution status, which is shown by
+ * the sibling table and does not require a Purpose.
+ *
+ * The list is a table because Purpose failures are rows, and it shares the
  * extension's shape, windowing and margin rule so that "a row you can put on
- * the field" means one thing across the product. What it does not share is the
- * paging: an obligation set is one document the read plane already holds, so
- * there is nothing to page and the whole list arrives at once.
+ * the field" means one thing across the product. Governed obligations are
+ * fetched by their own read contract and table.
  *
  * In the legacy branch, two granularities are kept apart. The rows are
  * obligations — tuple-level, *this
@@ -51,12 +52,6 @@ type Requirement = NonNullable<WorldDemand["requirements"]>[number];
 export type Obligation = LegacyWorldObligation & { key: string };
 export type GovernedObligation = WorldObligation & { key: string };
 
-export function isWorldObligation(
-  item: WorldDemand["obligations"][number],
-): item is WorldObligation {
-  return "obligation_id" in item;
-}
-
 export function FrontierTable({
   demand,
   relations,
@@ -72,21 +67,8 @@ export function FrontierTable({
   /** Obligation keys and assertion ids already on the field. */
   present: Set<string>;
   chrome: TableChrome;
-  onFocus: (obligation: Obligation | GovernedObligation) => void;
+  onFocus: (obligation: Obligation) => void;
 }) {
-  const governed = (demand?.obligations ?? [])
-    .filter(isWorldObligation)
-    .map((obligation) => ({ ...obligation, key: obligation.obligation_id }));
-  if (governed.length) {
-    return (
-      <GovernedFrontierTable
-        obligations={governed}
-        problem={problem}
-        chrome={chrome}
-        onFocus={onFocus}
-      />
-    );
-  }
   return (
     <LegacyFrontierTable
       demand={demand}
@@ -107,7 +89,7 @@ function statusLabel(status: WorldResolutionStatus): string {
   return status.toLowerCase().replaceAll("_", " ");
 }
 
-function GovernedFrontierTable({
+export function GovernedObligationTable({
   obligations,
   problem,
   chrome,
@@ -210,7 +192,7 @@ function LegacyFrontierTable({
 
   const all = useMemo<Obligation[]>(
     () =>
-      (demand?.obligations ?? []).filter((item): item is LegacyWorldObligation => !isWorldObligation(item)).map((obligation, index) => ({
+      (demand?.obligations ?? []).map((obligation, index) => ({
         ...obligation,
         // Positional, and positional in the *document* rather than in whatever
         // is being shown, so a key means the same obligation whether or not the

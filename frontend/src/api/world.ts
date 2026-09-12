@@ -78,6 +78,12 @@ export type WorldOverview = {
     obligations: number;
     demanded: number;
   } | null;
+  /** Durable Law-generated questions; independent of Purpose demand. */
+  governed_obligations: {
+    count: number;
+    resolved: number;
+    unresolved: number;
+  } | null;
 };
 
 export type WorldGrounding = {
@@ -203,6 +209,15 @@ export type WorldObligation = {
   structural_bindings?: Record<string, unknown>;
   candidates: WorldCandidateLink[];
   resolution?: WorldResolution;
+};
+
+/** A durable governed Obligation as returned by the collection read. */
+export type WorldObligationSummary = WorldObligation;
+
+export type WorldObligationsRead = {
+  contract: Record<string, string> | null;
+  governance: Record<string, string> | null;
+  obligations: WorldObligationSummary[];
 };
 
 export type WorldAdjudicationInspection = {
@@ -356,8 +371,9 @@ export type WorldSupport = {
 };
 
 /**
- * The legacy unresolved frontier recorded for a World purpose. Durable
- * governed Obligations use `WorldObligation` below and are not tuple failures.
+ * The legacy unresolved frontier recorded for a World Purpose. Durable
+ * governed Obligations are returned by `/world/obligations` and are not tuple
+ * failures.
  *
  * `rule` is optional because a purpose is prose plus construction state, not a
  * separate obligation compiler.
@@ -381,7 +397,7 @@ export type WorldDemand = {
   purpose: { id?: string; revision?: number; statement: string };
   rule: string | null;
   demanded: number;
-  obligations: (LegacyWorldObligation | WorldObligation)[];
+  obligations: LegacyWorldObligation[];
   requirements?: {
     name: string;
     kind: string;
@@ -464,6 +480,7 @@ export const worldApi = {
   assertion: (id: string) =>
     read<WorldAssertion>(`/world/assertion?id=${encodeURIComponent(id)}`),
   demand: () => read<{ demand: WorldDemand | null }>("/world/demand").then((r) => r.demand),
+  obligations: () => read<WorldObligationsRead>("/world/obligations"),
   derivation: (relation: string) =>
     read<WorldDerivation>(`/world/derivation?relation=${encodeURIComponent(relation)}`),
   support: (id: string) =>

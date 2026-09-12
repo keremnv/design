@@ -186,9 +186,17 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
 
         demand = explorer.demand()
         assert demand is not None
-        assert demand["demanded"] == len(expected_obligations)
-        assert len(demand["obligations"]) == len(expected_obligations)
-        for obligation in demand["obligations"]:
+        assert demand["demanded"] == 0
+        assert demand["obligations"] == []
+
+        governed = explorer.obligations()
+        assert governed["contract"] == {
+            "contract_id": "design-mobile-checkout",
+            "contract_revision": "1",
+        }
+        assert governed["governance"] == law.identity()
+        assert len(governed["obligations"]) == len(expected_obligations)
+        for obligation in governed["obligations"]:
             assert obligation["reason"]
             assert obligation["generated_by_rule"].startswith(
                 "rule:checkout_design_governance:"
@@ -243,12 +251,12 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
         )
         assert next(
             item["obligation_id"]
-            for item in demand["obligations"]
+            for item in governed["obligations"]
             if item["obligation_id"] == availability_id
         ) == availability_id
         assert next(
             item["resolution"]["status"]
-            for item in demand["obligations"]
+            for item in governed["obligations"]
             if item["obligation_id"] == availability_id
         ) == "RESOLVED"
 
@@ -264,7 +272,7 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
         assert commitment["candidate_for"] == [
             next(
                 item["obligation_id"]
-                for item in demand["obligations"]
+                for item in governed["obligations"]
                 if item["candidates"][0]["commitment_id"] == prominent_id
             )
         ]
@@ -274,7 +282,7 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
             for base in commitment["warrant"]["bases"]
         )
         assert sum(
-            len(item["candidates"]) for item in demand["obligations"]
+            len(item["candidates"]) for item in governed["obligations"]
         ) == len(expected_obligations)
 
     from starlette.testclient import TestClient
@@ -285,8 +293,10 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
             "bounded-react-jsx-attribute-adapter"
         )
         generated = client.get("/world/obligations").json()
-        assert set(generated["obligations"]) == set(expected_obligations)
-        assert len(generated["candidate_associations"]) == len(expected_obligations)
+        assert {
+            item["obligation_id"] for item in generated["obligations"]
+        } == set(expected_obligations)
+        assert all(item["candidates"] for item in generated["obligations"])
         assert client.get("/world/evidence-authority").json()["identity"] == {
             "authority_id": "design-mobile-checkout-evidence",
             "revision": "1",

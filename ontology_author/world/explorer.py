@@ -149,7 +149,13 @@ class WorldExplorerAdapter:
         self._purpose_document: dict[str, Any] | None = None
         purpose = _purpose_path(self.path)
         if purpose.exists():
-            self._purpose_document = json.loads(purpose.read_text(encoding="utf-8"))
+            document = json.loads(purpose.read_text(encoding="utf-8"))
+            # Project.run keeps passing an empty Purpose object to the legacy
+            # constructor and therefore may persist an empty compatibility
+            # sidecar. It is not a loaded Purpose demand unless it has user
+            # text or declared requirements.
+            if document.get("text", "").strip() or document.get("requirements"):
+                self._purpose_document = document
         self._governance_document = _read_json_sidecar(_governance_path(self.path))
         self._structure_document = _read_json_sidecar(_structure_path(self.path))
         self._obligations_document = _read_json_sidecar(_obligations_path(self.path))
@@ -362,17 +368,23 @@ class WorldExplorerAdapter:
         """The bounded descriptive frontend structure, when one was published."""
         return self._structure_document
 
-    def generated_obligations(self) -> dict[str, Any] | None:
-        """Law-generated obligation provenance, when the profile publishes it."""
-        resolutions = {
-            item["obligation_id"]: item for item in self._world.resolutions()
+    def obligations(self) -> dict[str, Any]:
+        """The read contract for durable, law-generated Obligations.
+
+        This is deliberately separate from :meth:`demand`.  The latter reads
+        only the legacy Purpose frontier; this payload reads the durable
+        Obligation records and their already-recorded resolution/candidate
+        projections.  Law provenance is attached to each item by
+        ``_governed_obligation_rows`` rather than returned as a second,
+        unrelated obligation document.
+        """
+        return {
+            "contract": self._world.contract_identity(),
+            "governance": (
+                self._governance_document or {}
+            ).get("identity"),
+            "obligations": self._governed_obligation_rows(),
         }
-        if self._obligations_document is None and not resolutions:
-            return None
-        payload = dict(self._obligations_document or {"law": None, "obligations": {}})
-        payload["resolutions"] = resolutions
-        payload["candidate_associations"] = self._world.candidate_associations()
-        return payload
 
     def resolution(self, obligation_id: str) -> dict[str, Any] | None:
         """The current persisted evaluation for one Obligation."""
@@ -389,7 +401,7 @@ class WorldExplorerAdapter:
         """
 
         target = str(obligation_id)
-        for item in self._contract_frontier():
+        for item in self._governed_obligation_rows():
             if item.get("obligation_id") != target:
                 continue
             resolution = item.get("resolution")
@@ -455,6 +467,7 @@ class WorldExplorerAdapter:
             "stale": self._world.stale_relations(),
             "incomplete": incomplete,
             "demand": self._demand_overview(),
+            "governed_obligations": self._governed_obligations_overview(),
         }
         if self._evidence_authority_document is not None:
             payload["evidence_authority"] = (
@@ -474,6 +487,20 @@ class WorldExplorerAdapter:
             "purpose": frontier["purpose"],
             "obligations": len(frontier["obligations"]),
             "demanded": frontier["demanded"],
+        }
+
+    def _governed_obligations_overview(self) -> dict[str, int] | None:
+        """Compact navigation counts for durable governed Obligations."""
+        obligations = self._world.obligations()
+        if not obligations:
+            return None
+        resolved = sum(
+            1 for item in obligations if item.get("resolution_status") == "RESOLVED"
+        )
+        return {
+            "count": len(obligations),
+            "resolved": resolved,
+            "unresolved": len(obligations) - resolved,
         }
 
     def schema(self) -> list[dict[str, Any]]:
@@ -1227,20 +1254,18 @@ class WorldExplorerAdapter:
             out["inputs"].append(answer)
         return out
 
-    # -- §8.7 the unresolved frontier --------------------------------------
+    # -- Legacy Purpose frontier -------------------------------------------
 
     def demand(self) -> dict[str, Any] | None:
         """What a declared purpose asked of this world, and what it did not get.
 
-        Returns `None` when no purpose is loaded, and the caller is expected to
-        say so rather than draw an empty frontier: unresolved is not a property
-        of the world. It is the join between what a purpose demanded and what
-        the world asserts, and with no purpose there is no such thing as an
-        unresolved obligation — which is different from there being none.
+        Returns `None` when no legacy Purpose demand is loaded. Durable
+        law-generated Obligations are read through ``obligations()`` instead;
+        they are never appended to this payload.
         """
         return self._purpose_frontier()
 
-    def _contract_frontier(self) -> list[dict[str, Any]]:
+    def _governed_obligation_rows(self) -> list[dict[str, Any]]:
         obligations: list[dict[str, Any]] = []
         generated = (
             (self._obligations_document or {}).get("obligations", {})
@@ -1376,12 +1401,11 @@ class WorldExplorerAdapter:
         delta answers, not something a single world can be asked.
         """
         rows = self._failure_rows()
-        contract_obligations = self._contract_frontier()
         document = self._purpose_document
-        if document is None and not rows and not contract_obligations:
+        if document is None and not rows:
             return None
         requirements = list((document or {}).get("requirements", []))
-        obligations = list(contract_obligations)
+        obligations: list[dict[str, Any]] = []
         for row in rows:
             subject = self._failure_subject(row["subject_json"])
             # `reason` is prose the constructor wrote about why this is
@@ -1413,11 +1437,8 @@ class WorldExplorerAdapter:
             failures_by_requirement[name] = failures_by_requirement.get(name, 0) + 1
         return {
             "purpose": {"statement": str((document or {}).get("text", "")).strip()},
-            "contract": self._world.contract_identity(),
             "rule": None,
-            # Purpose requirements and Contract obligations are separate
-            # demand sources; neither is silently treated as the other.
-            "demanded": (len(requirements) or len(rows)) + len(contract_obligations),
+            "demanded": len(requirements) or len(rows),
             "obligations": obligations,
             # Relation-level, and additive: the declarations themselves, each
             # carrying how many tuples failed it. An obligation says a tuple is

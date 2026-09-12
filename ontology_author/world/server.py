@@ -155,8 +155,8 @@ def build_app(world: Path | str, *, token: str | None = None):
     async def structure(_request):
         return await session.call(lambda adapter: adapter.structure())
 
-    async def generated_obligations(_request):
-        return await session.call(lambda adapter: adapter.generated_obligations())
+    async def obligations(_request):
+        return await session.call(lambda adapter: adapter.obligations())
 
     async def resolution(request):
         return await session.call(
@@ -213,7 +213,7 @@ def build_app(world: Path | str, *, token: str | None = None):
         Route("/world/adjudications", guard(adjudications)),
         Route("/world/adjudication", guard(adjudication)),
         Route("/world/structure", guard(structure)),
-        Route("/world/obligations", guard(generated_obligations)),
+        Route("/world/obligations", guard(obligations)),
         Route("/world/resolution", guard(resolution)),
         Route("/world/obligation", guard(obligation)),
         Route("/world/query", query, methods=["POST"]),

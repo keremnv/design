@@ -1,22 +1,24 @@
 /**
  * The TABLES dock's subject chrome.
  *
- * World and frontier are places in one panel, not extra surfaces. The handle
- * still says Tables; these buttons say which list you are in. A relation or
- * derivation is a subject you navigated to — named in the bar, not a third
- * tab — and world / frontier are how you leave it.
+ * World, the legacy Purpose frontier, and governed Obligations are subjects in
+ * one panel, not parallel applications. The handle still says Tables; these
+ * buttons say which read contract is open. A relation or derivation is a
+ * subject you navigated to — named in the bar, not a third tab.
  */
 
 import type { ReactNode } from "react";
 import { PanelClose } from "./panelChrome";
 
-export type TableSubject = "world" | "frontier" | "other";
+export type TableSubject = "world" | "frontier" | "governed" | "other";
 
 export type TableChrome = {
   current: TableSubject;
   hasFrontier: boolean;
+  hasGovernedObligations: boolean;
   onWorld: () => void;
   onFrontier: () => void;
+  onGoverned: () => void;
   onClose: () => void;
 };
 
@@ -48,14 +50,20 @@ export function TableBar({
             onClick={chrome.onFrontier}
           >
             {/*
-              * The list is of unresolved obligations, so the tab says
-              * unresolved. "Frontier" is the right word for the *set* — it is
-              * what moves as a world is built, and the docstrings keep it —
-              * but as a tab beside `world` it named a concept rather than a
-              * place, and a reader had to already know the theory to guess
-              * what was behind it.
+              * This is the compatibility surface for Purpose demand. It is
+              * named explicitly so it cannot be confused with the governed
+              * Obligation collection beside it.
               */}
-            unresolved
+            purpose frontier
+          </button>
+        ) : null}
+        {chrome.hasGovernedObligations ? (
+          <button
+            type="button"
+            aria-pressed={chrome.current === "governed"}
+            onClick={chrome.onGoverned}
+          >
+            obligations
           </button>
         ) : null}
       </nav>

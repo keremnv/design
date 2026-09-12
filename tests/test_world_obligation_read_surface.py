@@ -17,9 +17,11 @@ from profiles.design_checkout import (
 FIXTURE = Path(__file__).parents[1] / "profiles" / "design_checkout" / "fixture"
 
 
-def _checkout_world(tmp_path: Path) -> Path:
+def _checkout_world(tmp_path: Path, *, include_purpose: bool = True) -> Path:
     root = tmp_path / "checkout-world"
     shutil.copytree(FIXTURE, root)
+    if not include_purpose:
+        (root / "PURPOSE.md").unlink()
     result = rebuild(
         root,
         contract=DESIGN_CONTRACT,
@@ -34,7 +36,7 @@ def _checkout_world(tmp_path: Path) -> Path:
 def _obligation_id(explorer: WorldExplorerAdapter, dimension: str) -> str:
     return next(
         item["obligation_id"]
-        for item in explorer.demand()["obligations"]
+        for item in explorer.obligations()["obligations"]
         if item.get("dimension") == dimension
     )
 
@@ -195,3 +197,129 @@ def test_selected_obligation_read_preserves_conflict_and_adjudication_basis(
             detail["resolution"]["selected_commitment_id"]
         )
         assert detail["adjudications"][0]["assessment"]["status"] == "SUFFICIENT"
+
+
+def _mixed_world(tmp_path: Path) -> Path:
+    root = tmp_path / "mixed-world"
+    root.mkdir()
+    (root / "PURPOSE.md").write_text(
+        "# Purpose\n\nKeep the legacy task expectation visible.\n",
+        encoding="utf-8",
+    )
+    (root / "construction.py").write_text(
+        '''def construct(source, world, purpose):
+    purpose.unresolved(
+        "legacy.missing-fact",
+        subject={"subject": "thing"},
+        relation="legacy_fact",
+        reason="the legacy Purpose requirement remains open",
+    )
+    world.add_obligation(
+        "O7",
+        question="What governed question remains open?",
+    )
+''',
+        encoding="utf-8",
+    )
+    result = rebuild(root)
+    assert result.succeeded, result.errors
+    return root
+
+
+def test_demand_and_governed_obligation_reads_are_disjoint(tmp_path: Path):
+    root = _mixed_world(tmp_path)
+    with WorldExplorerAdapter(root / "world" / "world.sqlite") as explorer:
+        demand = explorer.demand()
+        assert demand is not None
+        assert demand["demanded"] == 1
+        assert len(demand["obligations"]) == 1
+        assert "contract" not in demand
+        assert "obligation_id" not in demand["obligations"][0]
+        assert demand["obligations"][0]["demanded_by"]["kind"] == "requirement"
+
+        governed = explorer.obligations()
+        assert "purpose" not in governed
+        assert governed["obligations"] == [
+            {
+                "obligation_id": "O7",
+                "question": "What governed question remains open?",
+                "relation": None,
+                "values": {},
+                "reason": None,
+                "demanded_by": {
+                    "kind": "contract",
+                    "name": "O7",
+                    "contract_id": "ontology-author-default",
+                    "contract_revision": "1",
+                },
+                "state": "UNRESOLVED",
+                "assertion_id": None,
+                "record_id": None,
+                "grounding_ref": None,
+                "contract_id": "ontology-author-default",
+                "contract_revision": "1",
+                "candidates": [],
+            }
+        ]
+
+        overview = explorer.overview()
+        assert overview["demand"]["obligations"] == 1
+        assert overview["governed_obligations"] == {
+            "count": 1,
+            "resolved": 0,
+            "unresolved": 1,
+        }
+
+    from starlette.testclient import TestClient
+
+    with TestClient(build_app(root / "world" / "world.sqlite")) as client:
+        legacy_payload = client.get("/world/demand").json()
+        assert len(legacy_payload["demand"]["obligations"]) == 1
+        assert "obligation_id" not in legacy_payload["demand"]["obligations"][0]
+        governed_payload = client.get("/world/obligations").json()
+        assert [item["obligation_id"] for item in governed_payload["obligations"]] == [
+            "O7"
+        ]
+
+
+def test_governed_obligations_are_read_without_a_loaded_purpose(tmp_path: Path):
+    root = _checkout_world(tmp_path, include_purpose=False)
+
+    with WorldExplorerAdapter(root / "world" / "world.sqlite") as explorer:
+        assert explorer.demand() is None
+        assert len(explorer.obligations()["obligations"]) == 3
+        assert explorer.overview()["demand"] is None
+        assert explorer.overview()["governed_obligations"] == {
+            "count": 3,
+            "resolved": 1,
+            "unresolved": 2,
+        }
+
+    from starlette.testclient import TestClient
+
+    with TestClient(build_app(root / "world" / "world.sqlite")) as client:
+        assert client.get("/world/demand").json()["demand"] is None
+        governed = client.get("/world/obligations").json()["obligations"]
+        assert len(governed) == 3
+        detail = client.get(
+            "/world/obligation",
+            params={"obligation_id": governed[0]["obligation_id"]},
+        )
+        assert detail.status_code == 200
+        assert detail.json()["obligation_id"] == governed[0]["obligation_id"]
+
+
+def test_frontend_read_types_do_not_use_a_mixed_demand_discriminator():
+    api = (Path(__file__).parents[1] / "frontend" / "src" / "api" / "world.ts").read_text(
+        encoding="utf-8"
+    )
+    frontier = (Path(__file__).parents[1] / "frontend" / "src" / "world" / "FrontierTable.tsx").read_text(
+        encoding="utf-8"
+    )
+    page = (Path(__file__).parents[1] / "frontend" / "src" / "world" / "WorldPage.tsx").read_text(
+        encoding="utf-8"
+    )
+    assert "obligations: LegacyWorldObligation[];" in api
+    assert "(LegacyWorldObligation | WorldObligation)[]" not in api
+    assert "isWorldObligation" not in frontier
+    assert "isWorldObligation" not in page
