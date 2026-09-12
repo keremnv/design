@@ -75,7 +75,9 @@ export type FieldReferent = {
 export type FieldAssertion = {
   assertion_id: string;
   relation: string;
+  /** Scalar compatibility summary; `origins` preserves every support path. */
   origin: string;
+  origins?: string[];
   mode: string;
   stale: boolean;
   completeness: "COMPLETE" | "INCOMPLETE" | "UNKNOWN" | null;
@@ -113,6 +115,7 @@ export type FieldBond = {
   assertion_id: string;
   relation: string;
   origin: string;
+  origins?: string[];
   mode: string;
   stale: boolean;
   completeness: "COMPLETE" | "INCOMPLETE" | "UNKNOWN" | null;
@@ -699,6 +702,7 @@ function fold(
       assertion_id: tuple.assertion_id,
       relation: input.relation,
       origin: tuple.origin,
+      origins: tuple.origins,
       mode: input.mode,
       stale: input.stale,
       completeness: input.completeness,
@@ -714,6 +718,7 @@ function fold(
     assertion_id: tuple.assertion_id,
     relation: input.relation,
     origin: tuple.origin,
+    origins: tuple.origins,
     mode: input.mode,
     stale: input.stale,
     completeness: input.completeness,
@@ -854,6 +859,7 @@ export function open(set: WorkingSet, assertionId: string): WorkingSet {
     assertion_id: bond.assertion_id,
     relation: bond.relation,
     origin: bond.origin,
+    origins: bond.origins,
     mode: bond.mode,
     stale: bond.stale,
     completeness: bond.completeness,
@@ -884,6 +890,7 @@ export function collapse(set: WorkingSet, assertionId: string): WorkingSet {
     assertion_id: assertion.assertion_id,
     relation: assertion.relation,
     origin: assertion.origin,
+    origins: assertion.origins,
     mode: assertion.mode,
     stale: assertion.stale,
     completeness: assertion.completeness,

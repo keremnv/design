@@ -117,7 +117,7 @@ It also retains semantic state needed to interpret and maintain those
 relations:
 
 ```text
-grounding · construction origin · revision · staleness
+grounding/support-path origin · revision · staleness
 completeness · WORLD / PURPOSE scope · explicit unresolvedness
 ```
 
@@ -221,7 +221,6 @@ my-project/
 
       world/
         world.sqlite
-        world.sqlite.origins.json
         world.admission.json
         world.purpose.json
 ```

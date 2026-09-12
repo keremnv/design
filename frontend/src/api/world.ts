@@ -246,7 +246,10 @@ export type WorldObligationInspection = Omit<WorldObligation, "candidates"> & {
 
 export type WorldTuple = {
   assertion_id: string;
+  /** Scalar compatibility summary; use `origins` for the complete answer. */
   origin: string;
+  /** Every construction/support-path origin represented by this assertion. */
+  origins?: string[];
   values: Record<string, unknown>;
 };
 
@@ -280,6 +283,7 @@ export type WorldReferent = {
     value: unknown;
     assertion_id: string;
     origin: string;
+    origins?: string[];
   }[];
   relations: {
     name: string;

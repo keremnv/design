@@ -1,8 +1,8 @@
 """World semantic implementation over SQLite storage.
 
 The calculus is CONSTITUTION.md. This module is the current kernel *mechanism*:
-domain vocabularies live in fixture/config code; construction origin is
-recorded beside the World database as sidecar metadata.
+domain vocabularies live in fixture/config code, while construction-origin
+metadata is recorded on the grounding/support paths for assertions.
 """
 
 from __future__ import annotations
@@ -25,8 +25,8 @@ from ontology_author.world.core.origins import ConstructionOrigin, OriginMetadat
 from ontology_author.world.core.source import AssertionGrounding, SourceObservation
 
 
-def _origin_path(db_path: Path) -> Path:
-    return Path(str(db_path) + ".origins.json")
+UNKNOWN_ORIGIN = "UNKNOWN"
+MULTIPLE_ORIGINS = "MULTIPLE"
 
 
 class SemanticWorld:
@@ -59,27 +59,9 @@ class SemanticWorld:
         finally:
             if original_mode is not None:
                 self.path.chmod(original_mode)
-        self._origins: dict[str, str] = {}
-        sidecar = _origin_path(self.path)
-        if sidecar.exists():
-            payload = json.loads(sidecar.read_text(encoding="utf-8"))
-            self._origins = dict(payload.get("assertions", {}))
 
     def close(self) -> None:
-        if not self.read_only:
-            self._persist_origins()
         self._store.close()
-
-    def _persist_origins(self) -> None:
-        _origin_path(self.path).write_text(
-            json.dumps(
-                {"world_id": self.world_id, "assertions": self._origins},
-                indent=2,
-                sort_keys=True,
-            )
-            + "\n",
-            encoding="utf-8",
-        )
 
     # -- Contract / obligation state -------------------------------------
 
@@ -213,18 +195,10 @@ class SemanticWorld:
         if origin is ConstructionOrigin.DERIVED:
             raise ValueError("BASE assert cannot use DERIVED origin")
         grounds = list(_assertion_groundings(grounding, origin))
-        result = self._store.assert_tuple(relation, values, grounding=grounds)
-        self._origins[result.assertion_id] = origin.value
-        self._persist_origins()
-        return result
+        return self._store.assert_tuple(relation, values, grounding=grounds)
 
     def retract_tuple(self, relation: str, values: Mapping[str, Any]) -> bool:
-        assertion_id = self._store.assertion_id_for_tuple(relation, values)
-        removed = self._store.retract_tuple(relation, values)
-        if removed:
-            self._origins.pop(assertion_id, None)
-            self._persist_origins()
-        return removed
+        return self._store.retract_tuple(relation, values)
 
     def register_derivation(
         self, relation: str, *, sql: str, inputs: Sequence[str]
@@ -232,14 +206,7 @@ class SemanticWorld:
         self._store.register_derivation(relation, sql=sql, inputs=inputs)
 
     def rerun(self, relation: str, *, completeness: Completeness):
-        result = self._store.run_derivation(relation, completeness=completeness)
-        for row in self._store.query(
-            "SELECT assertion_id FROM _world_assertions WHERE relation_name = ?",
-            (relation,),
-        ):
-            self._origins[row["assertion_id"]] = ConstructionOrigin.DERIVED.value
-        self._persist_origins()
-        return result
+        return self._store.run_derivation(relation, completeness=completeness)
 
     def is_stale(self, relation: str) -> bool:
         return self._store.is_stale(relation)
@@ -268,7 +235,9 @@ class SemanticWorld:
         if detail is None:
             return None
         assertion_id = self._store.assertion_id_for_tuple(relation, values)
-        detail["construction_origin"] = self.origin_for_assertion(assertion_id)
+        origins = self.origins_for_assertion(assertion_id)
+        detail["construction_origins"] = origins
+        detail["construction_origin"] = _origin_summary(origins)
         return detail
 
     def warrant_for_assertion(self, assertion_id: str) -> dict[str, Any]:
@@ -287,7 +256,6 @@ class SemanticWorld:
             raise KeyError(f"no assertion {assertion_id!r}")
         row = rows[0]
         bases: list[dict[str, Any]] = []
-        observed_origins: set[str] = set()
         for grounding in self._store.groundings("ASSERTION", assertion_id):
             item: dict[str, Any] = {
                 "kind": grounding["kind"],
@@ -302,27 +270,40 @@ class SemanticWorld:
                 else:
                     item["detail"] = parsed
                     if isinstance(parsed, dict) and parsed.get("construction_origin"):
-                        observed_origins.add(str(parsed["construction_origin"]))
+                        item["construction_origin"] = str(
+                            parsed["construction_origin"]
+                        )
             bases.append(item)
-        try:
-            recorded_origin = self.origin_for_assertion(assertion_id)
-        except OriginMetadataError:
-            recorded_origin = "UNKNOWN"
-        if recorded_origin != "UNKNOWN":
-            observed_origins.add(recorded_origin)
+        origins = self.origins_for_assertion(assertion_id)
         return {
             "commitment_id": assertion_id,
             "relation": row["relation_name"],
             "assertion_origin": row["origin"],
-            "recorded_construction_origin": recorded_origin,
-            "construction_origins": sorted(observed_origins),
+            # Kept as a compatibility field for consumers that only render one
+            # label. It is explicitly a summary; the complete support-path
+            # information is in `construction_origins` and each base.
+            "recorded_construction_origin": _origin_summary(origins),
+            "construction_origins": origins,
             "created_revision": int(row["created_revision"]),
             "bases": bases,
         }
 
-    def origin_for_assertion(self, assertion_id: str) -> str:
-        if assertion_id in self._origins:
-            return self._origins[assertion_id]
+    def construction_supports_for_assertion(
+        self, assertion_id: str
+    ) -> list[dict[str, Any]]:
+        """Return the recorded construction/support paths for an assertion.
+
+        ``ConstructionOrigin`` belongs to a support path, not to the
+        proposition identity. The path is currently represented by the
+        ``WORLD`` grounding created by :meth:`assert_tuple`; its detail keeps
+        the origin, construction method, and the source-observation pointers
+        that were supplied for that call.
+
+        Derived assertions are different: their durable derivation record is
+        the support path, and ``_world_assertions.origin`` is the separate
+        assertion-storage axis that identifies that fact.
+        """
+
         rows = self._store.query(
             "SELECT origin FROM _world_assertions WHERE assertion_id = ?",
             (assertion_id,),
@@ -332,18 +313,96 @@ class SemanticWorld:
                 f"no assertion {assertion_id!r} has a construction origin"
             )
         if rows[0]["origin"] == "DERIVED":
-            return ConstructionOrigin.DERIVED.value
-        raise OriginMetadataError(
-            f"asserted tuple {assertion_id!r} has no construction origin"
-        )
+            return [
+                {
+                    "origin": ConstructionOrigin.DERIVED.value,
+                    "has_source_grounding": False,
+                    "has_provenance": True,
+                    "has_construction_method": True,
+                    "kind": GroundingKind.DERIVATION.value,
+                }
+            ]
+
+        supports: list[dict[str, Any]] = []
+        for grounding in self._store.groundings("ASSERTION", assertion_id):
+            if grounding["kind"] != GroundingKind.WORLD.value:
+                continue
+            detail = grounding.get("detail") or ""
+            try:
+                parsed = json.loads(detail) if detail else {}
+            except (TypeError, ValueError):
+                parsed = {}
+            if not isinstance(parsed, Mapping):
+                parsed = {}
+            origin = parsed.get("construction_origin")
+            if not origin:
+                reference = str(grounding.get("reference") or "")
+                if reference.startswith("origin:"):
+                    origin = reference.removeprefix("origin:")
+            if not str(origin or "").strip():
+                continue
+            observations = parsed.get("observations")
+            has_source = any(
+                isinstance(item, Mapping)
+                and str(item.get("native_handle") or "").strip()
+                and str(item.get("source_revision") or "").strip()
+                for item in (observations if isinstance(observations, list) else [])
+            )
+            supports.append(
+                {
+                    "origin": str(origin),
+                    "has_source_grounding": has_source,
+                    "has_provenance": True,
+                    "has_construction_method": bool(
+                        str(parsed.get("construction_method") or "").strip()
+                    ),
+                    "kind": GroundingKind.WORLD.value,
+                }
+            )
+        if not supports:
+            raise OriginMetadataError(
+                f"asserted tuple {assertion_id!r} has no construction origin"
+            )
+        return supports
+
+    def origins_for_assertion(self, assertion_id: str) -> list[str]:
+        """Return all construction origins represented by support paths.
+
+        The returned list is deterministic and may contain more than one
+        origin for a single proposition. That is the intended representation
+        when distinct construction/support acts converge on one Commitment.
+        """
+
+        origins = {
+            str(path["origin"])
+            for path in self.construction_supports_for_assertion(assertion_id)
+            if str(path.get("origin") or "").strip()
+        }
+        return sorted(origins)
+
+    def origin_for_assertion(self, assertion_id: str) -> str:
+        """Compatibility accessor for assertions with exactly one origin.
+
+        A proposition with multiple support-path origins has no honest scalar
+        answer. Callers that need the complete information must use
+        :meth:`origins_for_assertion`.
+        """
+
+        origins = self.origins_for_assertion(assertion_id)
+        if len(origins) != 1:
+            raise OriginMetadataError(
+                f"assertion {assertion_id!r} has multiple construction origins; "
+                "use origins_for_assertion"
+            )
+        return origins[0]
 
     def origin_account(self) -> dict[str, int]:
         counts = {origin.value: 0 for origin in ConstructionOrigin}
         for row in self._store.query(
             "SELECT assertion_id FROM _world_assertions"
         ):
-            origin = self.origin_for_assertion(row["assertion_id"])
-            counts[origin] = counts.get(origin, 0) + 1
+            for origin in self.origins_for_assertion(row["assertion_id"]):
+                counts[origin] = counts.get(origin, 0) + 1
         return counts
 
     def relation_tuples(self, relation: str) -> set[tuple[Any, ...]]:
@@ -379,7 +438,7 @@ def _assertion_groundings(
         return [
             Grounding(
                 GroundingKind.WORLD,
-                f"origin:{origin.value}",
+                "construction",
                 json.dumps(
                     {"construction_origin": origin.value},
                     sort_keys=True,
@@ -398,8 +457,18 @@ def _assertion_groundings(
     grounds.append(
         Grounding(
             GroundingKind.WORLD,
-            f"origin:{origin.value}",
+            "construction",
             json.dumps(payload, sort_keys=True, separators=(",", ":")),
         )
     )
     return grounds
+
+
+def _origin_summary(origins: Sequence[str]) -> str:
+    """Render a legacy scalar origin field without selecting an origin."""
+
+    if not origins:
+        return UNKNOWN_ORIGIN
+    if len(origins) == 1:
+        return origins[0]
+    return MULTIPLE_ORIGINS

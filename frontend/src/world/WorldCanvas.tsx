@@ -746,7 +746,7 @@ export function WorldCanvas({
     }
     const assertion = set.assertions.get(id);
     if (assertion) {
-      return assertionShown(assertion.origin, assertion.mode, show)
+      return assertionShown(assertion.origins ?? assertion.origin, assertion.mode, show)
         ? { shape: "rect", id }
         : null;
     }
@@ -756,7 +756,7 @@ export function WorldCanvas({
       return show.unresolved ? { shape: "rect", id, dotted: true } : null;
     }
     const bond = set.bonds.find((edge) => edge.assertion_id === id);
-    if (bond && assertionShown(bond.origin, bond.mode, show)) {
+    if (bond && assertionShown(bond.origins ?? bond.origin, bond.mode, show)) {
       return {
         shape: "edge-label",
         id: bondElementId(id),
@@ -858,7 +858,7 @@ export function WorldCanvas({
       (bond) =>
         set.referents.has(bond.source) &&
         set.referents.has(bond.target) &&
-        assertionShown(bond.origin, bond.mode, show),
+        assertionShown(bond.origins ?? bond.origin, bond.mode, show),
     );
     /**
      * One stroke per pair of ends. Several claims between the same two
@@ -1051,10 +1051,10 @@ export function WorldCanvas({
     }
 
     for (const assertion of set.assertions.values()) {
-      if (!assertionShown(assertion.origin, assertion.mode, show)) continue;
+      if (!assertionShown(assertion.origins ?? assertion.origin, assertion.mode, show)) continue;
       const atChip = at(assertion.assertion_id);
       const overlay = unsettled(assertion.stale, assertion.completeness);
-      const kind = chipKindOf(assertion.origin);
+      const kind = chipKindOf(assertion.origins ?? assertion.origin);
       const chipPaint = paintFor(assertion.assertion_id, overlay);
       const chip = chipNode(
         assertion.assertion_id,
@@ -1199,7 +1199,7 @@ export function WorldCanvas({
 
     for (const bond of set.bonds) {
       if (!set.referents.has(bond.source) || !set.referents.has(bond.target)) continue;
-      if (!assertionShown(bond.origin, bond.mode, show)) continue;
+      if (!assertionShown(bond.origins ?? bond.origin, bond.mode, show)) continue;
       const overlay = unsettled(bond.stale, bond.completeness);
       const near = stationOfBond(bond);
       const layout = bondLabelLayout(
@@ -1225,7 +1225,7 @@ export function WorldCanvas({
         {
           label: bond.relation,
           named: namedBond.get(bond.assertion_id) ?? named(bond.assertion_id),
-          kind: chipKindOf(bond.origin),
+          kind: chipKindOf(bond.origins ?? bond.origin),
           labelPlacement: layout.placement,
           labelOffsetX: layout.offsetX,
           labelOffsetY: layout.offsetY,

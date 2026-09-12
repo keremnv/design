@@ -54,10 +54,11 @@ export const SHOW_DEFAULT: ShowState = {
 export type CompletenessStatus = "COMPLETE" | "INCOMPLETE" | "UNKNOWN";
 
 /**
- * One layer for one assertion. A tuple is not in two layers at once: origin
- * ADJUDICATED is a person's, origin SEMANTIC is the constructor's even if it
- * later feeds a derivation, origin DERIVED (or a derived relation whose origin
- * was not recorded) is computed, and everything else — MECHANICAL, UNKNOWN, an
+ * One or more layers for one assertion. A proposition may have support paths
+ * with different origins, so the complete origin list can occupy multiple
+ * layers. ADJUDICATED is a person's, SEMANTIC is the constructor's even if it
+ * later feeds a derivation, DERIVED (or a derived relation whose origin was
+ * not recorded) is computed, and everything else — MECHANICAL, UNKNOWN, an
  * empty BASE — is mechanical.
  *
  * ADJUDICATED is tested before the derivation mode, unlike SEMANTIC, and the
@@ -84,12 +85,18 @@ export function relationShown(relation: WorldRelation, show: ShowState): boolean
   return layersOfRelation(relation).some((layer) => show[layer]);
 }
 
+export function originsLabel(origin: string | string[]): string {
+  const origins = Array.isArray(origin) ? origin : [origin];
+  return origins.join(" + ");
+}
+
 export function assertionShown(
-  origin: string,
+  origin: string | string[],
   mode: string,
   show: ShowState,
 ): boolean {
-  return show[layerOf(origin, mode)];
+  const origins = Array.isArray(origin) ? origin : [origin];
+  return origins.some((item) => show[layerOf(item, mode)]);
 }
 
 /**

@@ -111,6 +111,7 @@ import "../styles/presence.css";
 import {
   SHOW_DEFAULT,
   assertionShown,
+  originsLabel,
   relationShown,
   reveal,
   type ShowState,
@@ -376,7 +377,11 @@ export function ReaderHeader({
 
 export function Grounding({ assertion }: { assertion: WorldAssertion }) {
   const sources = assertion.grounding.filter((item) => item.kind === "SOURCE");
-  const world = assertion.grounding.find((item) => item.kind === "WORLD");
+  const methods = assertion.grounding
+    .filter((item) => item.kind === "WORLD" && item.construction_method)
+    .map((item) => item.construction_method as string)
+    .filter((method, index, all) => all.indexOf(method) === index);
+  const origins = assertion.origins ?? [assertion.origin];
   return (
     <>
       <h3>grounded by</h3>
@@ -392,9 +397,10 @@ export function Grounding({ assertion }: { assertion: WorldAssertion }) {
       ) : (
         <p className="world__note">No source grounding recorded.</p>
       )}
-      {world?.construction_method ? (
-        <p className="world__note">method · {world.construction_method}</p>
+      {methods.length ? (
+        <p className="world__note">methods · {methods.join(" · ")}</p>
       ) : null}
+      <p className="world__note">origins · {originsLabel(origins)}</p>
     </>
   );
 }
@@ -727,6 +733,10 @@ function CandidateInspection({ candidate }: { candidate: WorldCandidate }) {
         <li>
           <b>authority</b>
           <span>{authorities.length ? authorities.join(", ") : "none recorded"}</span>
+        </li>
+        <li>
+          <b>origin</b>
+          <span>{originsLabel(candidate.warrant.construction_origins)}</span>
         </li>
         <li>
           <b>assessment</b>
@@ -1457,11 +1467,12 @@ export function WorldPage() {
   const fieldDirectory = useMemo<Directory>(() => [
     ...Array.from(set.referents.values(), ({ id, label }) => ({ id, label })),
     ...Array.from(set.assertions.values())
-      .filter((item) => assertionShown(item.origin, item.mode, show))
+      .filter((item) => assertionShown(item.origins ?? item.origin, item.mode, show))
       .map((item) => ({ id: item.assertion_id, label: item.relation })),
     ...set.bonds
       .filter((item) => set.referents.has(item.source) &&
-        set.referents.has(item.target) && assertionShown(item.origin, item.mode, show))
+        set.referents.has(item.target) &&
+        assertionShown(item.origins ?? item.origin, item.mode, show))
       .map((item) => ({ id: item.assertion_id, label: item.relation })),
     ...(show.unresolved
       ? Array.from(set.demands.values(), (item) => ({ id: item.key, label: item.relation }))
@@ -1717,6 +1728,7 @@ export function WorldPage() {
               tuple: {
                 assertion_id: obligation.assertion_id as string,
                 origin: found.origin,
+                origins: found.origins,
                 values: found.values,
               },
               labels: labels.current,

@@ -305,6 +305,9 @@ class ConstructionWorld:
     def warrant_for_assertion(self, assertion_id: str) -> dict[str, Any]:
         return self._inner.warrant_for_assertion(assertion_id)
 
+    def origins_for_assertion(self, assertion_id: str) -> list[str]:
+        return self._inner.origins_for_assertion(assertion_id)
+
     def admission_errors(self) -> list[dict[str, Any]]:
         """Return Contract admission failures without mutating the World."""
 
@@ -351,13 +354,10 @@ class ConstructionWorld:
             )
             for row in rows:
                 assertion_id = str(row["assertion_id"])
-                grounds = self.query(
-                    "SELECT kind, reference, detail FROM _world_groundings "
-                    "WHERE subject_type = 'ASSERTION' AND subject_id = ?",
-                    (assertion_id,),
-                )
                 try:
-                    origin = self._inner.origin_for_assertion(assertion_id)
+                    supports = self._inner.construction_supports_for_assertion(
+                        assertion_id
+                    )
                 except Exception as error:
                     errors.append(
                         {
@@ -369,32 +369,33 @@ class ConstructionWorld:
                         }
                     )
                     continue
-                try:
-                    self.contract.admit_assertion(
-                        relation=relation,
-                        scope=scope,
-                        mode=schema["mode"],
-                        origin=origin,
-                        has_source_grounding=any(
-                            str(item["kind"]) == "SOURCE"
-                            and str(item["reference"] or "").strip()
-                            for item in grounds
-                        ),
-                        has_provenance=bool(grounds),
-                        has_construction_method=_groundings_have_method(grounds),
-                        semantic_reference_kinds=reference_kinds,
-                        authority=self.constructor_authority,
-                    )
-                except ContractAdmissionError as error:
-                    errors.append(
-                        {
-                            "assertion_id": assertion_id,
-                            "relation": relation,
-                            "scope": scope,
-                            "reason": error.reason,
-                            "message": str(error),
-                        }
-                    )
+                for support in supports:
+                    try:
+                        self.contract.admit_assertion(
+                            relation=relation,
+                            scope=scope,
+                            mode=schema["mode"],
+                            origin=str(support["origin"]),
+                            has_source_grounding=bool(
+                                support["has_source_grounding"]
+                            ),
+                            has_provenance=bool(support["has_provenance"]),
+                            has_construction_method=bool(
+                                support["has_construction_method"]
+                            ),
+                            semantic_reference_kinds=reference_kinds,
+                            authority=self.constructor_authority,
+                        )
+                    except ContractAdmissionError as error:
+                        errors.append(
+                            {
+                                "assertion_id": assertion_id,
+                                "relation": relation,
+                                "scope": scope,
+                                "reason": error.reason,
+                                "message": str(error),
+                            }
+                        )
         return errors
 
     def retract_tuple(self, relation: str, values: Mapping[str, Any]) -> bool:
@@ -461,17 +462,3 @@ def role_text(name: str) -> Role:
 
 def role_referent(name: str) -> Role:
     return Role(name, RoleType.REFERENT)
-
-
-def _groundings_have_method(groundings: Iterable[Mapping[str, Any]]) -> bool:
-    for grounding in groundings:
-        detail = grounding.get("detail")
-        if not detail:
-            continue
-        try:
-            payload = json.loads(detail)
-        except (TypeError, ValueError):
-            continue
-        if isinstance(payload, dict) and str(payload.get("construction_method") or "").strip():
-            return True
-    return False

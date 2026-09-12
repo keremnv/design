@@ -20,10 +20,11 @@ about words:
 **Origin.** `_world_assertions.origin` is `ASSERTED` or `DERIVED` — how the tuple
 got into the table. The product means something else by origin: MECHANICAL,
 SEMANTIC or DERIVED — who decided it, which is what the canvas paints. That
-lives in the kernel's sidecar, via `origin_for_assertion`. A world compiled
-without the backfill has no answer at all, and this reports `UNKNOWN` rather
-than raising, because a missing origin is a fact about the world worth seeing on
-screen, not a broken request.
+lives on the grounding/support paths, via `origins_for_assertion`. A world
+compiled without that metadata has no answer at all, and this reports
+`UNKNOWN` rather than raising, because a missing origin is a fact about the
+world worth seeing on screen, not a broken request. `origin` remains a scalar
+compatibility summary; `origins` carries every support-path origin.
 
 **Roles versus columns.** A relation's role is `new_part`; its column is
 `new_part_id` for a referent role and the bare name for a scalar. `describe()`
@@ -42,8 +43,9 @@ from typing import Any, Iterable, Mapping, Sequence
 from ontology_author.world.core.kernel import SemanticWorld
 from ontology_author.world.core.origins import OriginMetadataError
 
-#: Reported when a world carries no construction-origin sidecar for a tuple.
+#: Reported when a world carries no construction-origin grounding for a tuple.
 UNKNOWN_ORIGIN = "UNKNOWN"
+MULTIPLE_ORIGINS = "MULTIPLE"
 
 #: Ceiling on rows any single call will return. The canvas is bounded by design
 #: and the table pages; nothing downstream wants the whole extension in one
@@ -167,15 +169,7 @@ class WorldExplorerAdapter:
         )
 
     def close(self) -> None:
-        """Release the world without writing to it.
-
-        `SemanticWorld.close()` persists the origins sidecar, which is right
-        for a constructor holding origins it decided and wrong for a read
-        plane: serving a world would rewrite a file beside it, and "no surface
-        writes a compiled world" would be a sentence rather than a fact. This
-        layer never mutates the origin map it loaded, so there is nothing here
-        that a write-back would preserve.
-        """
+        """Release the read-only World without writing to it."""
         self._world.close()
 
     def __enter__(self) -> "WorldExplorerAdapter":
@@ -227,11 +221,17 @@ class WorldExplorerAdapter:
             for r in record["roles"]
         ]
 
-    def _origin(self, assertion_id: str) -> str:
+    def _origins(self, assertion_id: str) -> list[str]:
         try:
-            return self._world.origin_for_assertion(assertion_id)
+            return self._world.origins_for_assertion(assertion_id)
         except OriginMetadataError:
-            return UNKNOWN_ORIGIN
+            return [UNKNOWN_ORIGIN]
+
+    def _origin(self, assertion_id: str) -> str:
+        origins = self._origins(assertion_id)
+        if len(origins) == 1:
+            return origins[0]
+        return MULTIPLE_ORIGINS
 
     def _grounding(self, subject_type: str, subject_id: str) -> list[dict[str, Any]]:
         """Grounding with its detail opened up.
@@ -270,6 +270,7 @@ class WorldExplorerAdapter:
         return {
             "assertion_id": assertion_id,
             "origin": self._origin(assertion_id),
+            "origins": self._origins(assertion_id),
             "values": {role.name: row[role.column] for role in roles},
         }
 
@@ -311,9 +312,9 @@ class WorldExplorerAdapter:
             "SELECT relation_name, assertion_id FROM _world_assertions"
         ):
             origins = seen.setdefault(row["relation_name"], [])
-            origin = self._origin(row["assertion_id"])
-            if origin not in origins:
-                origins.append(origin)
+            for origin in self._origins(row["assertion_id"]):
+                if origin not in origins:
+                    origins.append(origin)
         return {name: sorted(origins) for name, origins in seen.items()}
 
     # -- §7.1 world and schema ---------------------------------------------
@@ -445,8 +446,8 @@ class WorldExplorerAdapter:
         )[0]
         origins: dict[str, int] = {}
         for row in self._store.query("SELECT assertion_id FROM _world_assertions"):
-            origin = self._origin(row["assertion_id"])
-            origins[origin] = origins.get(origin, 0) + 1
+            for origin in self._origins(row["assertion_id"]):
+                origins[origin] = origins.get(origin, 0) + 1
         incomplete = [
             record["name"]
             for record in described
@@ -813,6 +814,7 @@ class WorldExplorerAdapter:
                             "value": row[scalar_roles[0].column],
                             "assertion_id": row["_assertion_id"],
                             "origin": self._origin(row["_assertion_id"]),
+                            "origins": self._origins(row["_assertion_id"]),
                         }
                     )
                 continue
@@ -1001,6 +1003,7 @@ class WorldExplorerAdapter:
             # (how it got into the table). Both are reported, because a reader
             # asking "why is this here" is served by neither alone.
             "origin": self._origin(assertion_id),
+            "origins": self._origins(assertion_id),
             "assertion_state": found[0]["origin"],
             "created_revision": int(found[0]["created_revision"]),
             "relation_stale": record["stale"],

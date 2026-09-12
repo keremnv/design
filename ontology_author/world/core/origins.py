@@ -1,7 +1,8 @@
 """Construction-origin axis used by the experimental harness.
 
-This is separate from ASSERTED/DERIVED assertion bookkeeping. It classifies how a live
-semantic tuple entered the world so frontier size can be computed mechanically.
+This is separate from ASSERTED/DERIVED assertion bookkeeping. It classifies
+how a particular construction/support path entered the World; it is not an
+intrinsic property with one value per semantic proposition.
 """
 
 from __future__ import annotations
@@ -10,13 +11,12 @@ from enum import StrEnum
 
 
 class ConstructionOrigin(StrEnum):
-    """How a live semantic tuple came to be in the world.
+    """How one support/construction path came to be in the World.
 
-    ``ADJUDICATED`` is a person's judgment, superseding or supplying one the
-    constructor made.  It is its own member rather than a flavour of
-    ``SEMANTIC`` because a human decision entering as the machine's launders
-    it: every downstream claim about how the world was constructed becomes
-    untrue, and the frontier stops being computable mechanically.
+    ``ADJUDICATED`` remains available for a direct adjudicated construction
+    path. A first-class Adjudication record is not automatically rewritten as
+    an origin on an ordinary Commitment; its own record remains the source of
+    that fact.
     """
 
     MECHANICAL = "MECHANICAL"

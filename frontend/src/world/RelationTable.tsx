@@ -34,6 +34,7 @@ import { ProblemNotice } from "./ProblemNotice";
 import { useRowWindow } from "./rowWindow";
 import { shortenIdentifier, useTableWidth } from "./tableWidth";
 import { TableBar, TableSearch, type TableChrome } from "./tableChrome";
+import { originsLabel } from "./show";
 
 /** Fixed, because a windowed table needs to know where a row is without asking. */
 const ROW_HEIGHT = 26;
@@ -283,7 +284,9 @@ export function RelationTable({
                     ))
                   : roles.map((role) => <span key={role.name} />)}
                 <span className="table__origin">
-                  {tuple ? tuple.origin.toLowerCase() : ""}
+                  {tuple
+                    ? originsLabel(tuple.origins ?? tuple.origin).toLowerCase()
+                    : ""}
                 </span>
               </div>
             );

@@ -237,9 +237,13 @@ export function discNode(
  * account of who made it, so it is applied by whoever knows that — never by
  * reading an origin.
  */
-export function chipKindOf(origin: string): ChipKind {
-  if (origin === "ADJUDICATED") return "adjudicated";
-  if (origin === "SEMANTIC") return "semantic";
+export function chipKindOf(origin: string | string[]): ChipKind {
+  const origins = Array.isArray(origin) ? origin : [origin];
+  // A mark has one visual treatment, while the inspector exposes every
+  // support-path origin. This ordering only keeps authored/human material
+  // visible when a proposition also has a mechanical support path.
+  if (origins.includes("ADJUDICATED")) return "adjudicated";
+  if (origins.includes("SEMANTIC")) return "semantic";
   return "mechanical";
 }
 
