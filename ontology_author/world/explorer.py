@@ -378,6 +378,53 @@ class WorldExplorerAdapter:
         """The current persisted evaluation for one Obligation."""
         return self._world.resolution(obligation_id)
 
+    def obligation(self, obligation_id: str) -> dict[str, Any] | None:
+        """One durable Obligation as a human-facing inspection aggregate.
+
+        ``/world/demand`` remains the compact frontier payload used by the
+        legacy Purpose surface.  This selected-obligation read joins the
+        already-recorded Commitment, Warrant, assessment, and adjudication
+        state so the reader does not have to reproduce kernel joins or make a
+        request per candidate.
+        """
+
+        target = str(obligation_id)
+        for item in self._contract_frontier():
+            if item.get("obligation_id") != target:
+                continue
+            resolution = item.get("resolution")
+            item["candidates"] = self._contract_candidates(
+                target,
+                detailed=True,
+                resolution=resolution if isinstance(resolution, Mapping) else None,
+            )
+            assessments = {
+                str(assessment.get("adjudication_id")): assessment
+                for assessment in (
+                    resolution.get("adjudication_assessments", [])
+                    if isinstance(resolution, Mapping)
+                    else []
+                )
+                if isinstance(assessment, Mapping)
+                and assessment.get("adjudication_id")
+            }
+            item["adjudications"] = [
+                {
+                    "record": record,
+                    "assessment": assessments.get(str(record["adjudication_id"])),
+                }
+                for record in self._world.adjudications_for_obligation(target)
+            ]
+            identities = self.identity()
+            item["context"] = {
+                "contract": identities.get("contract"),
+                "governance": identities.get("governance"),
+                "evidence_authority": identities.get("evidence_authority"),
+                "adjudication_authority": identities.get("adjudication_authority"),
+            }
+            return item
+        return None
+
     def overview(self) -> dict[str, Any]:
         described = self._described()
         counts = self._store.query(
@@ -935,6 +982,24 @@ class WorldExplorerAdapter:
             "warrant": self._world.warrant_for_assertion(assertion_id),
             "candidate_for": self._world.obligations_for(assertion_id),
         }
+        assessments: list[dict[str, Any]] = []
+        governing: list[str] = []
+        for obligation_id in out["candidate_for"]:
+            resolution = self._world.resolution(obligation_id)
+            if resolution is None:
+                continue
+            if resolution.get("selected_commitment_id") == assertion_id:
+                governing.append(obligation_id)
+            for assessment in resolution.get("candidate_assessments", []):
+                if (
+                    isinstance(assessment, Mapping)
+                    and assessment.get("commitment_id") == assertion_id
+                ):
+                    assessments.append(
+                        {"obligation_id": obligation_id, **dict(assessment)}
+                    )
+        out["governing_obligations"] = governing
+        out["candidate_assessments"] = assessments
         if record["mode"] == "DERIVED":
             out["derivation"] = {
                 **(record.get("derivation") or {}),
@@ -1208,6 +1273,7 @@ class WorldExplorerAdapter:
             if provenance:
                 obligation.update(
                     {
+                        "dimension": provenance.get("dimension"),
                         "generated_by_rule": provenance.get("rule_id"),
                         "law_provenance": provenance.get("law_provenance"),
                         "structural_bindings": provenance.get("bindings", {}),
@@ -1232,21 +1298,72 @@ class WorldExplorerAdapter:
             obligations.append(obligation)
         return obligations
 
-    def _contract_candidates(self, obligation_id: str) -> list[dict[str, Any]]:
+    def _contract_candidates(
+        self,
+        obligation_id: str,
+        *,
+        detailed: bool = False,
+        resolution: Mapping[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         """Read the kernel candidate association, not a domain relation."""
 
-        return [
+        links = [
             {
                 # Keep the human-facing name for the association while making
                 # clear that it has no semantic assertion id of its own.
                 "relation": "candidate_for",
                 "association_id": item["association_id"],
+                "obligation_id": item["obligation_id"],
                 "commitment_id": item["commitment_id"],
                 "created_revision": item["created_revision"],
             }
             for item in self._world.candidate_associations()
             if item["obligation_id"] == obligation_id
         ]
+        if not detailed:
+            for item in links:
+                item.pop("obligation_id", None)
+            return links
+
+        candidate_assessments = {
+            str(assessment.get("commitment_id")): assessment
+            for assessment in (
+                resolution.get("candidate_assessments", [])
+                if isinstance(resolution, Mapping)
+                else []
+            )
+            if isinstance(assessment, Mapping) and assessment.get("commitment_id")
+        }
+        selected = (
+            str(resolution.get("selected_commitment_id"))
+            if isinstance(resolution, Mapping)
+            and resolution.get("selected_commitment_id")
+            else None
+        )
+        detailed_links: list[dict[str, Any]] = []
+        for link in links:
+            commitment = self.assertion(str(link["commitment_id"]))
+            detailed_links.append(
+                {
+                    **link,
+                    "commitment": {
+                        "commitment_id": commitment["commitment_id"],
+                        "assertion_id": commitment["assertion_id"],
+                        "relation": commitment["relation"],
+                        "roles": commitment["roles"],
+                        "values": commitment["values"],
+                        "origin": commitment["origin"],
+                        "created_revision": commitment["created_revision"],
+                    },
+                    "warrant": commitment["warrant"],
+                    "grounding": commitment["grounding"],
+                    "assessment": candidate_assessments.get(
+                        str(link["commitment_id"])
+                    ),
+                    "governing": selected == str(link["commitment_id"]),
+                }
+            )
+        return detailed_links
 
     def _purpose_frontier(self) -> dict[str, Any] | None:
         """The same frontier, read off a world rebuilt by the v1 boundary.

@@ -1,5 +1,6 @@
 /**
- * The unresolved frontier — what a purpose asked of this world and did not get.
+ * The shared obligation table: legacy Purpose demand when that is all a World
+ * has, or durable governed Obligations when the new semantic read model exists.
  *
  * §8.7 makes semantic demand first-class, and the reason it has to be a surface
  * of its own is that unresolved is not a property of the world. It is the join
@@ -14,7 +15,8 @@
  * paging: an obligation set is one document the read plane already holds, so
  * there is nothing to page and the whole list arrives at once.
  *
- * Two granularities, kept apart. The rows are obligations — tuple-level, *this
+ * In the legacy branch, two granularities are kept apart. The rows are
+ * obligations — tuple-level, *this
  * demanded tuple is missing*. The band above them is `requirements` —
  * relation-level, *this is what was wanted of the world at all* — which is
  * where the v1 lineage records the met half of a frontier. See `Asked`.
@@ -27,7 +29,13 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import type { WorldDemand, WorldRelation } from "../api/world";
+import type {
+  LegacyWorldObligation,
+  WorldDemand,
+  WorldObligation,
+  WorldRelation,
+  WorldResolutionStatus,
+} from "../api/world";
 import { still } from "../styles/motion";
 import { ProblemNotice } from "./ProblemNotice";
 import { useRowWindow } from "./rowWindow";
@@ -40,9 +48,147 @@ const ASKED_COLUMNS = "28px minmax(0, 2fr) minmax(0, 1.1fr)";
 
 type Requirement = NonNullable<WorldDemand["requirements"]>[number];
 
-export type Obligation = WorldDemand["obligations"][number] & { key: string };
+export type Obligation = LegacyWorldObligation & { key: string };
+export type GovernedObligation = WorldObligation & { key: string };
+
+export function isWorldObligation(
+  item: WorldDemand["obligations"][number],
+): item is WorldObligation {
+  return "obligation_id" in item;
+}
 
 export function FrontierTable({
+  demand,
+  relations,
+  problem,
+  present,
+  chrome,
+  onFocus,
+}: {
+  demand: WorldDemand | null;
+  /** The vocabulary, so a tuple prints in role order rather than JSON order. */
+  relations: WorldRelation[];
+  problem: string | null;
+  /** Obligation keys and assertion ids already on the field. */
+  present: Set<string>;
+  chrome: TableChrome;
+  onFocus: (obligation: Obligation | GovernedObligation) => void;
+}) {
+  const governed = (demand?.obligations ?? [])
+    .filter(isWorldObligation)
+    .map((obligation) => ({ ...obligation, key: obligation.obligation_id }));
+  if (governed.length) {
+    return (
+      <GovernedFrontierTable
+        obligations={governed}
+        problem={problem}
+        chrome={chrome}
+        onFocus={onFocus}
+      />
+    );
+  }
+  return (
+    <LegacyFrontierTable
+      demand={demand}
+      relations={relations}
+      problem={problem}
+      present={present}
+      chrome={chrome}
+      onFocus={onFocus}
+    />
+  );
+}
+
+function statusOf(obligation: WorldObligation): WorldResolutionStatus {
+  return obligation.resolution?.status ?? "NO_CANDIDATE";
+}
+
+function statusLabel(status: WorldResolutionStatus): string {
+  return status.toLowerCase().replaceAll("_", " ");
+}
+
+function GovernedFrontierTable({
+  obligations,
+  problem,
+  chrome,
+  onFocus,
+}: {
+  obligations: GovernedObligation[];
+  problem: string | null;
+  chrome: TableChrome;
+  onFocus: (obligation: GovernedObligation) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const rows = useMemo(
+    () => obligations.filter((item) =>
+      JSON.stringify(item).toLowerCase().includes(query.trim().toLowerCase()),
+    ),
+    [obligations, query],
+  );
+  const counts = useMemo(() => {
+    const result = new Map<WorldResolutionStatus, number>();
+    obligations.forEach((item) => {
+      const status = statusOf(item);
+      result.set(status, (result.get(status) ?? 0) + 1);
+    });
+    return result;
+  }, [obligations]);
+
+  return (
+    <section className="table" aria-label="governed obligations">
+      <TableBar
+        chrome={chrome}
+        meta={
+          <>
+            {obligations.length} governed obligation
+            {obligations.length === 1 ? "" : "s"}
+            {counts.get("RESOLVED")
+              ? ` · ${counts.get("RESOLVED")} resolved`
+              : ""}
+          </>
+        }
+      />
+      <TableSearch value={query} onChange={setQuery} label="Search governed obligations" />
+      {query && !rows.length ? (
+        <p className="table__empty">No obligations match this search.</p>
+      ) : null}
+      <div
+        className="table__head"
+        style={{ gridTemplateColumns: "minmax(0, 3fr) 155px 90px" }}
+      >
+        <span>question</span>
+        <span>dimension</span>
+        <span>status</span>
+      </div>
+      {problem ? <ProblemNotice message={problem} title="Unable to load obligations" /> : null}
+      <div className="table__scroll">
+        {rows.map((item) => {
+          const status = statusOf(item);
+          return (
+            <div
+              key={item.key}
+              className="table__row"
+              {...still("rowsNeverFly")}
+              data-loaded
+              data-resolved={status === "RESOLVED" ? true : undefined}
+              style={{
+                minHeight: ROW_HEIGHT,
+                gridTemplateColumns: "minmax(0, 3fr) 155px 90px",
+              }}
+              onClick={() => onFocus(item)}
+            >
+              <span title={item.question}>{item.question}</span>
+              <span className="table__origin">{item.dimension ?? "—"}</span>
+              <span className="table__origin">{statusLabel(status)}</span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function LegacyFrontierTable({
   demand,
   relations,
   problem,
@@ -64,7 +210,7 @@ export function FrontierTable({
 
   const all = useMemo<Obligation[]>(
     () =>
-      (demand?.obligations ?? []).map((obligation, index) => ({
+      (demand?.obligations ?? []).filter((item): item is LegacyWorldObligation => !isWorldObligation(item)).map((obligation, index) => ({
         ...obligation,
         // Positional, and positional in the *document* rather than in whatever
         // is being shown, so a key means the same obligation whether or not the

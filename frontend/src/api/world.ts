@@ -61,6 +61,10 @@ export type WorldRelation = {
 export type WorldOverview = {
   world_id: string;
   revision: number;
+  contract?: Record<string, string> | null;
+  governance?: Record<string, string> | null;
+  evidence_authority?: Record<string, string> | null;
+  adjudication_authority?: Record<string, string> | null;
   relations: number;
   referents: number;
   assertions: number;
@@ -89,6 +93,142 @@ export type WorldGrounding = {
   detail_text?: string;
 };
 
+export type WorldWarrantBase = {
+  kind: string;
+  reference: string;
+  detail?: Record<string, unknown>;
+  detail_text?: string;
+  [key: string]: unknown;
+};
+
+export type WorldWarrant = {
+  commitment_id: string;
+  relation: string;
+  assertion_origin: string;
+  recorded_construction_origin: string;
+  construction_origins: string[];
+  created_revision: number;
+  bases: WorldWarrantBase[];
+};
+
+export type WorldResolutionStatus =
+  | "RESOLVED"
+  | "NO_CANDIDATE"
+  | "INSUFFICIENT_WARRANT"
+  | "CONFLICT"
+  | "AMBIGUOUS";
+
+export type WorldCandidateAssessment = {
+  commitment_id: string;
+  status: "SUFFICIENT" | "INSUFFICIENT";
+  reason: string;
+  warrant_authorities: string[];
+  authority_basis: Record<string, unknown>[];
+};
+
+export type WorldAdjudicationAssessment = {
+  adjudication_id: string;
+  selected_commitment_id: string;
+  status: "SUFFICIENT" | "INSUFFICIENT";
+  reason: string;
+  adjudicative_authorities: string[];
+  authority_basis: Record<string, unknown>[];
+};
+
+export type WorldResolution = {
+  resolution_id: string;
+  obligation_id: string;
+  status: WorldResolutionStatus;
+  selected_commitment_id: string | null;
+  reason: string;
+  contract_id: string;
+  contract_revision: string;
+  candidate_assessments: WorldCandidateAssessment[];
+  adjudication_assessments: WorldAdjudicationAssessment[];
+  resolution_basis: Record<string, unknown>[];
+};
+
+export type WorldCandidateLink = {
+  relation: "candidate_for";
+  association_id: string;
+  commitment_id: string;
+  created_revision: number;
+};
+
+export type WorldCommitment = {
+  commitment_id: string;
+  assertion_id: string;
+  relation: string;
+  roles: WorldRole[];
+  values: Record<string, unknown>;
+  origin: string;
+  created_revision: number;
+};
+
+export type WorldCandidate = WorldCandidateLink & {
+  obligation_id: string;
+  commitment: WorldCommitment;
+  warrant: WorldWarrant;
+  grounding: WorldGrounding[];
+  assessment: WorldCandidateAssessment | null;
+  governing: boolean;
+};
+
+export type WorldLawProvenance = {
+  rule_id?: string;
+  source_id?: string;
+  source_revision?: string;
+  source_location?: string;
+  source_excerpt?: string;
+  interpretation_method?: string;
+  [key: string]: unknown;
+};
+
+export type WorldObligation = {
+  obligation_id: string;
+  question: string;
+  dimension?: string | null;
+  relation: null;
+  values: Record<string, unknown>;
+  reason: string | null;
+  demanded_by: Record<string, unknown>;
+  state: "RESOLVED" | "UNRESOLVED";
+  assertion_id: null;
+  record_id: null;
+  grounding_ref: null;
+  contract_id: string;
+  contract_revision: string;
+  generated_by_rule?: string | null;
+  law_provenance?: WorldLawProvenance | null;
+  structural_bindings?: Record<string, unknown>;
+  candidates: WorldCandidateLink[];
+  resolution?: WorldResolution;
+};
+
+export type WorldAdjudicationInspection = {
+  record: {
+    adjudication_id: string;
+    obligation_id: string;
+    selected_commitment_id: string;
+    authority_basis: Record<string, unknown>;
+    contract_id: string;
+    contract_revision: string;
+    [key: string]: unknown;
+  };
+  assessment: WorldAdjudicationAssessment | null;
+};
+
+export type WorldObligationInspection = Omit<WorldObligation, "candidates"> & {
+  candidates: WorldCandidate[];
+  adjudications: WorldAdjudicationInspection[];
+  context: {
+    contract: Record<string, string> | null;
+    governance: Record<string, string> | null;
+    evidence_authority: Record<string, string> | null;
+    adjudication_authority: Record<string, string> | null;
+  };
+};
+
 export type WorldTuple = {
   assertion_id: string;
   origin: string;
@@ -105,6 +245,13 @@ export type WorldAssertion = WorldTuple & {
   relation_stale: boolean;
   completeness: WorldCompleteness | null;
   grounding: WorldGrounding[];
+  warrant: WorldWarrant;
+  commitment_id: string;
+  candidate_for: string[];
+  governing_obligations: string[];
+  candidate_assessments: (WorldCandidateAssessment & {
+    obligation_id: string;
+  })[];
   derivation?: { inputs: string[] } & Record<string, unknown>;
 };
 
@@ -209,29 +356,32 @@ export type WorldSupport = {
 };
 
 /**
- * The unresolved frontier recorded for a World purpose.
+ * The legacy unresolved frontier recorded for a World purpose. Durable
+ * governed Obligations use `WorldObligation` below and are not tuple failures.
  *
  * `rule` is optional because a purpose is prose plus construction state, not a
  * separate obligation compiler.
  * `requirements` is the relation-level summary of what the purpose asked for,
  * alongside any unresolved tuples.
  */
+export type LegacyWorldObligation = {
+  relation: string;
+  values: Record<string, unknown>;
+  demanded_by: Record<string, unknown>;
+  state: "ASSERTED" | "UNRESOLVED";
+  assertion_id: string | null;
+  /** The failure tuple itself, where unresolvedness is world state. */
+  record_id?: string;
+  /** Why it is unresolved, where the constructor said so. Not a role value. */
+  reason?: string | null;
+  grounding_ref?: string | null;
+};
+
 export type WorldDemand = {
   purpose: { id?: string; revision?: number; statement: string };
   rule: string | null;
   demanded: number;
-  obligations: {
-    relation: string;
-    values: Record<string, unknown>;
-    demanded_by: Record<string, unknown>;
-    state: "ASSERTED" | "UNRESOLVED";
-    assertion_id: string | null;
-    /** The failure tuple itself, where unresolvedness is world state. */
-    record_id?: string;
-    /** Why it is unresolved, where the constructor said so. Not a role value. */
-    reason?: string | null;
-    grounding_ref?: string | null;
-  }[];
+  obligations: (LegacyWorldObligation | WorldObligation)[];
   requirements?: {
     name: string;
     kind: string;
@@ -318,4 +468,8 @@ export const worldApi = {
     read<WorldDerivation>(`/world/derivation?relation=${encodeURIComponent(relation)}`),
   support: (id: string) =>
     read<WorldSupport>(`/world/support?id=${encodeURIComponent(id)}`),
+  obligation: (id: string) =>
+    read<WorldObligationInspection | null>(
+      `/world/obligation?obligation_id=${encodeURIComponent(id)}`,
+    ),
 };

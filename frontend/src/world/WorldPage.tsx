@@ -29,8 +29,12 @@ import {
 import {
   worldApi,
   type WorldAssertion,
+  type WorldCandidate,
   type WorldDemand,
+  type WorldObligation,
+  type WorldObligationInspection,
   type WorldOverview,
+  type WorldResolutionStatus,
   type WorldReferent,
   type WorldRelation,
   type WorldRole,
@@ -58,7 +62,12 @@ import {
   expansionViewState,
   type ExpansionRequests,
 } from "./expansionMachine";
-import { FrontierTable, type Obligation } from "./FrontierTable";
+import {
+  FrontierTable,
+  isWorldObligation,
+  type GovernedObligation,
+  type Obligation,
+} from "./FrontierTable";
 import { MARK_DEFAULTS } from "./marks";
 import { RelationTable } from "./RelationTable";
 import { SchemaCanvas } from "./SchemaCanvas";
@@ -421,6 +430,9 @@ export function AssertionPanel({
     assertion.relation_stale,
     assertion.completeness,
   ).replace(/^ · /, "");
+  const assessments = new Map(
+    assertion.candidate_assessments.map((item) => [item.obligation_id, item]),
+  );
   return (
     <article className="world-reader__article">
       <ReaderHeader
@@ -451,6 +463,38 @@ export function AssertionPanel({
         <section className="world-reader__section">
           <Grounding assertion={assertion} />
         </section>
+        {assertion.candidate_for.length ? (
+          <section className="world-reader__section">
+            <h3>Candidate for</h3>
+            <ol className="world__roles">
+              {assertion.candidate_for.map((obligationId) => {
+                const assessment = assessments.get(obligationId);
+                const governing = assertion.governing_obligations.includes(obligationId);
+                return (
+                  <li key={obligationId}>
+                    <b>{obligationId}</b>
+                    <span>
+                      {governing
+                        ? "governing"
+                        : assessment
+                          ? `${assessment.status.toLowerCase()} · ${assessment.warrant_authorities.join(", ") || "no authority"}`
+                          : "candidate; not assessed"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+            {assertion.candidate_assessments.some((item) => item.authority_basis.length) ? (
+              <p className="world__note">
+                authority basis · {assertion.candidate_assessments
+                  .flatMap((item) => item.authority_basis)
+                  .map((item) => String(item.source_id || item.authority || "recorded binding"))
+                  .filter((item, index, all) => all.indexOf(item) === index)
+                  .join(", ")}
+              </p>
+            ) : null}
+          </section>
+        ) : null}
       </div>
       <footer className="world-reader__actions">
         {folding ? (
@@ -620,6 +664,250 @@ export function DemandPanel({
           Take off the field
         </button>
       </footer>
+    </article>
+  );
+}
+
+function isObligationInspection(
+  obligation: WorldObligation | WorldObligationInspection,
+): obligation is WorldObligationInspection {
+  return "context" in obligation;
+}
+
+function obligationStatus(
+  obligation: WorldObligation | WorldObligationInspection,
+): WorldResolutionStatus {
+  return obligation.resolution?.status ?? "NO_CANDIDATE";
+}
+
+function readableStatus(status: WorldResolutionStatus): string {
+  return status.toLowerCase().replaceAll("_", " ");
+}
+
+function commitmentText(candidate: WorldCandidate): string {
+  const roles = candidate.commitment.roles
+    .map((role) => `${role.name} = ${String(candidate.commitment.values[role.name] ?? "—")}`)
+    .join(", ");
+  return `${candidate.commitment.relation}(${roles})`;
+}
+
+function supportLabel(candidate: WorldCandidate, index: number): string {
+  const grounding = candidate.grounding[index];
+  if (grounding?.native_handle) {
+    return grounding.native_location
+      ? `${grounding.native_handle} · ${grounding.native_location}`
+      : grounding.native_handle;
+  }
+  const basis = candidate.warrant.bases[index];
+  return basis?.reference || basis?.kind || "recorded support";
+}
+
+function CandidateInspection({ candidate }: { candidate: WorldCandidate }) {
+  const assessment = candidate.assessment;
+  const authorities = assessment?.warrant_authorities ?? [];
+  return (
+    <article className="world-reader__section">
+      <h3>
+        {candidate.commitment.commitment_id}
+        {candidate.governing ? " · governing" : " · candidate"}
+      </h3>
+      <p className="world__code">{commitmentText(candidate)}</p>
+      <ol className="world__roles">
+        <li>
+          <b>supported by</b>
+          <span>
+            {candidate.grounding.length || candidate.warrant.bases.length
+              ? (candidate.grounding.length || candidate.warrant.bases.length) === 1
+                ? supportLabel(candidate, 0)
+                : `${candidate.grounding.length || candidate.warrant.bases.length} recorded bases`
+              : "No support basis recorded."}
+          </span>
+        </li>
+        <li>
+          <b>authority</b>
+          <span>{authorities.length ? authorities.join(", ") : "none recorded"}</span>
+        </li>
+        <li>
+          <b>assessment</b>
+          <span>
+            {assessment
+              ? `${assessment.status.toLowerCase()} · ${assessment.reason}`
+              : "not assessed in the persisted resolution"}
+          </span>
+        </li>
+      </ol>
+      {candidate.grounding.length > 1 ? (
+        <ul className="world__grounding">
+          {candidate.grounding.map((item, index) => (
+            <li key={`${item.reference}:${index}`}>
+              <b>{item.native_handle || item.reference}</b>
+              <span>{item.native_location || item.construction_method || item.kind}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {assessment?.authority_basis.length ? (
+        <p className="world__note">
+          authority basis · {assessment.authority_basis
+            .map((basis) => String(basis.source_id || basis.authority || "recorded binding"))
+            .join(", ")}
+        </p>
+      ) : null}
+    </article>
+  );
+}
+
+export function GovernedObligationPanel({
+  obligation,
+  problem,
+  onClose,
+}: {
+  obligation: WorldObligation | WorldObligationInspection;
+  problem: string | null;
+  onClose: () => void;
+}) {
+  const status = obligationStatus(obligation);
+  const detailed = isObligationInspection(obligation);
+  const law = obligation.law_provenance;
+  const resolution = obligation.resolution;
+  const basis = resolution?.resolution_basis ?? [];
+  const adjudicated = basis.filter((item) => item.kind === "ADJUDICATION");
+  return (
+    <article className="world-reader__article">
+      <ReaderHeader
+        title={obligation.question}
+        kind={readableStatus(status)}
+        meta={`${obligation.obligation_id}${obligation.dimension ? ` · ${obligation.dimension}` : ""}`}
+        onClose={onClose}
+      />
+      <div className="world-reader__content">
+        {problem ? <ProblemNotice message={problem} title="Unable to read Obligation" /> : null}
+        <section className="world-reader__section">
+          <h3>Question</h3>
+          <p>{obligation.question}</p>
+        </section>
+
+        <section className="world-reader__section">
+          <h3>Required by</h3>
+          <ol className="world__roles">
+            <li>
+              <b>law rule</b>
+              <span>{obligation.generated_by_rule || "—"}</span>
+            </li>
+            <li>
+              <b>source</b>
+              <span>
+                {law?.source_id || "—"}
+                {law?.source_location ? ` · ${law.source_location}` : ""}
+              </span>
+            </li>
+            {law?.source_excerpt ? (
+              <li>
+                <b>statement</b>
+                <span>{law.source_excerpt}</span>
+              </li>
+            ) : null}
+          </ol>
+        </section>
+
+        {obligation.structural_bindings && Object.keys(obligation.structural_bindings).length ? (
+          <section className="world-reader__section">
+            <h3>Bindings</h3>
+            <ol className="world__roles">
+              {Object.entries(obligation.structural_bindings).map(([name, value]) => (
+                <li key={name}>
+                  <b>{name}</b>
+                  <span>{String(value)}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : null}
+
+        <section className="world-reader__section">
+          <h3>Resolution</h3>
+          <p>
+            {status === "RESOLVED" && resolution?.selected_commitment_id
+              ? `Resolved → ${resolution.selected_commitment_id}`
+              : status === "NO_CANDIDATE"
+                ? "No candidate answer has been recorded."
+                : status === "INSUFFICIENT_WARRANT"
+                  ? "Candidates exist, but none has evidence sufficient to govern."
+                  : status === "CONFLICT"
+                    ? "Sufficient candidates disagree; no winner is selected."
+                    : "More than one compatible sufficient answer remains."}
+          </p>
+          {resolution?.reason ? <p className="world__reason">{resolution.reason}</p> : null}
+          {adjudicated.length ? (
+            <p className="world__note">
+              Selected by authorized adjudication · {adjudicated
+                .map((item) => String(item.adjudication_id || "recorded decision"))
+                .join(", ")}
+            </p>
+          ) : null}
+        </section>
+
+        <section className="world-reader__section">
+          <h3>Candidates</h3>
+          {detailed ? (
+            obligation.candidates.length ? (
+              obligation.candidates.map((candidate) => (
+                <CandidateInspection key={candidate.association_id} candidate={candidate} />
+              ))
+            ) : (
+              <p className="world__note">No candidate Commitment is recorded.</p>
+            )
+          ) : (
+            <ul className="world__inputs">
+              {obligation.candidates.length ? obligation.candidates.map((candidate) => (
+                <li key={candidate.association_id}>{candidate.commitment_id}</li>
+              )) : <li>No candidate Commitment is recorded.</li>}
+            </ul>
+          )}
+        </section>
+
+        {detailed && obligation.adjudications.length ? (
+          <section className="world-reader__section">
+            <h3>Adjudication</h3>
+            {obligation.adjudications.map(({ record, assessment }) => (
+              <ol className="world__roles" key={record.adjudication_id}>
+                <li>
+                  <b>{record.adjudication_id}</b>
+                  <span>selected {record.selected_commitment_id}</span>
+                </li>
+                <li>
+                  <b>authority</b>
+                  <span>
+                    {assessment?.adjudicative_authorities?.join(", ") || "none recorded"}
+                  </span>
+                </li>
+                <li>
+                  <b>assessment</b>
+                  <span>{assessment?.status.toLowerCase() || "not sufficient"}</span>
+                </li>
+              </ol>
+            ))}
+          </section>
+        ) : null}
+
+        {detailed ? (
+          <section className="world-reader__section">
+            <h3>Governing context</h3>
+            <ol className="world__roles">
+              {Object.entries(obligation.context).map(([name, identity]) => (
+                <li key={name}>
+                  <b>{name.replaceAll("_", " ")}</b>
+                  <span>
+                    {identity
+                      ? Object.values(identity).join(" @ ")
+                      : "not recorded"}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : null}
+      </div>
     </article>
   );
 }
@@ -879,6 +1167,11 @@ export function WorldPage() {
   const [table, setTable] = useState<TableView>({ kind: "world" });
   const [demand, setDemand] = useState<WorldDemand | null>(null);
   const [demandProblem, setDemandProblem] = useState<string | null>(null);
+  const [selectedObligation, setSelectedObligation] =
+    useState<WorldObligation | null>(null);
+  const [obligationInspection, setObligationInspection] =
+    useState<WorldObligationInspection | null>(null);
+  const [obligationProblem, setObligationProblem] = useState<string | null>(null);
   /**
    * The vocabulary, inverted — and with an empty field, the whole screen.
    *
@@ -1129,6 +1422,9 @@ export function WorldPage() {
   }, [selection]);
 
   const chooseFieldMark = useCallback((next: CanvasSelection) => {
+    setSelectedObligation(null);
+    setObligationInspection(null);
+    setObligationProblem(null);
     setSelection(next);
     setReaderOpen(Boolean(next));
   }, []);
@@ -1339,7 +1635,7 @@ export function WorldPage() {
   /** Obligations by the key the field knows them under. */
   const obligations = useMemo(() => {
     const out = new Map<string, Obligation>();
-    (demand?.obligations ?? []).forEach((obligation, index) =>
+    (demand?.obligations ?? []).filter((item) => !isWorldObligation(item)).forEach((obligation, index) =>
       out.set(`demand#${index}`, { ...obligation, key: `demand#${index}` }),
     );
     return out;
@@ -1355,7 +1651,25 @@ export function WorldPage() {
    * placed exactly as a table row would place it.
    */
   const onFocusObligation = useCallback(
-    async (obligation: Obligation) => {
+    async (obligation: Obligation | GovernedObligation) => {
+      if (isWorldObligation(obligation)) {
+        const durable = obligation as GovernedObligation;
+        setSelectedObligation(durable);
+        setObligationInspection(null);
+        setObligationProblem(null);
+        setReaderOpen(true);
+        setSelection(null);
+        try {
+          const found = await worldApi.obligation(durable.obligation_id);
+          if (found) setObligationInspection(found);
+          else setObligationProblem("This Obligation is not present in the sealed World.");
+        } catch (problem) {
+          setObligationProblem((problem as Error).message);
+        }
+        return;
+      }
+      setSelectedObligation(null);
+      setObligationInspection(null);
       const schema = relations.find((item) => item.name === obligation.relation);
       if (!schema) {
         setNotice(`${obligation.relation} is not in this world's vocabulary.`);
@@ -1627,7 +1941,9 @@ export function WorldPage() {
    * token is what `Swap` compares, so it has to name the *subject* rather than
    * the panel — two referents in a row are two subjects through one panel.
    */
-  const readerSubject = onField && selection
+  const readerSubject = selectedObligation
+    ? `obligation:${selectedObligation.obligation_id}`
+    : onField && selection
     ? `${selection.kind}:${selection.id}`
     : relation
       ? `relation:${relation.name}`
@@ -1933,7 +2249,17 @@ export function WorldPage() {
                   </div>
                 ) : null}
                 <Swap id={readerSubject} className="motion-swap--fill">
-                  {onField && selection?.kind === "demand" ? (
+                  {selectedObligation ? (
+                    <GovernedObligationPanel
+                      obligation={obligationInspection ?? selectedObligation}
+                      problem={obligationProblem}
+                      onClose={() => {
+                        setReaderOpen(false);
+                        setSelectedObligation(null);
+                        setObligationInspection(null);
+                      }}
+                    />
+                  ) : onField && selection?.kind === "demand" ? (
                     <DemandPanel
                       obligation={obligations.get(selection.id) ?? null}
                       demand={demand}
