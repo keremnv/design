@@ -62,6 +62,7 @@ def write_sidecars(
     purpose_payload: dict[str, Any],
     governance_payload: dict[str, Any] | None = None,
     evidence_authority_payload: dict[str, Any] | None = None,
+    adjudication_authority_payload: dict[str, Any] | None = None,
 ) -> None:
     directory = world.path.parent
     (directory / "world.admission.json").write_text(
@@ -80,6 +81,11 @@ def write_sidecars(
     if evidence_authority_payload is not None:
         (directory / "world.evidence-authority.json").write_text(
             json.dumps(evidence_authority_payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    if adjudication_authority_payload is not None:
+        (directory / "world.adjudication-authority.json").write_text(
+            json.dumps(adjudication_authority_payload, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
 

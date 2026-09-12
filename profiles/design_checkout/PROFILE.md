@@ -53,6 +53,12 @@ authority classes are sufficient. The sealed bundle records the authority
 configuration and each candidate assessment records its matched source and
 authority basis.
 
+Adjudication is a separate, optional input. The fixture's
+`adjudication-authorities.json` binds `design-review-decision` to
+`AUTHORIZED_ADJUDICATION`, but ordinary construction creates no adjudication.
+When an adjudication is explicitly recorded, it selects an existing candidate
+and the resolver may use it only to break an otherwise sufficient conflict.
+
 Governance Law is not authored directly in the constructor or in this module's
 dimension declarations. `fixture/governance-sources.json` explicitly selects
 `fixture/design-governance.md` as law-bearing. The bounded compiler in

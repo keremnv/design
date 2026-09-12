@@ -175,6 +175,32 @@ class ConstructionWorld:
     def resolutions(self) -> list[dict[str, Any]]:
         return self._inner.resolutions()
 
+    def add_adjudication(
+        self,
+        *,
+        adjudication_id: str,
+        obligation_id: str,
+        selected_commitment_id: str,
+        authority_basis: Mapping[str, Any],
+    ) -> str:
+        if self._inner.read_only:
+            raise ConstructionError("World is read-only")
+        return self._inner.add_adjudication(
+            adjudication_id=adjudication_id,
+            obligation_id=obligation_id,
+            selected_commitment_id=selected_commitment_id,
+            authority_basis=authority_basis,
+        )
+
+    def adjudication(self, adjudication_id: str) -> dict[str, Any] | None:
+        return self._inner.adjudication(adjudication_id)
+
+    def adjudications(self) -> list[dict[str, Any]]:
+        return self._inner.adjudications()
+
+    def adjudications_for_obligation(self, obligation_id: str) -> list[dict[str, Any]]:
+        return self._inner.adjudications_for_obligation(obligation_id)
+
     def record_resolution(
         self,
         *,
@@ -183,6 +209,8 @@ class ConstructionWorld:
         selected_commitment_id: str | None = None,
         reason: str = "",
         candidate_assessments: Sequence[Mapping[str, Any]] = (),
+        adjudication_assessments: Sequence[Mapping[str, Any]] = (),
+        resolution_basis: Sequence[Mapping[str, Any]] = (),
     ) -> str:
         if self._inner.read_only:
             raise ConstructionError("World is read-only")
@@ -192,6 +220,8 @@ class ConstructionWorld:
             selected_commitment_id=selected_commitment_id,
             reason=reason,
             candidate_assessments=candidate_assessments,
+            adjudication_assessments=adjudication_assessments,
+            resolution_basis=resolution_basis,
         )
 
     def semantic_reference_errors(self) -> list[dict[str, str]]:

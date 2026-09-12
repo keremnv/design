@@ -6,7 +6,11 @@ from collections.abc import Callable, Mapping
 from itertools import combinations
 from typing import Any
 
-from ontology_author.world.core.contract import CandidateAssessment, Contract
+from ontology_author.world.core.contract import (
+    AdjudicationAssessment,
+    CandidateAssessment,
+    Contract,
+)
 from ontology_author.world.core.model import ResolutionStatus
 from ontology_author.world.core.resolution import Resolution
 
@@ -26,6 +30,7 @@ def resolve_world(
     *,
     conflict_checker: CommitmentConflictChecker | None = None,
     evidence_authority: Any | None = None,
+    adjudication_authority: Any | None = None,
 ) -> tuple[Resolution, ...]:
     """Evaluate every durable Contract Obligation in deterministic order.
 
@@ -63,6 +68,8 @@ def resolve_world(
                 )
             )
         assessments.sort(key=lambda item: item.commitment_id)
+        adjudication_assessments: list[AdjudicationAssessment] = []
+        resolution_basis: list[Mapping[str, Any]] = []
 
         sufficient_ids = [
             item.commitment_id for item in assessments if item.status == "SUFFICIENT"
@@ -95,13 +102,62 @@ def resolve_world(
                     if incompatible:
                         conflicts.append((first_id, second_id))
             if conflicts:
-                status = ResolutionStatus.CONFLICT
-                selected = None
-                pairs = ", ".join(f"{first}/{second}" for first, second in conflicts)
-                reason = (
-                    f"Obligation {obligation_id} has incompatible sufficient "
-                    f"Commitments ({pairs}); no Contract precedence rule chooses one."
+                adjudication_assessments = _evaluate_adjudications(
+                    world,
+                    obligation,
+                    sufficient_ids,
+                    contract,
+                    adjudication_authority,
                 )
+                valid = [
+                    item
+                    for item in adjudication_assessments
+                    if item.status == "SUFFICIENT"
+                    and item.selected_commitment_id in sufficient_ids
+                ]
+                selected_targets = sorted(
+                    {item.selected_commitment_id for item in valid}
+                )
+                if len(selected_targets) == 1:
+                    status = ResolutionStatus.RESOLVED
+                    selected = selected_targets[0]
+                    resolution_basis = [
+                        {
+                            "kind": "ADJUDICATION",
+                            "adjudication_id": item.adjudication_id,
+                            "selected_commitment_id": item.selected_commitment_id,
+                            "adjudicative_authorities": list(
+                                item.adjudicative_authorities
+                            ),
+                            "authority_basis": [
+                                dict(basis) for basis in item.authority_basis
+                            ],
+                        }
+                        for item in valid
+                    ]
+                    ids = ", ".join(item.adjudication_id for item in valid)
+                    reason = (
+                        f"Authorized adjudication {ids} selects Commitment {selected} "
+                        "among the otherwise sufficient conflicting candidates."
+                    )
+                else:
+                    status = ResolutionStatus.CONFLICT
+                    selected = None
+                    pairs = ", ".join(
+                        f"{first}/{second}" for first, second in conflicts
+                    )
+                    if len(selected_targets) > 1:
+                        reason = (
+                            f"Obligation {obligation_id} has competing authorized "
+                            f"adjudications selecting {', '.join(selected_targets)}; "
+                            "no adjudication precedence rule chooses one."
+                        )
+                    else:
+                        reason = (
+                            f"Obligation {obligation_id} has incompatible sufficient "
+                            f"Commitments ({pairs}); no authorized adjudication "
+                            "selects a governing candidate."
+                        )
             elif len(sufficient_ids) == 1:
                 status = ResolutionStatus.RESOLVED
                 selected = sufficient_ids[0]
@@ -126,6 +182,8 @@ def resolve_world(
             contract_id=contract.contract_id,
             contract_revision=contract.contract_revision,
             candidate_assessments=tuple(assessments),
+            adjudication_assessments=tuple(adjudication_assessments),
+            resolution_basis=tuple(resolution_basis),
         )
         world.record_resolution(
             obligation_id=obligation_id,
@@ -133,9 +191,53 @@ def resolve_world(
             selected_commitment_id=result.selected_commitment_id,
             reason=result.reason,
             candidate_assessments=[item.as_payload() for item in result.candidate_assessments],
+            adjudication_assessments=[
+                item.as_payload() for item in result.adjudication_assessments
+            ],
+            resolution_basis=list(result.resolution_basis),
         )
         results.append(result)
     return tuple(results)
+
+
+def _evaluate_adjudications(
+    world: Any,
+    obligation: Mapping[str, Any],
+    sufficient_ids: list[str],
+    contract: Contract,
+    configuration: Any | None,
+) -> list[AdjudicationAssessment]:
+    """Assess recorded adjudications only when ordinary conflict exists."""
+
+    obligation_id = str(obligation.get("obligation_id") or "")
+    records = world.adjudications_for_obligation(obligation_id)
+    assessments: list[AdjudicationAssessment] = []
+    for record in records:
+        authority = _derive_adjudication_authority(configuration, record)
+        assessment = contract.assess_adjudication(
+            adjudication=record,
+            adjudicative_authorities=authority["authority_kinds"],
+            authority_basis=authority["authority_basis"],
+        )
+        if (
+            assessment.status == "SUFFICIENT"
+            and assessment.selected_commitment_id not in sufficient_ids
+        ):
+            assessment = AdjudicationAssessment(
+                adjudication_id=assessment.adjudication_id,
+                selected_commitment_id=assessment.selected_commitment_id,
+                status="INSUFFICIENT",
+                reason=(
+                    f"Adjudication {assessment.adjudication_id} selects Commitment "
+                    f"{assessment.selected_commitment_id}, which is not a "
+                    "warrant-sufficient candidate for this conflict."
+                ),
+                adjudicative_authorities=assessment.adjudicative_authorities,
+                authority_basis=assessment.authority_basis,
+            )
+        assessments.append(assessment)
+    assessments.sort(key=lambda item: item.adjudication_id)
+    return assessments
 
 
 def _derive_evidence_authority(
@@ -182,6 +284,52 @@ def _derive_evidence_authority(
     return {
         "authority_kinds": tuple(str(item).strip().upper() for item in raw_kinds if str(item).strip()),
         "authority_basis": basis,
+    }
+
+
+def _derive_adjudication_authority(
+    configuration: Any | None,
+    adjudication: Mapping[str, Any],
+) -> dict[str, tuple[Any, ...]]:
+    """Derive adjudicative standing from the external configuration."""
+
+    if configuration is None:
+        return {"authority_kinds": (), "authority_basis": ()}
+    assessor = getattr(configuration, "assess_adjudication", None)
+    if not callable(assessor):
+        raise ResolutionEvaluationError(
+            "adjudication authority configuration must provide "
+            "assess_adjudication(adjudication)"
+        )
+    try:
+        result = assessor(adjudication)
+    except Exception as error:
+        raise ResolutionEvaluationError(
+            f"adjudication authority assessment failed: {error}"
+        ) from error
+    if not isinstance(result, Mapping):
+        raise ResolutionEvaluationError(
+            "adjudication authority assessment must return a mapping"
+        )
+    raw_kinds = result.get("authority_kinds", ())
+    raw_basis = result.get("authority_basis", ())
+    if isinstance(raw_kinds, (str, bytes)) or not isinstance(
+        raw_kinds, (list, tuple, set, frozenset)
+    ):
+        raise ResolutionEvaluationError(
+            "adjudication authority assessment authority_kinds must be a collection"
+        )
+    if not isinstance(raw_basis, (list, tuple)):
+        raise ResolutionEvaluationError(
+            "adjudication authority assessment authority_basis must be a sequence"
+        )
+    return {
+        "authority_kinds": tuple(
+            str(item).strip().upper() for item in raw_kinds if str(item).strip()
+        ),
+        "authority_basis": tuple(
+            item for item in raw_basis if isinstance(item, Mapping)
+        ),
     }
 
 

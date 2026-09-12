@@ -89,6 +89,11 @@ def _evidence_authority_path(db_path: Path) -> Path:
     return db_path.with_suffix(".evidence-authority.json")
 
 
+def _adjudication_authority_path(db_path: Path) -> Path:
+    """`world.sqlite` -> the selected adjudication-authority configuration."""
+    return db_path.with_suffix(".adjudication-authority.json")
+
+
 def _read_json_sidecar(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
@@ -150,6 +155,9 @@ class WorldExplorerAdapter:
         self._obligations_document = _read_json_sidecar(_obligations_path(self.path))
         self._evidence_authority_document = _read_json_sidecar(
             _evidence_authority_path(self.path)
+        )
+        self._adjudication_authority_document = _read_json_sidecar(
+            _adjudication_authority_path(self.path)
         )
 
     def close(self) -> None:
@@ -324,6 +332,10 @@ class WorldExplorerAdapter:
             payload["evidence_authority"] = (
                 self._evidence_authority_document.get("identity")
             )
+        if self._adjudication_authority_document is not None:
+            payload["adjudication_authority"] = (
+                self._adjudication_authority_document.get("identity")
+            )
         return payload
 
     def governance(self) -> dict[str, Any] | None:
@@ -333,6 +345,18 @@ class WorldExplorerAdapter:
     def evidence_authority(self) -> dict[str, Any] | None:
         """The externally selected evidence-authority artifact, when published."""
         return self._evidence_authority_document
+
+    def adjudication_authority(self) -> dict[str, Any] | None:
+        """The selected adjudication-authority artifact, when published."""
+        return self._adjudication_authority_document
+
+    def adjudication(self, adjudication_id: str) -> dict[str, Any] | None:
+        """One durable adjudicative input, addressed by its identity."""
+        return self._world.adjudication(adjudication_id)
+
+    def adjudications(self) -> list[dict[str, Any]]:
+        """All durable adjudicative inputs in deterministic order."""
+        return self._world.adjudications()
 
     def structure(self) -> dict[str, Any] | None:
         """The bounded descriptive frontend structure, when one was published."""
@@ -387,6 +411,10 @@ class WorldExplorerAdapter:
         if self._evidence_authority_document is not None:
             payload["evidence_authority"] = (
                 self._evidence_authority_document.get("identity")
+            )
+        if self._adjudication_authority_document is not None:
+            payload["adjudication_authority"] = (
+                self._adjudication_authority_document.get("identity")
             )
         return payload
 
@@ -1194,6 +1222,10 @@ class WorldExplorerAdapter:
                     "contract_id": item["contract_id"],
                     "contract_revision": item["contract_revision"],
                     "candidate_assessments": item.get("candidate_assessments", []),
+                    "adjudication_assessments": item.get(
+                        "adjudication_assessments", []
+                    ),
+                    "resolution_basis": item.get("resolution_basis", []),
                 }
             obligations.append(obligation)
         return obligations

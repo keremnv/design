@@ -42,6 +42,7 @@ def rebuild(
     contract: Contract | None = None,
     governance: Any | None = None,
     evidence_authority: Any | None = None,
+    adjudication_authority: Any | None = None,
 ) -> RunResult:
     """Construct, validate, and replace this World's sealed bundle."""
 
@@ -50,6 +51,7 @@ def rebuild(
         contract=contract,
         governance=governance,
         evidence_authority=evidence_authority,
+        adjudication_authority=adjudication_authority,
     )
     result = project.run(construction)
     payload = {

@@ -21,7 +21,7 @@ from .governance import (
     compile_governance_law,
     select_authoritative_sources,
 )
-from .authority import load_evidence_authority
+from .authority import load_adjudication_authority, load_evidence_authority
 
 
 DESIGN_REFERENTS = (
@@ -116,6 +116,11 @@ DESIGN_LAW = load_design_law(Path(__file__).with_name("fixture"))
 DESIGN_EVIDENCE_AUTHORITY = load_evidence_authority(Path(__file__).with_name("fixture"))
 
 
+DESIGN_ADJUDICATION_AUTHORITY = load_adjudication_authority(
+    Path(__file__).with_name("fixture")
+)
+
+
 DESIGN_CONTRACT = Contract(
     "design-mobile-checkout",
     "1",
@@ -123,4 +128,5 @@ DESIGN_CONTRACT = Contract(
     semantic_relations=frozenset(DESIGN_RELATION_NAMES),
     allow_semantic_reference_relations=True,
     resolution_warrant_kinds=frozenset({"APPROVED_REQUIREMENT"}),
+    adjudication_authority_kinds=frozenset({"AUTHORIZED_ADJUDICATION"}),
 )

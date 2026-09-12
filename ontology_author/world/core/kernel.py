@@ -109,6 +109,30 @@ class SemanticWorld:
     def resolutions(self) -> list[dict[str, Any]]:
         return self._store.resolutions()
 
+    def add_adjudication(
+        self,
+        *,
+        adjudication_id: str,
+        obligation_id: str,
+        selected_commitment_id: str,
+        authority_basis: Mapping[str, Any],
+    ) -> str:
+        return self._store.record_adjudication(
+            adjudication_id=adjudication_id,
+            obligation_id=obligation_id,
+            selected_commitment_id=selected_commitment_id,
+            authority_basis=authority_basis,
+        )
+
+    def adjudication(self, adjudication_id: str) -> dict[str, Any] | None:
+        return self._store.adjudication(adjudication_id)
+
+    def adjudications(self) -> list[dict[str, Any]]:
+        return self._store.adjudications()
+
+    def adjudications_for_obligation(self, obligation_id: str) -> list[dict[str, Any]]:
+        return self._store.adjudications_for_obligation(obligation_id)
+
     def record_resolution(
         self,
         *,
@@ -117,6 +141,8 @@ class SemanticWorld:
         selected_commitment_id: str | None = None,
         reason: str = "",
         candidate_assessments: Sequence[Mapping[str, Any]] = (),
+        adjudication_assessments: Sequence[Mapping[str, Any]] = (),
+        resolution_basis: Sequence[Mapping[str, Any]] = (),
     ) -> str:
         return self._store.record_resolution(
             obligation_id=obligation_id,
@@ -124,6 +150,8 @@ class SemanticWorld:
             selected_commitment_id=selected_commitment_id,
             reason=reason,
             candidate_assessments=candidate_assessments,
+            adjudication_assessments=adjudication_assessments,
+            resolution_basis=resolution_basis,
         )
 
     def semantic_reference_errors(self) -> list[dict[str, str]]:

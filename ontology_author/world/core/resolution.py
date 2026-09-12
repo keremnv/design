@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping
 
-from ontology_author.world.core.contract import CandidateAssessment
+from ontology_author.world.core.contract import (
+    AdjudicationAssessment,
+    CandidateAssessment,
+)
 from ontology_author.world.core.model import ResolutionStatus
 
 
@@ -20,6 +23,8 @@ class Resolution:
     contract_id: str
     contract_revision: str
     candidate_assessments: tuple[CandidateAssessment, ...] = ()
+    adjudication_assessments: tuple[AdjudicationAssessment, ...] = ()
+    resolution_basis: tuple[Mapping[str, Any], ...] = ()
 
     def __post_init__(self) -> None:
         status = ResolutionStatus(self.status)
@@ -47,6 +52,10 @@ class Resolution:
             "candidate_assessments": [
                 item.as_payload() for item in self.candidate_assessments
             ],
+            "adjudication_assessments": [
+                item.as_payload() for item in self.adjudication_assessments
+            ],
+            "resolution_basis": [dict(item) for item in self.resolution_basis],
         }
 
 

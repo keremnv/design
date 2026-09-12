@@ -107,6 +107,7 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
                 "context": "checkout_commitment",
             }
         ]
+        assert world.adjudications() == []
 
         prominent_id = _assertion_id(world, "relative_prominence")
         available_id = _assertion_id(world, "remains_available_during")
@@ -169,6 +170,7 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
             "authority_id": "design-mobile-checkout-evidence",
             "revision": "1",
         }
+        assert explorer.adjudications() == []
         assert explorer.governance()["state"] == "EFFECTIVE"
         assert explorer.governance()["source_selection"]["sources"][0]["source_id"] == (
             "checkout-design-governance"

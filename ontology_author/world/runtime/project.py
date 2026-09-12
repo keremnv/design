@@ -54,6 +54,7 @@ class Project:
         governance: Any | None = None,
         constructor_authority: Any | None = None,
         evidence_authority: Any | None = None,
+        adjudication_authority: Any | None = None,
     ) -> None:
         self.root = Path(root)
         self.project_root = (
@@ -70,6 +71,7 @@ class Project:
         # external runtime binding used only after the candidate has recorded
         # its Warrant bases.
         self.evidence_authority = evidence_authority
+        self.adjudication_authority = adjudication_authority
 
     @staticmethod
     def _infer_project_root(root: Path) -> Path:
@@ -128,6 +130,7 @@ class Project:
                 purpose.payload(),
                 _governance_payload(self.governance),
                 _evidence_authority_payload(self.evidence_authority),
+                _adjudication_authority_payload(self.adjudication_authority),
             )
             report = validate_contract_admission(world)
             if not report.ok:
@@ -141,12 +144,16 @@ class Project:
                         f"{item['relation']}:{item['assertion_id']}" for item in report.ungrounded
                     ),
                 )
-            if self.contract.resolution_warrant_kinds:
+            if (
+                self.contract.resolution_warrant_kinds
+                or self.contract.adjudication_authority_kinds
+            ):
                 resolve_world(
                     world,
                     self.contract,
                     conflict_checker=_resolution_conflict_checker(self.governance),
                     evidence_authority=self.evidence_authority,
+                    adjudication_authority=self.adjudication_authority,
                 )
             world.close()
             world = None  # type: ignore[assignment]
@@ -270,6 +277,23 @@ def _evidence_authority_payload(authority: Any | None) -> dict[str, Any] | None:
     if not isinstance(payload, dict):
         raise ConstructionError(
             "evidence_authority inspection_payload() must return a mapping"
+        )
+    return payload
+
+
+def _adjudication_authority_payload(authority: Any | None) -> dict[str, Any] | None:
+    if authority is None:
+        return None
+    inspector = getattr(authority, "inspection_payload", None)
+    if not callable(inspector):
+        raise ConstructionError(
+            "adjudication_authority must provide inspection_payload() "
+            "for sealed-world inspection"
+        )
+    payload = inspector()
+    if not isinstance(payload, dict):
+        raise ConstructionError(
+            "adjudication_authority inspection_payload() must return a mapping"
         )
     return payload
 

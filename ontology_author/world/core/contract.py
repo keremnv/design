@@ -68,6 +68,53 @@ class CandidateAssessment:
 
 
 @dataclass(frozen=True)
+class AdjudicationAssessment:
+    """Contract evaluation of one recorded adjudicative determination."""
+
+    adjudication_id: str
+    selected_commitment_id: str
+    status: str
+    reason: str
+    adjudicative_authorities: tuple[str, ...] = ()
+    authority_basis: tuple[Mapping[str, Any], ...] = ()
+
+    def __post_init__(self) -> None:
+        value = str(self.status).strip().upper()
+        if value not in {"SUFFICIENT", "INSUFFICIENT"}:
+            raise ValueError(f"unknown adjudication assessment status {self.status!r}")
+        object.__setattr__(self, "status", value)
+        object.__setattr__(
+            self,
+            "adjudicative_authorities",
+            tuple(
+                sorted(
+                    {
+                        str(item).strip().upper()
+                        for item in self.adjudicative_authorities
+                        if str(item).strip()
+                    }
+                )
+            ),
+        )
+        basis: list[Mapping[str, Any]] = []
+        for item in self.authority_basis:
+            if isinstance(item, Mapping):
+                basis.append({str(key): value for key, value in item.items()})
+        basis.sort(key=lambda item: repr(sorted(item.items())))
+        object.__setattr__(self, "authority_basis", tuple(basis))
+
+    def as_payload(self) -> dict[str, object]:
+        return {
+            "adjudication_id": self.adjudication_id,
+            "selected_commitment_id": self.selected_commitment_id,
+            "status": self.status,
+            "reason": self.reason,
+            "adjudicative_authorities": list(self.adjudicative_authorities),
+            "authority_basis": [dict(item) for item in self.authority_basis],
+        }
+
+
+@dataclass(frozen=True)
 class Contract:
     """A minimal Contract identity plus executable admission rules.
 
@@ -87,6 +134,7 @@ class Contract:
     allow_semantic_reference_relations: bool = False
     semantic_relations: frozenset[str] = field(default_factory=frozenset)
     resolution_warrant_kinds: frozenset[str] = field(default_factory=frozenset)
+    adjudication_authority_kinds: frozenset[str] = field(default_factory=frozenset)
 
     def __post_init__(self) -> None:
         identity = str(self.contract_id or "").strip()
@@ -119,6 +167,15 @@ class Contract:
             frozenset(
                 str(item).strip().upper()
                 for item in self.resolution_warrant_kinds
+                if str(item).strip()
+            ),
+        )
+        object.__setattr__(
+            self,
+            "adjudication_authority_kinds",
+            frozenset(
+                str(item).strip().upper()
+                for item in self.adjudication_authority_kinds
                 if str(item).strip()
             ),
         )
@@ -204,6 +261,74 @@ class Contract:
             status="INSUFFICIENT",
             reason=reason,
             warrant_authorities=authorities,
+            authority_basis=basis,
+        )
+
+    def assess_adjudication(
+        self,
+        *,
+        adjudication: Mapping[str, Any],
+        adjudicative_authorities: Iterable[str] = (),
+        authority_basis: Iterable[Mapping[str, Any]] = (),
+    ) -> AdjudicationAssessment:
+        """Assess adjudicative authority separately from evidence authority.
+
+        The runtime supplies authority classes derived from an external
+        adjudication-authority binding. The adjudication record itself is not
+        allowed to grant its own standing.
+        """
+
+        adjudication_id = str(adjudication.get("adjudication_id") or "")
+        selected_commitment_id = str(
+            adjudication.get("selected_commitment_id") or ""
+        )
+        authorities = tuple(
+            sorted(
+                {
+                    str(item).strip().upper()
+                    for item in adjudicative_authorities
+                    if str(item).strip()
+                }
+            )
+        )
+        basis = tuple(authority_basis)
+        sufficient = tuple(
+            sorted(set(authorities) & set(self.adjudication_authority_kinds))
+        )
+        if sufficient:
+            return AdjudicationAssessment(
+                adjudication_id=adjudication_id,
+                selected_commitment_id=selected_commitment_id,
+                status="SUFFICIENT",
+                reason=(
+                    f"Adjudication {adjudication_id} has Contract-authorized "
+                    f"adjudicative authority: {', '.join(sufficient)}."
+                ),
+                adjudicative_authorities=authorities,
+                authority_basis=basis,
+            )
+        if not self.adjudication_authority_kinds:
+            reason = (
+                f"Contract {self.contract_id}@{self.contract_revision} has no "
+                "configured adjudicative authority standard."
+            )
+        elif authorities:
+            reason = (
+                f"Adjudication {adjudication_id} has authority classes "
+                f"{', '.join(authorities)}, none accepted for adjudication by "
+                f"Contract {self.contract_id}@{self.contract_revision}."
+            )
+        else:
+            reason = (
+                f"Adjudication {adjudication_id} has no external adjudicative "
+                "authority binding."
+            )
+        return AdjudicationAssessment(
+            adjudication_id=adjudication_id,
+            selected_commitment_id=selected_commitment_id,
+            status="INSUFFICIENT",
+            reason=reason,
+            adjudicative_authorities=authorities,
             authority_basis=basis,
         )
 

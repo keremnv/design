@@ -1,4 +1,4 @@
-"""Explicit evidence-authority bindings for the bounded checkout profile.
+"""Explicit evidence and adjudication authority bindings for checkout.
 
 This is deliberately an application-side configuration, not a kernel Warrant
 table and not a property of a source file.  A Warrant records source
@@ -141,6 +141,89 @@ class EvidenceAuthorityConfiguration:
         }
 
 
+@dataclass(frozen=True)
+class AdjudicationAuthorityConfiguration:
+    """An explicit source/decision-record binding for adjudicative acts."""
+
+    authority_id: str
+    revision: str
+    manifest_path: str
+    bindings: tuple[EvidenceAuthorityBinding, ...]
+    selection_method: str = "explicit adjudication-authority manifest"
+
+    def __post_init__(self) -> None:
+        authority_id = str(self.authority_id).strip()
+        revision = str(self.revision).strip()
+        if not authority_id or not revision:
+            raise ValueError(
+                "adjudication authority identity and revision are required"
+            )
+        seen: set[str] = set()
+        normalized: list[EvidenceAuthorityBinding] = []
+        for binding in self.bindings:
+            item = (
+                binding
+                if isinstance(binding, EvidenceAuthorityBinding)
+                else EvidenceAuthorityBinding(**binding)
+            )
+            if item.source_id in seen:
+                raise ValueError(
+                    f"duplicate adjudication authority source {item.source_id!r}"
+                )
+            seen.add(item.source_id)
+            normalized.append(item)
+        object.__setattr__(self, "authority_id", authority_id)
+        object.__setattr__(self, "revision", revision)
+        object.__setattr__(self, "manifest_path", str(self.manifest_path))
+        object.__setattr__(self, "bindings", tuple(normalized))
+
+    def identity(self) -> dict[str, str]:
+        return {
+            "authority_id": self.authority_id,
+            "revision": self.revision,
+        }
+
+    def inspection_payload(self) -> dict[str, object]:
+        return {
+            "state": "EFFECTIVE",
+            "domain": "ADJUDICATION",
+            "identity": self.identity(),
+            "manifest_path": self.manifest_path,
+            "selection_method": self.selection_method,
+            "bindings": [item.as_payload() for item in self.bindings],
+        }
+
+    def assess_adjudication(
+        self, adjudication: Mapping[str, Any]
+    ) -> dict[str, object]:
+        """Derive standing from the record's source identity only."""
+
+        raw_basis = adjudication.get("authority_basis")
+        if not isinstance(raw_basis, Mapping):
+            return {"authority_kinds": (), "authority_basis": ()}
+        source_id = str(raw_basis.get("source_id") or "").strip()
+        binding = next(
+            (item for item in self.bindings if item.source_id == source_id),
+            None,
+        )
+        if binding is None:
+            return {"authority_kinds": (), "authority_basis": ()}
+        basis = {
+            "source_id": source_id,
+            "source_revision": str(raw_basis.get("source_revision") or ""),
+            "source_location": str(raw_basis.get("source_location") or ""),
+            "authority": binding.authority,
+            "authority_id": self.authority_id,
+            "authority_revision": self.revision,
+            "authority_manifest": self.manifest_path,
+            "authority_domain": "ADJUDICATION",
+        }
+        return {
+            "authority_kinds": (binding.authority,),
+            "authority_basis": (basis,),
+        }
+
+
 def load_evidence_authority(directory: Path | str) -> EvidenceAuthorityConfiguration:
     """Load exactly the explicitly selected evidence-authority manifest."""
 
@@ -175,8 +258,46 @@ def load_evidence_authority(directory: Path | str) -> EvidenceAuthorityConfigura
     )
 
 
+def load_adjudication_authority(
+    directory: Path | str,
+) -> AdjudicationAuthorityConfiguration:
+    """Load exactly the selected adjudication-authority manifest."""
+
+    root = Path(directory)
+    path = root / "adjudication-authorities.json"
+    if not path.exists():
+        raise FileNotFoundError(path)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise ValueError(f"invalid adjudication-authorities.json: {error}") from error
+    if not isinstance(payload, Mapping):
+        raise ValueError("adjudication-authorities.json must contain an object")
+    raw_bindings = payload.get("bindings", ())
+    if not isinstance(raw_bindings, list):
+        raise ValueError("adjudication-authorities.json bindings must be a list")
+    bindings: list[EvidenceAuthorityBinding] = []
+    for raw in raw_bindings:
+        if not isinstance(raw, Mapping):
+            raise ValueError("each adjudication authority binding must be an object")
+        bindings.append(
+            EvidenceAuthorityBinding(
+                source_id=str(raw.get("source_id") or ""),
+                authority=str(raw.get("authority") or ""),
+            )
+        )
+    return AdjudicationAuthorityConfiguration(
+        authority_id=str(payload.get("authority_id") or ""),
+        revision=str(payload.get("revision") or ""),
+        manifest_path=path.name,
+        bindings=tuple(bindings),
+    )
+
+
 __all__ = [
     "EvidenceAuthorityBinding",
     "EvidenceAuthorityConfiguration",
+    "AdjudicationAuthorityConfiguration",
+    "load_adjudication_authority",
     "load_evidence_authority",
 ]

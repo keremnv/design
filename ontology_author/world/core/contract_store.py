@@ -78,6 +78,18 @@ class ContractWorldStore(WorldStore):
                 contract_id TEXT NOT NULL,
                 contract_revision TEXT NOT NULL,
                 candidate_assessments TEXT NOT NULL,
+                adjudication_assessments TEXT NOT NULL DEFAULT '[]',
+                resolution_basis TEXT NOT NULL DEFAULT '[]',
+                created_revision INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS _world_adjudications (
+                adjudication_id TEXT PRIMARY KEY,
+                obligation_id TEXT NOT NULL
+                    REFERENCES _world_obligations(obligation_id) ON DELETE CASCADE,
+                selected_commitment_id TEXT NOT NULL,
+                authority_basis TEXT NOT NULL,
+                contract_id TEXT NOT NULL,
+                contract_revision TEXT NOT NULL,
                 created_revision INTEGER NOT NULL
             );
             CREATE TABLE IF NOT EXISTS _world_semantic_reference_roles (
@@ -88,7 +100,26 @@ class ContractWorldStore(WorldStore):
             );
             """
         )
+        self._ensure_resolution_columns()
         self._db.commit()
+
+    def _ensure_resolution_columns(self) -> None:
+        """Add current derived-resolution fields to older development Worlds."""
+
+        columns = {
+            str(row["name"])
+            for row in self._db.execute("PRAGMA table_info(_world_resolutions)")
+        }
+        if "adjudication_assessments" not in columns:
+            self._db.execute(
+                "ALTER TABLE _world_resolutions ADD COLUMN "
+                "adjudication_assessments TEXT NOT NULL DEFAULT '[]'"
+            )
+        if "resolution_basis" not in columns:
+            self._db.execute(
+                "ALTER TABLE _world_resolutions ADD COLUMN "
+                "resolution_basis TEXT NOT NULL DEFAULT '[]'"
+            )
 
     # -- Contract binding -------------------------------------------------
 
@@ -194,6 +225,143 @@ class ContractWorldStore(WorldStore):
             )
         ]
 
+    # -- Adjudications ----------------------------------------------------
+
+    def record_adjudication(
+        self,
+        *,
+        adjudication_id: str,
+        obligation_id: str,
+        selected_commitment_id: str,
+        authority_basis: Mapping[str, Any],
+        contract_id: str | None = None,
+        contract_revision: str | None = None,
+    ) -> str:
+        """Record one immutable selection of an existing candidate.
+
+        The stored authority basis identifies the external decision/source
+        record. It does not grant that record authority; resolution derives
+        standing from a separate adjudication-authority configuration.
+        """
+
+        adjudication = str(adjudication_id or "").strip()
+        obligation = str(obligation_id or "").strip()
+        selected = str(selected_commitment_id or "").strip()
+        if not adjudication:
+            raise WorldStoreError("adjudication identity must be non-empty")
+        if not obligation:
+            raise WorldStoreError("adjudication obligation identity must be non-empty")
+        if not selected:
+            raise WorldStoreError("adjudication selected Commitment must be non-empty")
+        if not isinstance(authority_basis, Mapping):
+            raise WorldStoreError("adjudication authority_basis must be a mapping")
+        basis = {str(key): value for key, value in authority_basis.items()}
+        if not str(basis.get("source_id") or "").strip():
+            raise WorldStoreError(
+                "adjudication authority_basis requires an external source_id"
+            )
+        if self.obligation(obligation) is None:
+            raise WorldStoreError(f"unknown adjudication obligation {obligation!r}")
+        contract = self.contract_identity()
+        if contract is None:
+            raise WorldStoreError("an Adjudication requires a bound Contract revision")
+        if contract_id is not None and str(contract_id) != contract["contract_id"]:
+            raise WorldStoreError("Adjudication Contract identity does not match World")
+        if contract_revision is not None and str(contract_revision) != contract["contract_revision"]:
+            raise WorldStoreError("Adjudication Contract revision does not match World")
+        found = self._db.execute(
+            "SELECT 1 FROM _world_assertions WHERE assertion_id = ?", (selected,)
+        ).fetchone()
+        if found is None:
+            raise WorldStoreError(f"unknown adjudication Commitment {selected!r}")
+        if not self._candidate_exists(obligation, selected):
+            raise WorldStoreError(
+                f"selected Commitment {selected!r} is not a candidate for "
+                f"obligation {obligation!r}"
+            )
+
+        encoded_basis = json.dumps(basis, sort_keys=True, separators=(",", ":"))
+        existing = self._db.execute(
+            "SELECT obligation_id, selected_commitment_id, authority_basis, "
+            "contract_id, contract_revision FROM _world_adjudications "
+            "WHERE adjudication_id = ?",
+            (adjudication,),
+        ).fetchone()
+        expected = (
+            obligation,
+            selected,
+            encoded_basis,
+            contract["contract_id"],
+            contract["contract_revision"],
+        )
+        if existing is not None:
+            if tuple(existing) != expected:
+                raise WorldStoreError(
+                    f"adjudication {adjudication!r} already exists with different semantics"
+                )
+            return adjudication
+
+        with self._db:
+            next_revision = self.revision + 1
+            self._db.execute(
+                "INSERT INTO _world_adjudications "
+                "(adjudication_id, obligation_id, selected_commitment_id, "
+                "authority_basis, contract_id, contract_revision, created_revision) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    adjudication,
+                    obligation,
+                    selected,
+                    encoded_basis,
+                    contract["contract_id"],
+                    contract["contract_revision"],
+                    next_revision,
+                ),
+            )
+            self._bump_world()
+        return adjudication
+
+    def adjudication(self, adjudication_id: str) -> dict[str, Any] | None:
+        row = self._db.execute(
+            "SELECT * FROM _world_adjudications WHERE adjudication_id = ?",
+            (str(adjudication_id),),
+        ).fetchone()
+        if row is None:
+            return None
+        payload = dict(row)
+        try:
+            payload["authority_basis"] = json.loads(payload["authority_basis"])
+        except (TypeError, ValueError):
+            payload["authority_basis"] = {}
+        return payload
+
+    def adjudications(self) -> list[dict[str, Any]]:
+        return [
+            dict(item)
+            for item in (
+                self.adjudication(str(row["adjudication_id"]))
+                for row in self._db.execute(
+                    "SELECT adjudication_id FROM _world_adjudications "
+                    "ORDER BY adjudication_id"
+                )
+            )
+            if item is not None
+        ]
+
+    def adjudications_for_obligation(self, obligation_id: str) -> list[dict[str, Any]]:
+        return [
+            dict(item)
+            for item in (
+                self.adjudication(str(row["adjudication_id"]))
+                for row in self._db.execute(
+                    "SELECT adjudication_id FROM _world_adjudications "
+                    "WHERE obligation_id = ? ORDER BY adjudication_id",
+                    (str(obligation_id),),
+                )
+            )
+            if item is not None
+        ]
+
     def record_resolution(
         self,
         *,
@@ -204,6 +372,8 @@ class ContractWorldStore(WorldStore):
         contract_id: str | None = None,
         contract_revision: str | None = None,
         candidate_assessments: Sequence[Mapping[str, Any]] = (),
+        adjudication_assessments: Sequence[Mapping[str, Any]] = (),
+        resolution_basis: Sequence[Mapping[str, Any]] = (),
     ) -> str:
         """Replace the current Resolution for one durable Obligation."""
 
@@ -240,9 +410,16 @@ class ContractWorldStore(WorldStore):
 
         assessments = [dict(item) for item in candidate_assessments]
         encoded = json.dumps(assessments, sort_keys=True, separators=(",", ":"))
+        adjudications = [dict(item) for item in adjudication_assessments]
+        encoded_adjudications = json.dumps(
+            adjudications, sort_keys=True, separators=(",", ":")
+        )
+        basis = [dict(item) for item in resolution_basis]
+        encoded_basis = json.dumps(basis, sort_keys=True, separators=(",", ":"))
         existing = self._db.execute(
             "SELECT status, selected_commitment_id, reason, contract_id, "
-            "contract_revision, candidate_assessments "
+            "contract_revision, candidate_assessments, adjudication_assessments, "
+            "resolution_basis "
             "FROM _world_resolutions WHERE obligation_id = ?",
             (identity,),
         ).fetchone()
@@ -253,6 +430,8 @@ class ContractWorldStore(WorldStore):
             contract["contract_id"],
             contract["contract_revision"],
             encoded,
+            encoded_adjudications,
+            encoded_basis,
         )
         if existing is not None and tuple(existing) == expected:
             return f"resolution:{identity}"
@@ -261,14 +440,17 @@ class ContractWorldStore(WorldStore):
             self._db.execute(
                 "INSERT INTO _world_resolutions "
                 "(obligation_id, status, selected_commitment_id, reason, contract_id, "
-                "contract_revision, candidate_assessments, created_revision) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                "contract_revision, candidate_assessments, adjudication_assessments, "
+                "resolution_basis, created_revision) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(obligation_id) DO UPDATE SET "
                 "status = excluded.status, "
                 "selected_commitment_id = excluded.selected_commitment_id, "
                 "reason = excluded.reason, contract_id = excluded.contract_id, "
                 "contract_revision = excluded.contract_revision, "
                 "candidate_assessments = excluded.candidate_assessments, "
+                "adjudication_assessments = excluded.adjudication_assessments, "
+                "resolution_basis = excluded.resolution_basis, "
                 "created_revision = excluded.created_revision",
                 (
                     identity,
@@ -278,6 +460,8 @@ class ContractWorldStore(WorldStore):
                     contract["contract_id"],
                     contract["contract_revision"],
                     encoded,
+                    encoded_adjudications,
+                    encoded_basis,
                     next_revision,
                 ),
             )
@@ -326,6 +510,11 @@ class ContractWorldStore(WorldStore):
         except (TypeError, ValueError):
             assessments = []
         payload["candidate_assessments"] = assessments
+        for field in ("adjudication_assessments", "resolution_basis"):
+            try:
+                payload[field] = json.loads(payload[field])
+            except (KeyError, TypeError, ValueError):
+                payload[field] = []
         payload["resolution_id"] = f"resolution:{payload['obligation_id']}"
         return payload
 
@@ -352,6 +541,10 @@ class ContractWorldStore(WorldStore):
         obligation["resolution_reason"] = resolution["reason"]
         obligation["selected_commitment_id"] = resolution["selected_commitment_id"]
         obligation["candidate_assessments"] = resolution["candidate_assessments"]
+        obligation["adjudication_assessments"] = resolution[
+            "adjudication_assessments"
+        ]
+        obligation["resolution_basis"] = resolution["resolution_basis"]
         return obligation
 
     # -- Typed semantic references ---------------------------------------

@@ -1,0 +1,10 @@
+{
+  "authority_id": "design-mobile-checkout-adjudication",
+  "revision": "1",
+  "bindings": [
+    {
+      "source_id": "design-review-decision",
+      "authority": "AUTHORIZED_ADJUDICATION"
+    }
+  ]
+}

@@ -141,6 +141,17 @@ def build_app(world: Path | str, *, token: str | None = None):
     async def evidence_authority(_request):
         return await session.call(lambda adapter: adapter.evidence_authority())
 
+    async def adjudication_authority(_request):
+        return await session.call(lambda adapter: adapter.adjudication_authority())
+
+    async def adjudications(_request):
+        return {"adjudications": await session.call(lambda adapter: adapter.adjudications())}
+
+    async def adjudication(request):
+        return await session.call(
+            lambda adapter: adapter.adjudication(required(request, "id"))
+        )
+
     async def structure(_request):
         return await session.call(lambda adapter: adapter.structure())
 
@@ -193,6 +204,9 @@ def build_app(world: Path | str, *, token: str | None = None):
         Route("/world/demand", guard(demand)),
         Route("/world/governance", guard(governance)),
         Route("/world/evidence-authority", guard(evidence_authority)),
+        Route("/world/adjudication-authority", guard(adjudication_authority)),
+        Route("/world/adjudications", guard(adjudications)),
+        Route("/world/adjudication", guard(adjudication)),
         Route("/world/structure", guard(structure)),
         Route("/world/obligations", guard(generated_obligations)),
         Route("/world/resolution", guard(resolution)),

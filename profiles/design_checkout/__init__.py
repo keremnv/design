@@ -2,6 +2,7 @@
 
 from .profile import (
     DESIGN_CONTRACT,
+    DESIGN_ADJUDICATION_AUTHORITY,
     DESIGN_EVIDENCE_AUTHORITY,
     DESIGN_LAW,
     DESIGN_REFERENTS,
@@ -11,8 +12,10 @@ from .profile import (
     load_design_law,
 )
 from .authority import (
+    AdjudicationAuthorityConfiguration,
     EvidenceAuthorityBinding,
     EvidenceAuthorityConfiguration,
+    load_adjudication_authority,
     load_evidence_authority,
 )
 from .governance import (
@@ -39,6 +42,7 @@ from .structure import (
 
 __all__ = [
     "DESIGN_CONTRACT",
+    "DESIGN_ADJUDICATION_AUTHORITY",
     "DESIGN_EVIDENCE_AUTHORITY",
     "DESIGN_LAW",
     "DESIGN_REFERENTS",
@@ -48,6 +52,8 @@ __all__ = [
     "load_design_law",
     "EvidenceAuthorityBinding",
     "EvidenceAuthorityConfiguration",
+    "AdjudicationAuthorityConfiguration",
+    "load_adjudication_authority",
     "load_evidence_authority",
     "AuthoritativeLawSources",
     "COMPILER_ID",
