@@ -13,7 +13,6 @@ DESIGN_CONTRACT = Contract(
     "design-core",
     "1",
     semantic_origins=frozenset({ConstructionOrigin.SEMANTIC.value}),
-    allow_semantic_reference_relations=True,
 )
 
 
@@ -49,32 +48,7 @@ DESIGN_CONSTRUCTION = '''def construct(source, world, purpose):
             construction_method="agent design judgment from requirements and code",
         ),
     )
-    world.declare_relation(
-        "candidate_for",
-        [
-            Role(
-                "obligation",
-                RoleType.TEXT,
-                reference_kind=SemanticRefKind.OBLIGATION,
-            ),
-            Role(
-                "commitment",
-                RoleType.TEXT,
-                reference_kind=SemanticRefKind.COMMITMENT,
-            ),
-        ],
-        description="A commitment proposed as a candidate answer to an obligation.",
-        scope="WORLD",
-    )
-    world.assert_tuple(
-        "candidate_for",
-        {"obligation": "O7", "commitment": commitment.assertion_id},
-        origin=ConstructionOrigin.SEMANTIC,
-        grounding=AssertionGrounding(
-            observations=(),
-            construction_method="constructor records candidate relationship",
-        ),
-    )
+    world.add_candidate("O7", commitment.assertion_id)
 '''
 
 
@@ -108,8 +82,8 @@ def test_design_contract_constructs_and_publishes_first_slice(tmp_path):
             "SELECT assertion_id FROM _world_assertions "
             "WHERE relation_name = 'relative_prominence'"
         )[0]["assertion_id"]
-        candidate = world.relation_rows("candidate_for")
-        assert candidate == [{"obligation": "O7", "commitment": commitment_id}]
+        assert world.candidates_for("O7") == [commitment_id]
+        assert world.obligations_for(commitment_id) == ["O7"]
 
         warrant = world.warrant_for_assertion(commitment_id)
         assert warrant["commitment_id"] == commitment_id
@@ -154,8 +128,9 @@ def test_design_contract_constructs_and_publishes_first_slice(tmp_path):
                 "candidates": [
                     {
                         "relation": "candidate_for",
-                        "assertion_id": demand["obligations"][0]["candidates"][0]["assertion_id"],
+                        "association_id": demand["obligations"][0]["candidates"][0]["association_id"],
                         "commitment_id": demand["obligations"][0]["candidates"][0]["commitment_id"],
+                        "created_revision": demand["obligations"][0]["candidates"][0]["created_revision"],
                     }
                 ],
             }
@@ -209,14 +184,20 @@ def test_semantic_judgment_requires_contract_authorization(tmp_path):
 
 def test_candidate_reference_targets_are_hard_and_candidate_does_not_resolve(tmp_path):
     for role, _value, expected in (
-        ("obligation", "missing-obligation", "unknown obligation"),
-        ("commitment", "assertion:not-real", "unknown commitment"),
+        ("obligation", "missing-obligation", "unknown candidate obligation"),
+        ("commitment", "assertion:not-real", "unknown candidate commitment"),
     ):
         construction = DESIGN_CONSTRUCTION
         if role == "obligation":
-            construction = construction.replace('{"obligation": "O7", "commitment": commitment.assertion_id}', '{"obligation": "missing-obligation", "commitment": commitment.assertion_id}')
+            construction = construction.replace(
+                'world.add_candidate("O7", commitment.assertion_id)',
+                'world.add_candidate("missing-obligation", commitment.assertion_id)',
+            )
         else:
-            construction = construction.replace('{"obligation": "O7", "commitment": commitment.assertion_id}', '{"obligation": "O7", "commitment": "assertion:not-real"}')
+            construction = construction.replace(
+                'world.add_candidate("O7", commitment.assertion_id)',
+                'world.add_candidate("O7", "assertion:not-real")',
+            )
         root = _workspace(tmp_path / role, construction)
         result = rebuild(root, contract=DESIGN_CONTRACT)
         assert not result.succeeded

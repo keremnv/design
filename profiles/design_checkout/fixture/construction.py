@@ -178,34 +178,5 @@ def construct(source, world, purpose):
                 ),
             )
 
-    world.declare_relation(
-        "candidate_for",
-        [
-            Role(
-                "obligation",
-                RoleType.TEXT,
-                reference_kind=SemanticRefKind.OBLIGATION,
-            ),
-            Role(
-                "commitment",
-                RoleType.TEXT,
-                reference_kind=SemanticRefKind.COMMITMENT,
-            ),
-        ],
-        description="A commitment proposed as a candidate answer to an obligation.",
-        scope="WORLD",
-    )
-    candidate_grounding = AssertionGrounding(
-        observations=(),
-        construction_method="constructor records candidate relationship",
-    )
     for obligation_id, commitment in sorted(commitments.items()):
-        world.assert_tuple(
-            "candidate_for",
-            {
-                "obligation": obligation_id,
-                "commitment": commitment.assertion_id,
-            },
-            origin=ConstructionOrigin.SEMANTIC,
-            grounding=candidate_grounding,
-        )
+        world.add_candidate(obligation_id, commitment.assertion_id)

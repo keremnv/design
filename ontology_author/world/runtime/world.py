@@ -169,6 +169,20 @@ class ConstructionWorld:
     def obligations(self) -> list[dict[str, Any]]:
         return self._inner.obligations()
 
+    def add_candidate(self, obligation_id: str, commitment_id: str) -> str:
+        if self._inner.read_only:
+            raise ConstructionError("World is read-only")
+        return self._inner.add_candidate(obligation_id, commitment_id)
+
+    def candidates_for(self, obligation_id: str) -> list[str]:
+        return self._inner.candidates_for(obligation_id)
+
+    def obligations_for(self, commitment_id: str) -> list[str]:
+        return self._inner.obligations_for(commitment_id)
+
+    def candidate_associations(self) -> list[dict[str, Any]]:
+        return self._inner.candidate_associations()
+
     def resolution(self, obligation_id: str) -> dict[str, Any] | None:
         return self._inner.resolution(obligation_id)
 
@@ -295,6 +309,19 @@ class ConstructionWorld:
         """Return Contract admission failures without mutating the World."""
 
         errors: list[dict[str, Any]] = []
+        for candidate_error in self._inner.candidate_errors():
+            errors.append(
+                {
+                    "assertion_id": candidate_error["commitment_id"],
+                    "relation": "candidate_association",
+                    "scope": "WORLD",
+                    "reason": "candidate_integrity",
+                    "message": (
+                        "candidate association target is no longer valid: "
+                        f"{candidate_error}"
+                    ),
+                }
+            )
         for reference_error in self.semantic_reference_errors():
             errors.append(
                 {

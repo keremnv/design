@@ -28,7 +28,8 @@ remain available” from “the required question has not been determined yet.�
 The negative commitment preserves that design distinction without introducing
 generic negation or a conflict framework.
 
-`candidate_for` is kernel bookkeeping, not Design vocabulary. Every Design
+`candidate_for` is the human-readable name of a kernel Obligation↔Commitment
+association, not a Design relation or ontology vocabulary. Every Design
 obligation is evaluated separately after construction. The approved
 requirement-backed availability candidate resolves in the current bounded
 experiment; agent-judgment candidates remain unresolved because the Design

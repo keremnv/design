@@ -371,6 +371,7 @@ class WorldExplorerAdapter:
             return None
         payload = dict(self._obligations_document or {"law": None, "obligations": {}})
         payload["resolutions"] = resolutions
+        payload["candidate_associations"] = self._world.candidate_associations()
         return payload
 
     def resolution(self, obligation_id: str) -> dict[str, Any] | None:
@@ -932,6 +933,7 @@ class WorldExplorerAdapter:
             "completeness": self._completeness_out(record["completeness"]),
             "grounding": self._grounding("ASSERTION", assertion_id),
             "warrant": self._world.warrant_for_assertion(assertion_id),
+            "candidate_for": self._world.obligations_for(assertion_id),
         }
         if record["mode"] == "DERIVED":
             out["derivation"] = {
@@ -1231,39 +1233,20 @@ class WorldExplorerAdapter:
         return obligations
 
     def _contract_candidates(self, obligation_id: str) -> list[dict[str, Any]]:
-        candidates: list[dict[str, Any]] = []
-        for record in self._described():
-            obligation_roles = [
-                role
-                for role in record["roles"]
-                if role.get("reference_kind") == "OBLIGATION"
-            ]
-            commitment_roles = [
-                role
-                for role in record["roles"]
-                if role.get("reference_kind") == "COMMITMENT"
-            ]
-            if len(obligation_roles) != 1 or len(commitment_roles) != 1:
-                continue
-            obligation_role = obligation_roles[0]
-            commitment_role = commitment_roles[0]
-            relation = _quote_identifier(record["name"])
-            obligation_column = _quote_identifier(obligation_role["column"])
-            commitment_column = _quote_identifier(commitment_role["column"])
-            rows = self._store.query(
-                f"SELECT _assertion_id, {commitment_column} AS commitment_id "
-                f"FROM {relation} WHERE {obligation_column} = ?",
-                (obligation_id,),
-            )
-            candidates.extend(
-                {
-                    "relation": record["name"],
-                    "assertion_id": row["_assertion_id"],
-                    "commitment_id": row["commitment_id"],
-                }
-                for row in rows
-            )
-        return candidates
+        """Read the kernel candidate association, not a domain relation."""
+
+        return [
+            {
+                # Keep the human-facing name for the association while making
+                # clear that it has no semantic assertion id of its own.
+                "relation": "candidate_for",
+                "association_id": item["association_id"],
+                "commitment_id": item["commitment_id"],
+                "created_revision": item["created_revision"],
+            }
+            for item in self._world.candidate_associations()
+            if item["obligation_id"] == obligation_id
+        ]
 
     def _purpose_frontier(self) -> dict[str, Any] | None:
         """The same frontier, read off a world rebuilt by the v1 boundary.

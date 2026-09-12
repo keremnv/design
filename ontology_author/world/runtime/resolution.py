@@ -334,39 +334,7 @@ def _derive_adjudication_authority(
 
 
 def _candidate_ids(world: Any, obligation_id: str) -> tuple[str, ...]:
-    references = world.query(
-        "SELECT r.relation_name, r.role_name, r.reference_kind, w.column_name "
-        "FROM _world_semantic_reference_roles r "
-        "JOIN _world_roles w ON w.relation_name = r.relation_name "
-        "AND w.role_name = r.role_name "
-        "WHERE r.reference_kind IN ('OBLIGATION', 'COMMITMENT') "
-        "ORDER BY r.relation_name, r.role_name"
-    )
-    grouped: dict[str, dict[str, str]] = {}
-    for row in references:
-        grouped.setdefault(str(row["relation_name"]), {})[
-            str(row["reference_kind"])
-        ] = str(row["column_name"])
-
-    found: set[str] = set()
-    for relation, columns in sorted(grouped.items()):
-        obligation_column = columns.get("OBLIGATION")
-        commitment_column = columns.get("COMMITMENT")
-        if not obligation_column or not commitment_column:
-            continue
-        rows = world.query(
-            f"SELECT {_quote_identifier(commitment_column)} AS commitment_id "
-            f"FROM {_quote_identifier(relation)} "
-            f"WHERE {_quote_identifier(obligation_column)} = ? "
-            f"ORDER BY {_quote_identifier(commitment_column)}",
-            (obligation_id,),
-        )
-        found.update(str(row["commitment_id"]) for row in rows)
-    return tuple(sorted(found))
-
-
-def _quote_identifier(value: str) -> str:
-    return '"' + str(value).replace('"', '""') + '"'
+    return tuple(world.candidates_for(obligation_id))
 
 
 def _commitment(world: Any, commitment_id: str) -> dict[str, Any]:

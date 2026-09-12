@@ -112,9 +112,9 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
         prominent_id = _assertion_id(world, "relative_prominence")
         available_id = _assertion_id(world, "remains_available_during")
         supports_id = _assertion_id(world, "supports")
-        candidate_rows = world.relation_rows("candidate_for")
-        assert {row["obligation"] for row in candidate_rows} == set(expected_obligations)
-        assert {row["commitment"] for row in candidate_rows} == {
+        candidate_rows = world.candidate_associations()
+        assert {row["obligation_id"] for row in candidate_rows} == set(expected_obligations)
+        assert {row["commitment_id"] for row in candidate_rows} == {
             prominent_id,
             available_id,
             supports_id,
@@ -182,24 +182,7 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
         assert (
             set(DESIGN_RELATIONS) - {"does_not_remain_available_during"}
         ).issubset(schema)
-        assert schema["candidate_for"]["roles"] == [
-            {
-                "name": "obligation",
-                "type": "TEXT",
-                "column": "obligation",
-                "referent": False,
-                "kinds": [],
-                "reference_kind": "OBLIGATION",
-            },
-            {
-                "name": "commitment",
-                "type": "TEXT",
-                "column": "commitment",
-                "referent": False,
-                "kinds": [],
-                "reference_kind": "COMMITMENT",
-            },
-        ]
+        assert "candidate_for" not in schema
 
         demand = explorer.demand()
         assert demand is not None
@@ -278,12 +261,21 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
             "context": "checkout_commitment",
         }
         assert commitment["warrant"]["recorded_construction_origin"] == "SEMANTIC"
+        assert commitment["candidate_for"] == [
+            next(
+                item["obligation_id"]
+                for item in demand["obligations"]
+                if item["candidates"][0]["commitment_id"] == prominent_id
+            )
+        ]
         assert all(
             "resolution_authority"
             not in base.get("detail", {}).get("extra", {})
             for base in commitment["warrant"]["bases"]
         )
-        assert explorer.rows("candidate_for")["total"] == len(expected_obligations)
+        assert sum(
+            len(item["candidates"]) for item in demand["obligations"]
+        ) == len(expected_obligations)
 
     from starlette.testclient import TestClient
 
@@ -294,6 +286,7 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
         )
         generated = client.get("/world/obligations").json()
         assert set(generated["obligations"]) == set(expected_obligations)
+        assert len(generated["candidate_associations"]) == len(expected_obligations)
         assert client.get("/world/evidence-authority").json()["identity"] == {
             "authority_id": "design-mobile-checkout-evidence",
             "revision": "1",

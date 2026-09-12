@@ -103,6 +103,21 @@ class SemanticWorld:
     def obligations(self) -> list[dict[str, Any]]:
         return self._store.obligations()
 
+    def add_candidate(self, obligation_id: str, commitment_id: str) -> str:
+        return self._store.add_candidate(obligation_id, commitment_id)
+
+    def candidates_for(self, obligation_id: str) -> list[str]:
+        return self._store.candidates_for(obligation_id)
+
+    def obligations_for(self, commitment_id: str) -> list[str]:
+        return self._store.obligations_for(commitment_id)
+
+    def candidate_associations(self) -> list[dict[str, Any]]:
+        return self._store.candidate_associations()
+
+    def candidate_errors(self) -> list[dict[str, str]]:
+        return self._store.candidate_errors()
+
     def resolution(self, obligation_id: str) -> dict[str, Any] | None:
         return self._store.resolution(obligation_id)
 

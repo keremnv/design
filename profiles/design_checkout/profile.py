@@ -3,7 +3,8 @@
 This is application vocabulary, not a proposal for a universal Design
 ontology. The Contract authorizes the three decision relations used by the
 fixture, plus one explicitly negative availability relation required by the
-counterfactual adequacy test.
+counterfactual adequacy test. Candidate bookkeeping is a kernel
+association, not part of this language.
 """
 
 from __future__ import annotations
@@ -126,7 +127,6 @@ DESIGN_CONTRACT = Contract(
     "1",
     semantic_origins=frozenset({ConstructionOrigin.SEMANTIC.value}),
     semantic_relations=frozenset(DESIGN_RELATION_NAMES),
-    allow_semantic_reference_relations=True,
     resolution_warrant_kinds=frozenset({"APPROVED_REQUIREMENT"}),
     adjudication_authority_kinds=frozenset({"AUTHORIZED_ADJUDICATION"}),
 )

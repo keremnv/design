@@ -1,9 +1,9 @@
 """Contract-bearing extensions over the existing WorldStore.
 
 This slice keeps resolution separate from construction. It adds a World/Contract
-binding, durable obligations, typed semantic references, and one current
-resolution record per obligation; the resolver itself remains a runtime
-evaluation over recorded state.
+binding, durable obligations, kernel candidate associations, typed semantic
+references, and one current resolution record per obligation; the resolver
+itself remains a runtime evaluation over recorded state.
 
 Commitments are, provisionally, the existing addressable assertions. This keeps
 proposition identity content-addressed while warrant work remains separate.
@@ -26,11 +26,11 @@ from ontology_author.world.core.model import (
     SemanticRefKind,
     WorldStoreError,
 )
-from ontology_author.world.core.store import WorldStore, _identifier, _quote
+from ontology_author.world.core.store import WorldStore, _identifier, _quote, _stable_id
 
 
 class ContractWorldStore(WorldStore):
-    """WorldStore with minimal contract, obligation, and semantic-ref state."""
+    """WorldStore with Contract, obligation, candidate, and semantic-ref state."""
 
     def __init__(
         self,
@@ -62,6 +62,16 @@ class ContractWorldStore(WorldStore):
                 contract_revision TEXT NOT NULL,
                 created_revision INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS _world_obligation_candidates (
+                obligation_id TEXT NOT NULL
+                    REFERENCES _world_obligations(obligation_id) ON DELETE CASCADE,
+                commitment_id TEXT NOT NULL
+                    REFERENCES _world_assertions(assertion_id) ON DELETE RESTRICT,
+                created_revision INTEGER NOT NULL,
+                PRIMARY KEY(obligation_id, commitment_id)
+            );
+            CREATE INDEX IF NOT EXISTS _world_obligation_candidates_commitment_idx
+                ON _world_obligation_candidates(commitment_id);
             CREATE TABLE IF NOT EXISTS _world_resolutions (
                 obligation_id TEXT PRIMARY KEY
                     REFERENCES _world_obligations(obligation_id) ON DELETE CASCADE,
@@ -221,6 +231,129 @@ class ContractWorldStore(WorldStore):
                 "SELECT * FROM _world_obligations ORDER BY obligation_id"
             )
         ]
+
+    # -- Obligation/Commitment candidates -------------------------------
+
+    @staticmethod
+    def _candidate_association_id(obligation_id: str, commitment_id: str) -> str:
+        """Return a stable inspection identity for a candidate association."""
+
+        return _stable_id("candidate", [obligation_id, commitment_id])
+
+    def add_candidate(self, obligation_id: str, commitment_id: str) -> str:
+        """Associate an existing Commitment with an existing Obligation.
+
+        This is kernel bookkeeping, not a semantic-domain assertion. The
+        association is deliberately stored outside the relation tables, while
+        the two referenced identities remain hard-validated at the API
+        boundary.
+        """
+
+        obligation = str(obligation_id or "").strip()
+        commitment = str(commitment_id or "").strip()
+        if not obligation:
+            raise WorldStoreError("candidate Obligation identity must be non-empty")
+        if not commitment:
+            raise WorldStoreError("candidate Commitment identity must be non-empty")
+        if self.obligation(obligation) is None:
+            raise WorldStoreError(f"unknown candidate obligation {obligation!r}")
+        found = self._db.execute(
+            "SELECT 1 FROM _world_assertions WHERE assertion_id = ?",
+            (commitment,),
+        ).fetchone()
+        if found is None:
+            raise WorldStoreError(f"unknown candidate commitment {commitment!r}")
+        existing = self._db.execute(
+            "SELECT 1 FROM _world_obligation_candidates "
+            "WHERE obligation_id = ? AND commitment_id = ?",
+            (obligation, commitment),
+        ).fetchone()
+        if existing is not None:
+            return self._candidate_association_id(obligation, commitment)
+        with self._db:
+            next_revision = self.revision + 1
+            self._db.execute(
+                "INSERT INTO _world_obligation_candidates "
+                "(obligation_id, commitment_id, created_revision) VALUES (?, ?, ?)",
+                (obligation, commitment, next_revision),
+            )
+            self._bump_world()
+        return self._candidate_association_id(obligation, commitment)
+
+    def candidates_for(self, obligation_id: str) -> list[str]:
+        """Return candidate Commitment identities in deterministic order."""
+
+        return [
+            str(row["commitment_id"])
+            for row in self._db.execute(
+                "SELECT commitment_id FROM _world_obligation_candidates "
+                "WHERE obligation_id = ? ORDER BY commitment_id",
+                (str(obligation_id),),
+            )
+        ]
+
+    def obligations_for(self, commitment_id: str) -> list[str]:
+        """Return Obligation identities for which a Commitment is a candidate."""
+
+        return [
+            str(row["obligation_id"])
+            for row in self._db.execute(
+                "SELECT obligation_id FROM _world_obligation_candidates "
+                "WHERE commitment_id = ? ORDER BY obligation_id",
+                (str(commitment_id),),
+            )
+        ]
+
+    def candidate_associations(self) -> list[dict[str, Any]]:
+        """Inspect all candidate associations and their creation revisions."""
+
+        return [
+            {
+                "association_id": self._candidate_association_id(
+                    str(row["obligation_id"]), str(row["commitment_id"])
+                ),
+                "obligation_id": str(row["obligation_id"]),
+                "commitment_id": str(row["commitment_id"]),
+                "created_revision": int(row["created_revision"]),
+            }
+            for row in self._db.execute(
+                "SELECT obligation_id, commitment_id, created_revision "
+                "FROM _world_obligation_candidates "
+                "ORDER BY obligation_id, commitment_id"
+            )
+        ]
+
+    def candidate_errors(self) -> list[dict[str, str]]:
+        """Find dangling candidate references before publication."""
+
+        errors: list[dict[str, str]] = []
+        for row in self._db.execute(
+            "SELECT obligation_id, commitment_id "
+            "FROM _world_obligation_candidates "
+            "ORDER BY obligation_id, commitment_id"
+        ):
+            obligation = str(row["obligation_id"])
+            commitment = str(row["commitment_id"])
+            if self.obligation(obligation) is None:
+                errors.append(
+                    {
+                        "obligation_id": obligation,
+                        "commitment_id": commitment,
+                        "reason": "unknown_candidate_obligation",
+                    }
+                )
+            if self._db.execute(
+                "SELECT 1 FROM _world_assertions WHERE assertion_id = ?",
+                (commitment,),
+            ).fetchone() is None:
+                errors.append(
+                    {
+                        "obligation_id": obligation,
+                        "commitment_id": commitment,
+                        "reason": "unknown_candidate_commitment",
+                    }
+                )
+        return errors
 
     # -- Adjudications ----------------------------------------------------
 
@@ -466,33 +599,12 @@ class ContractWorldStore(WorldStore):
         return f"resolution:{identity}"
 
     def _candidate_exists(self, obligation_id: str, commitment_id: str) -> bool:
-        references = list(self._db.execute(
-            "SELECT r.relation_name, r.reference_kind, w.column_name "
-            "FROM _world_semantic_reference_roles r "
-            "JOIN _world_roles w ON w.relation_name = r.relation_name "
-            "AND w.role_name = r.role_name "
-            "WHERE r.reference_kind IN ('OBLIGATION', 'COMMITMENT') "
-            "ORDER BY r.relation_name, r.role_name"
-        ))
-        grouped: dict[str, dict[str, str]] = {}
-        for row in references:
-            grouped.setdefault(str(row["relation_name"]), {})[
-                str(row["reference_kind"])
-            ] = str(row["column_name"])
-        for relation, columns in grouped.items():
-            obligation_column = columns.get("OBLIGATION")
-            commitment_column = columns.get("COMMITMENT")
-            if not obligation_column or not commitment_column:
-                continue
-            row = self._db.execute(
-                f"SELECT 1 FROM {_quote(relation)} WHERE "
-                f"{_quote(obligation_column)} = ? AND "
-                f"{_quote(commitment_column)} = ? LIMIT 1",
-                (obligation_id, commitment_id),
-            ).fetchone()
-            if row is not None:
-                return True
-        return False
+        row = self._db.execute(
+            "SELECT 1 FROM _world_obligation_candidates "
+            "WHERE obligation_id = ? AND commitment_id = ?",
+            (obligation_id, commitment_id),
+        ).fetchone()
+        return row is not None
 
     def resolution(self, obligation_id: str) -> dict[str, Any] | None:
         row = self._db.execute(
@@ -697,6 +809,16 @@ class ContractWorldStore(WorldStore):
         return errors
 
     def retract(self, relation: str, assertion_id: str) -> bool:
+        candidate = self._db.execute(
+            "SELECT 1 FROM _world_obligation_candidates "
+            "WHERE commitment_id = ? LIMIT 1",
+            (assertion_id,),
+        ).fetchone()
+        if candidate is not None:
+            raise WorldStoreError(
+                f"cannot retract commitment {assertion_id!r}: "
+                "candidate associations depend on it"
+            )
         for spec in self._db.execute(
             "SELECT r.relation_name, w.column_name "
             "FROM _world_semantic_reference_roles r "
@@ -722,10 +844,17 @@ class ContractWorldStore(WorldStore):
             raise WorldStoreError(
                 f"derivation {relation!r} left dangling semantic references: {dangling}"
             )
+        candidates = self.candidate_errors()
+        if candidates:
+            raise WorldStoreError(
+                f"derivation {relation!r} left dangling candidate associations: "
+                f"{candidates}"
+            )
         return result
 
     def describe(self) -> dict[str, Any]:
         payload = super().describe()
         payload["world"]["contract"] = self.contract_identity()
         payload["obligations"] = self.obligations()
+        payload["obligation_candidates"] = self.candidate_associations()
         return payload

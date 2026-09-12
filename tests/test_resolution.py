@@ -129,33 +129,8 @@ def construct(source, world, purpose):
             ),
         ).assertion_id
 
-    world.declare_relation(
-        "candidate_for",
-        [
-            Role(
-                "obligation",
-                RoleType.TEXT,
-                reference_kind=SemanticRefKind.OBLIGATION,
-            ),
-            Role(
-                "commitment",
-                RoleType.TEXT,
-                reference_kind=SemanticRefKind.COMMITMENT,
-            ),
-        ],
-        description="Scenario candidate relationship.",
-        scope="WORLD",
-    )
     for commitment_id in commitments:
-        world.assert_tuple(
-            "candidate_for",
-            {"obligation": "O7", "commitment": commitment_id},
-            origin=ConstructionOrigin.SEMANTIC,
-            grounding=AssertionGrounding(
-                observations=(),
-                construction_method="bounded resolution scenario candidate",
-            ),
-        )
+        world.add_candidate("O7", commitment_id)
 
     for record in scenario.get("adjudications", []):
         candidate_index = record.get("candidate_index")
@@ -235,7 +210,7 @@ def test_admitted_candidate_without_authoritative_warrant_stays_unresolved(
         assert resolution["selected_commitment_id"] is None
         assert resolution["candidate_assessments"][0]["status"] == "INSUFFICIENT"
         assert world.obligation("O7")["state"] == "UNRESOLVED"
-        assert world.relation_rows("candidate_for")
+        assert world.candidates_for("O7")
     finally:
         world.close()
 
@@ -254,7 +229,7 @@ def test_authoritative_requirement_resolves_and_survives_reopen_and_read_surface
     )
     _result, world = _evaluate(root)
     try:
-        commitment_id = world.relation_rows("candidate_for")[0]["commitment"]
+        commitment_id = world.candidates_for("O7")[0]
         assert world.obligation("O7")["state"] == "RESOLVED"
         resolution = world.resolution("O7")
         assert resolution["status"] == "RESOLVED"
@@ -319,7 +294,7 @@ def test_removing_external_authority_binding_changes_the_same_candidate_to_insuf
     )
     _result, world = _evaluate(root)
     try:
-        commitment_id = world.relation_rows("candidate_for")[0]["commitment"]
+        commitment_id = world.candidates_for("O7")[0]
         warrant_before = world.warrant_for_assertion(commitment_id)
         assert world.resolution("O7")["status"] == "RESOLVED"
     finally:
@@ -343,7 +318,7 @@ def test_removing_external_authority_binding_changes_the_same_candidate_to_insuf
     assert result.succeeded, result.errors
     world = Project(root).open_world()
     try:
-        assert world.relation_rows("candidate_for")[0]["commitment"] == commitment_id
+        assert world.candidates_for("O7")[0] == commitment_id
         assert world.warrant_for_assertion(commitment_id) == warrant_before
         resolution = world.resolution("O7")
         assert resolution["status"] == "INSUFFICIENT_WARRANT"
@@ -368,7 +343,7 @@ def test_constructor_claimed_authority_cannot_create_sufficient_evidence(
     )
     _result, world = _evaluate(root)
     try:
-        commitment_id = world.relation_rows("candidate_for")[0]["commitment"]
+        commitment_id = world.candidates_for("O7")[0]
         resolution = world.resolution("O7")
         assert resolution["status"] == "INSUFFICIENT_WARRANT"
         assert resolution["candidate_assessments"][0]["authority_basis"] == []
@@ -393,7 +368,7 @@ def test_unbound_evidence_remains_inspectable_but_is_insufficient(tmp_path: Path
     )
     _result, world = _evaluate(root)
     try:
-        commitment_id = world.relation_rows("candidate_for")[0]["commitment"]
+        commitment_id = world.candidates_for("O7")[0]
         resolution = world.resolution("O7")
         assert resolution["status"] == "INSUFFICIENT_WARRANT"
         assert resolution["candidate_assessments"][0]["authority_basis"] == []
@@ -561,8 +536,8 @@ def test_authorized_adjudication_resolves_conflict_without_erasing_candidates(
     )
     _result, world = _evaluate(root)
     try:
-        candidates = world.relation_rows("candidate_for")
-        selected = candidates[0]["commitment"]
+        candidates = world.candidates_for("O7")
+        selected = candidates[0]
         resolution = world.resolution("O7")
         assert resolution["status"] == "RESOLVED"
         assert resolution["selected_commitment_id"] == selected
@@ -594,7 +569,7 @@ def test_authorized_adjudication_resolves_conflict_without_erasing_candidates(
                 ],
             }
         ]
-        assert len(world.relation_rows("candidate_for")) == 2
+        assert len(world.candidates_for("O7")) == 2
         assert len(world.adjudications()) == 1
     finally:
         world.close()
@@ -734,9 +709,9 @@ def test_adjudication_selecting_insufficient_candidate_does_not_rescue_it(
     _result, world = _evaluate(root)
     try:
         resolution = world.resolution("O7")
-        candidate_rows = world.relation_rows("candidate_for")
+        candidate_rows = world.candidates_for("O7")
         assert resolution["status"] == "RESOLVED"
-        assert resolution["selected_commitment_id"] == candidate_rows[0]["commitment"]
+        assert resolution["selected_commitment_id"] == candidate_rows[0]
         assert resolution["resolution_basis"] == []
         assert world.adjudication("A-weak") is not None
     finally:
@@ -889,7 +864,7 @@ def test_sufficient_answer_is_not_defeated_by_incompatible_weak_candidate(
         resolution = world.resolution("O7")
         assert resolution["status"] == "RESOLVED"
         selected = resolution["selected_commitment_id"]
-        assert selected == world.relation_rows("candidate_for")[0]["commitment"]
+        assert selected == world.candidates_for("O7")[0]
         assert {
             item["status"] for item in resolution["candidate_assessments"]
         } == {"INSUFFICIENT", "SUFFICIENT"}
@@ -917,9 +892,7 @@ def test_same_proposition_with_multiple_support_paths_has_one_commitment(
         )
         assert len(commitment_rows) == 1
         commitment_id = commitment_rows[0]["assertion_id"]
-        assert world.relation_rows("candidate_for") == [
-            {"obligation": "O7", "commitment": commitment_id}
-        ]
+        assert world.candidates_for("O7") == [commitment_id]
         warrant = world.warrant_for_assertion(commitment_id)
         assert len(warrant["bases"]) == 3
         assert world.resolution("O7")["status"] == "RESOLVED"
@@ -948,8 +921,8 @@ def test_resolution_failure_preserves_previous_sealed_world(tmp_path: Path):
 
     broken = (root / "construction.py").read_text(encoding="utf-8")
     broken = broken.replace(
-        '"obligation": "O7", "commitment": commitment_id',
-        '"obligation": "missing", "commitment": commitment_id',
+        'world.add_candidate("O7", commitment_id)',
+        'world.add_candidate("missing", commitment_id)',
     )
     (root / "construction.py").write_text(broken, encoding="utf-8")
     result = rebuild(

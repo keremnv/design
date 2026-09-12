@@ -71,30 +71,7 @@ def test_design_commitment_can_be_candidate_for_durable_obligation(tmp_path):
             ),
         )
 
-        world.declare_relation(
-            "candidate_for",
-            [
-                Role(
-                    "obligation",
-                    RoleType.TEXT,
-                    SemanticRefKind.OBLIGATION,
-                ),
-                Role(
-                    "commitment",
-                    RoleType.TEXT,
-                    SemanticRefKind.COMMITMENT,
-                ),
-            ],
-            description="A commitment proposed as an answer to an obligation.",
-        )
-        candidate = world.assert_tuple(
-            "candidate_for",
-            {
-                "obligation": obligation_id,
-                "commitment": commitment.assertion_id,
-            },
-            origin=ConstructionOrigin.SEMANTIC,
-        )
+        association_id = world.add_candidate(obligation_id, commitment.assertion_id)
 
         obligation = world.obligation(obligation_id)
         assert obligation is not None
@@ -102,25 +79,18 @@ def test_design_commitment_can_be_candidate_for_durable_obligation(tmp_path):
         assert obligation["contract_id"] == "design-core"
         assert obligation["contract_revision"] == "1"
 
-        assert world.relation_tuples("candidate_for") == {
-            (obligation_id, commitment.assertion_id)
-        }
-        assert candidate.assertion_id != commitment.assertion_id
-
-        schema = world.relation_schema("candidate_for")
-        assert schema["roles"] == [
+        assert association_id.startswith("candidate:")
+        assert world.candidates_for(obligation_id) == [commitment.assertion_id]
+        assert world.obligations_for(commitment.assertion_id) == [obligation_id]
+        assert world.candidate_associations() == [
             {
-                "name": "obligation",
-                "type": "TEXT",
-                "column": "obligation",
-                "reference_kind": "OBLIGATION",
-            },
-            {
-                "name": "commitment",
-                "type": "TEXT",
-                "column": "commitment",
-                "reference_kind": "COMMITMENT",
-            },
+                "association_id": association_id,
+                "obligation_id": obligation_id,
+                "commitment_id": commitment.assertion_id,
+                "created_revision": world.candidate_associations()[0][
+                    "created_revision"
+                ],
+            }
         ]
 
         warrant = world.warrant_for_assertion(commitment.assertion_id)
@@ -146,14 +116,14 @@ def test_design_commitment_can_be_candidate_for_durable_obligation(tmp_path):
             "contract_revision": "1",
         }
         assert reopened.obligation("checkout.prominence.total-vs-promo")["state"] == "UNRESOLVED"
-        assert reopened.relation_tuples("candidate_for") == {
-            ("checkout.prominence.total-vs-promo", commitment.assertion_id)
-        }
+        assert reopened.candidates_for("checkout.prominence.total-vs-promo") == [
+            commitment.assertion_id
+        ]
     finally:
         reopened.close()
 
 
-def test_semantic_reference_roles_reject_unknown_targets(tmp_path):
+def test_candidate_association_rejects_unknown_targets(tmp_path):
     world = _design_world(tmp_path)
     try:
         world.add_referent("a")
@@ -162,30 +132,15 @@ def test_semantic_reference_roles_reject_unknown_targets(tmp_path):
             "fact", {"subject": "a"}, origin=ConstructionOrigin.SEMANTIC
         )
         world.add_obligation("o1", question="What should happen?")
-        world.declare_relation(
-            "candidate_for",
-            [
-                Role("obligation", RoleType.TEXT, SemanticRefKind.OBLIGATION),
-                Role("commitment", RoleType.TEXT, SemanticRefKind.COMMITMENT),
-            ],
-        )
-        with pytest.raises(WorldStoreError, match="unknown commitment"):
-            world.assert_tuple(
-                "candidate_for",
-                {"obligation": "o1", "commitment": "assertion:not-real"},
-                origin=ConstructionOrigin.SEMANTIC,
-            )
-        with pytest.raises(WorldStoreError, match="unknown obligation"):
-            world.assert_tuple(
-                "candidate_for",
-                {"obligation": "missing", "commitment": commitment.assertion_id},
-                origin=ConstructionOrigin.SEMANTIC,
-            )
+        with pytest.raises(WorldStoreError, match="unknown candidate commitment"):
+            world.add_candidate("o1", "assertion:not-real")
+        with pytest.raises(WorldStoreError, match="unknown candidate obligation"):
+            world.add_candidate("missing", commitment.assertion_id)
     finally:
         world.close()
 
 
-def test_referenced_commitment_cannot_be_retracted(tmp_path):
+def test_candidate_commitment_cannot_be_retracted(tmp_path):
     world = _design_world(tmp_path)
     try:
         world.add_referent("a")
@@ -200,19 +155,69 @@ def test_referenced_commitment_cannot_be_retracted(tmp_path):
             origin=ConstructionOrigin.SEMANTIC,
         )
         world.add_obligation("o1", question="Which is preferred?")
+        world.add_candidate("o1", commitment.assertion_id)
+        with pytest.raises(WorldStoreError, match="candidate associations depend on it"):
+            world.retract_tuple("preference", {"more": "a", "less": "b"})
+    finally:
+        world.close()
+
+
+def test_candidate_association_is_idempotent_and_bidirectional(tmp_path):
+    world = _design_world(tmp_path)
+    try:
+        world.add_referent("a")
+        world.add_referent("b")
         world.declare_relation(
-            "candidate_for",
+            "preference",
+            [Role("more", RoleType.REFERENT), Role("less", RoleType.REFERENT)],
+        )
+        commitment = world.assert_tuple(
+            "preference",
+            {"more": "a", "less": "b"},
+            origin=ConstructionOrigin.SEMANTIC,
+        )
+        world.add_obligation("o1", question="Which is preferred in context one?")
+        world.add_obligation("o2", question="Which is preferred in context two?")
+
+        first = world.add_candidate("o1", commitment.assertion_id)
+        revision_after_first = world._store.revision
+        assert world.add_candidate("o1", commitment.assertion_id) == first
+        assert world._store.revision == revision_after_first
+        world.add_candidate("o2", commitment.assertion_id)
+
+        assert world.candidates_for("o1") == [commitment.assertion_id]
+        assert world.candidates_for("o2") == [commitment.assertion_id]
+        assert world.obligations_for(commitment.assertion_id) == ["o1", "o2"]
+        assert len(world.candidate_associations()) == 2
+    finally:
+        world.close()
+
+
+def test_generic_semantic_reference_relations_remain_separate_from_candidates(tmp_path):
+    world = _design_world(tmp_path)
+    try:
+        world.add_referent("a")
+        world.declare_relation("fact", [Role("subject", RoleType.REFERENT)])
+        commitment = world.assert_tuple(
+            "fact", {"subject": "a"}, origin=ConstructionOrigin.SEMANTIC
+        )
+        world.add_obligation("o1", question="What should happen?")
+        world.declare_relation(
+            "semantic_link",
             [
                 Role("obligation", RoleType.TEXT, SemanticRefKind.OBLIGATION),
                 Role("commitment", RoleType.TEXT, SemanticRefKind.COMMITMENT),
             ],
         )
         world.assert_tuple(
-            "candidate_for",
+            "semantic_link",
             {"obligation": "o1", "commitment": commitment.assertion_id},
             origin=ConstructionOrigin.SEMANTIC,
         )
-        with pytest.raises(WorldStoreError, match="semantic references depend on it"):
-            world.retract_tuple("preference", {"more": "a", "less": "b"})
+
+        assert world.relation_tuples("semantic_link") == {
+            ("o1", commitment.assertion_id)
+        }
+        assert world.candidates_for("o1") == []
     finally:
         world.close()
