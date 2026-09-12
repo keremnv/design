@@ -6,7 +6,6 @@ from ontology_author.world.core.contract import (
     Contract,
     ContractAdmissionError,
 )
-from ontology_author.world.core.adjudication import Adjudication
 from ontology_author.world.core.resolution import Resolution
 from ontology_author.world.core.model import ResolutionStatus
 from .runtime import (
@@ -28,7 +27,6 @@ from .workspaces import WorldRef, WorldSelectionError, discover, select, world_r
 __all__ = [
     "Contract",
     "ContractAdmissionError",
-    "Adjudication",
     "AdjudicationAssessment",
     "CandidateAssessment",
     "ConstructionError",

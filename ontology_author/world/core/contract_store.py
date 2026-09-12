@@ -57,7 +57,6 @@ class ContractWorldStore(WorldStore):
             CREATE TABLE IF NOT EXISTS _world_obligations (
                 obligation_id TEXT PRIMARY KEY,
                 question TEXT NOT NULL,
-                state TEXT NOT NULL CHECK(state IN ('UNRESOLVED')),
                 reason TEXT NOT NULL DEFAULT '',
                 contract_id TEXT NOT NULL,
                 contract_revision TEXT NOT NULL,
@@ -178,7 +177,6 @@ class ContractWorldStore(WorldStore):
         ).fetchone()
         expected = {
             "question": text,
-            "state": ObligationState.UNRESOLVED.value,
             "reason": str(reason or ""),
             "contract_id": contract["contract_id"],
             "contract_revision": contract["contract_revision"],
@@ -194,13 +192,12 @@ class ContractWorldStore(WorldStore):
             next_revision = self.revision + 1
             self._db.execute(
                 "INSERT INTO _world_obligations"
-                "(obligation_id, question, state, reason, contract_id, "
+                "(obligation_id, question, reason, contract_id, "
                 "contract_revision, created_revision) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     identity,
                     text,
-                    ObligationState.UNRESOLVED.value,
                     str(reason or ""),
                     contract["contract_id"],
                     contract["contract_revision"],
@@ -529,6 +526,10 @@ class ContractWorldStore(WorldStore):
         return out
 
     def _obligation_with_resolution(self, obligation: dict[str, Any]) -> dict[str, Any]:
+        # `state` is a read-model projection. The durable question carries no
+        # mutable resolution state; the current Resolution is the only source
+        # of truth for whether it has a governing answer.
+        obligation["state"] = ObligationState.UNRESOLVED.value
         resolution = self.resolution(str(obligation["obligation_id"]))
         if resolution is None:
             return obligation
