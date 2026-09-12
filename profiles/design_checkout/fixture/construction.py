@@ -87,6 +87,12 @@ def construct(source, world, purpose):
         description="A means-to-design-goal decision in a context.",
         scope="WORLD",
     )
+    world.declare_relation(
+        "does_not_remain_available_during",
+        design_roles["remains_available_during"],
+        description="A provisional explicit negative availability decision.",
+        scope="WORLD",
+    )
 
     requirements_basis = source.observation(
         "checkout-requirements.md",
@@ -117,6 +123,7 @@ def construct(source, world, purpose):
                     ),
                     extra={
                         "basis": "requirements plus current structural model",
+                        "resolution_authority": "APPROVED_REQUIREMENT",
                         "current_present_during": list(structure.present_during),
                     },
                 ),
@@ -136,7 +143,10 @@ def construct(source, world, purpose):
                         "agent design judgment: make the amount due more prominent "
                         "than the optional promo action at the commitment point"
                     ),
-                    extra={"basis": "requirements plus current structural model"},
+                    extra={
+                        "basis": "requirements plus current structural model",
+                        "resolution_authority": "AGENT_JUDGMENT",
+                    },
                 ),
             )
         elif obligation.dimension == "goal_support":
@@ -154,7 +164,10 @@ def construct(source, world, purpose):
                         "agent design judgment: visible order summary supports "
                         "confident purchase"
                     ),
-                    extra={"basis": "requirements plus current structural model"},
+                    extra={
+                        "basis": "requirements plus current structural model",
+                        "resolution_authority": "AGENT_JUDGMENT",
+                    },
                 ),
             )
 

@@ -56,9 +56,23 @@ class GroundingKind(StrEnum):
 
 
 class ObligationState(StrEnum):
-    """The first slice intentionally has no resolution transition yet."""
+    """Whether an obligation currently has a governing answer."""
 
     UNRESOLVED = "UNRESOLVED"
+    RESOLVED = "RESOLVED"
+
+
+class ResolutionStatus(StrEnum):
+    """The result of one deterministic resolution evaluation."""
+
+    RESOLVED = "RESOLVED"
+    NO_CANDIDATE = "NO_CANDIDATE"
+    INSUFFICIENT_WARRANT = "INSUFFICIENT_WARRANT"
+    CONFLICT = "CONFLICT"
+    # A single-answer obligation cannot silently choose among multiple
+    # sufficient compatible candidates. This is an explicit bounded escape
+    # hatch, not a general resolution taxonomy.
+    AMBIGUOUS = "AMBIGUOUS"
 
 
 @dataclass(frozen=True)

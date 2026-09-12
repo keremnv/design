@@ -8,7 +8,9 @@ counterfactual adequacy test.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from ontology_author.world import Contract
 from ontology_author.world.core.origins import ConstructionOrigin
@@ -55,7 +57,50 @@ def load_design_law(project_root: Path | str) -> GovernanceProfile:
 
     selected = select_authoritative_sources(project_root)
     proposed = compile_governance_law(selected)
-    return adopt_governance_law(proposed)
+    return adopt_governance_law(
+        proposed,
+        conflict_checker=design_commitments_conflict,
+    )
+
+
+def design_commitments_conflict(
+    _obligation: Mapping[str, Any],
+    first: Mapping[str, Any],
+    second: Mapping[str, Any],
+) -> bool:
+    """Bounded semantic incompatibility for the checkout profile.
+
+    This recognizes only the two concrete counterexamples required by this
+    profile. It is not generic negation or a precedence system.
+    """
+
+    first_relation = str(first.get("relation") or "")
+    second_relation = str(second.get("relation") or "")
+    first_values = first.get("values")
+    second_values = second.get("values")
+    if not isinstance(first_values, Mapping) or not isinstance(second_values, Mapping):
+        return False
+
+    availability_relations = {
+        "remains_available_during",
+        "does_not_remain_available_during",
+    }
+    if (
+        first_relation != second_relation
+        and {first_relation, second_relation} == availability_relations
+    ):
+        return all(
+            first_values.get(name) == second_values.get(name)
+            for name in ("subject", "activity", "context")
+        )
+
+    if first_relation == second_relation == "relative_prominence":
+        return (
+            first_values.get("context") == second_values.get("context")
+            and first_values.get("more") == second_values.get("less")
+            and first_values.get("less") == second_values.get("more")
+        )
+    return False
 
 
 # Compatibility for callers that want the checked-in fixture's effective law.
@@ -70,4 +115,5 @@ DESIGN_CONTRACT = Contract(
     semantic_origins=frozenset({ConstructionOrigin.SEMANTIC.value}),
     semantic_relations=frozenset(DESIGN_RELATION_NAMES),
     allow_semantic_reference_relations=True,
+    resolution_warrant_kinds=frozenset({"APPROVED_REQUIREMENT"}),
 )

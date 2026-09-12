@@ -103,6 +103,29 @@ class SemanticWorld:
     def obligations(self) -> list[dict[str, Any]]:
         return self._store.obligations()
 
+    def resolution(self, obligation_id: str) -> dict[str, Any] | None:
+        return self._store.resolution(obligation_id)
+
+    def resolutions(self) -> list[dict[str, Any]]:
+        return self._store.resolutions()
+
+    def record_resolution(
+        self,
+        *,
+        obligation_id: str,
+        status: str,
+        selected_commitment_id: str | None = None,
+        reason: str = "",
+        candidate_assessments: Sequence[Mapping[str, Any]] = (),
+    ) -> str:
+        return self._store.record_resolution(
+            obligation_id=obligation_id,
+            status=status,
+            selected_commitment_id=selected_commitment_id,
+            reason=reason,
+            candidate_assessments=candidate_assessments,
+        )
+
     def semantic_reference_errors(self) -> list[dict[str, str]]:
         return self._store.semantic_reference_errors()
 

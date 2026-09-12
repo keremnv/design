@@ -323,7 +323,18 @@ class WorldExplorerAdapter:
 
     def generated_obligations(self) -> dict[str, Any] | None:
         """Law-generated obligation provenance, when the profile publishes it."""
-        return self._obligations_document
+        resolutions = {
+            item["obligation_id"]: item for item in self._world.resolutions()
+        }
+        if self._obligations_document is None and not resolutions:
+            return None
+        payload = dict(self._obligations_document or {"law": None, "obligations": {}})
+        payload["resolutions"] = resolutions
+        return payload
+
+    def resolution(self, obligation_id: str) -> dict[str, Any] | None:
+        """The current persisted evaluation for one Obligation."""
+        return self._world.resolution(obligation_id)
 
     def overview(self) -> dict[str, Any]:
         described = self._described()
@@ -1150,6 +1161,18 @@ class WorldExplorerAdapter:
                         "structural_bindings": provenance.get("bindings", {}),
                     }
                 )
+            resolution_status = item.get("resolution_status")
+            if resolution_status:
+                obligation["resolution"] = {
+                    "resolution_id": f"resolution:{obligation_id}",
+                    "obligation_id": obligation_id,
+                    "status": resolution_status,
+                    "selected_commitment_id": item.get("selected_commitment_id"),
+                    "reason": item.get("resolution_reason") or "",
+                    "contract_id": item["contract_id"],
+                    "contract_revision": item["contract_revision"],
+                    "candidate_assessments": item.get("candidate_assessments", []),
+                }
             obligations.append(obligation)
         return obligations
 

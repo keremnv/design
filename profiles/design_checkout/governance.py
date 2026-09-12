@@ -26,6 +26,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Callable, Mapping
 
 from .structure import FrontendStructure, NodeSelector
 
@@ -183,7 +184,8 @@ class GeneratedObligation:
         return (
             f"Governance Law {self.law_id}@{self.law_revision} requires "
             f"{article} {self.dimension} determination under rule {self.rule_id} "
-            "for these structural subjects; no resolver runs in this slice."
+            "for these structural subjects; resolution is evaluated separately "
+            "from construction."
         )
 
     def as_payload(self) -> dict[str, object]:
@@ -227,6 +229,9 @@ class ProposedGovernanceLaw:
         *,
         adopted_by: str,
         adoption_method: str = "explicit configuration",
+        conflict_checker: Callable[
+            [Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]], bool
+        ] | None = None,
     ) -> "GovernanceProfile":
         actor = str(adopted_by or "").strip()
         if not actor:
@@ -239,6 +244,7 @@ class ProposedGovernanceLaw:
             compilation_method=self.compilation_method,
             adoption={"adopted_by": actor, "method": adoption_method},
             proposed_law=self,
+            conflict_checker=conflict_checker,
         )
 
 
@@ -253,6 +259,9 @@ class GovernanceProfile:
     compilation_method: str = ""
     adoption: dict[str, str] | None = None
     proposed_law: ProposedGovernanceLaw | None = None
+    conflict_checker: Callable[
+        [Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]], bool
+    ] | None = None
 
     def identity(self) -> dict[str, str]:
         return {"law_id": self.law_id, "revision": self.revision}
@@ -272,6 +281,7 @@ class GovernanceProfile:
             compilation_method=self.compilation_method,
             adoption=self.adoption,
             proposed_law=self.proposed_law,
+            conflict_checker=self.conflict_checker,
         )
 
     def enumerate_obligations(
@@ -420,10 +430,16 @@ def adopt_governance_law(
     proposed_law: ProposedGovernanceLaw,
     *,
     adopted_by: str = "explicit checkout profile configuration",
+    conflict_checker: Callable[
+        [Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]], bool
+    ] | None = None,
 ) -> GovernanceProfile:
     """Make the compiler output effective through an explicit adoption step."""
 
-    return proposed_law.adopt(adopted_by=adopted_by)
+    return proposed_law.adopt(
+        adopted_by=adopted_by,
+        conflict_checker=conflict_checker,
+    )
 
 
 def write_obligation_artifact(

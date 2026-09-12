@@ -29,8 +29,11 @@ The negative commitment preserves that design distinction without introducing
 generic negation or a conflict framework.
 
 `candidate_for` is kernel bookkeeping, not Design vocabulary. Every Design
-obligation remains `UNRESOLVED` in this slice even when it has a candidate;
-there is no resolution engine.
+obligation is evaluated separately after construction. The approved
+requirement-backed availability candidate resolves in the current bounded
+experiment; agent-judgment candidates remain unresolved because the Design
+Contract accepts only the structured `APPROVED_REQUIREMENT` warrant authority
+for resolution. This is not final Design authority policy.
 
 The fixture's structural adapter is deliberately limited to literal JSX tags
 with double-quoted attributes. It does not execute React, resolve components,

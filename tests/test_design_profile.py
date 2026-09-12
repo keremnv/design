@@ -71,7 +71,12 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
             actual = actual_obligations[obligation_id]
             assert actual["question"] == generated.question
             assert actual["reason"] == generated.reason
-            assert actual["state"] == "UNRESOLVED"
+            if generated.dimension == "availability":
+                assert actual["state"] == "RESOLVED"
+                assert actual["resolution_status"] == "RESOLVED"
+            else:
+                assert actual["state"] == "UNRESOLVED"
+                assert actual["resolution_status"] == "INSUFFICIENT_WARRANT"
             assert actual["contract_id"] == "design-mobile-checkout"
             assert actual["contract_revision"] == "1"
 
@@ -107,6 +112,12 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
             available_id,
             supports_id,
         }
+        availability_obligation = next(
+            item
+            for item in actual_obligations.values()
+            if item["resolution_status"] == "RESOLVED"
+        )
+        assert availability_obligation["selected_commitment_id"] == available_id
 
         prominent_warrant = world.warrant_for_assertion(prominent_id)
         assert prominent_warrant["recorded_construction_origin"] == "SEMANTIC"
@@ -179,7 +190,6 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
         assert demand["demanded"] == len(expected_obligations)
         assert len(demand["obligations"]) == len(expected_obligations)
         for obligation in demand["obligations"]:
-            assert obligation["state"] == "UNRESOLVED"
             assert obligation["reason"]
             assert obligation["generated_by_rule"].startswith(
                 "rule:checkout_design_governance:"
@@ -189,6 +199,17 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
             )
             assert obligation["structural_bindings"]
             assert len(obligation["candidates"]) == 1
+            assert obligation["resolution"]["status"] in {
+                "RESOLVED",
+                "INSUFFICIENT_WARRANT",
+            }
+            if obligation["resolution"]["status"] == "RESOLVED":
+                assert obligation["state"] == "RESOLVED"
+                assert obligation["resolution"]["selected_commitment_id"] == (
+                    available_id
+                )
+            else:
+                assert obligation["state"] == "UNRESOLVED"
 
         structure = explorer.structure()
         assert structure is not None
@@ -213,8 +234,9 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
             for item in structure["present_during"]
         }
 
-        # Current structure is evidence for the availability candidate; it does
-        # not transition the generated question out of UNRESOLVED.
+        # Current structure is evidence for the availability candidate; the
+        # approved requirement is what makes that candidate resolution-
+        # sufficient under the Contract.
         availability_id = next(
             item_id
             for item_id, item in expected_obligations.items()
@@ -225,6 +247,11 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
             for item in demand["obligations"]
             if item["obligation_id"] == availability_id
         ) == availability_id
+        assert next(
+            item["resolution"]["status"]
+            for item in demand["obligations"]
+            if item["obligation_id"] == availability_id
+        ) == "RESOLVED"
 
         prominent_id = explorer.rows("relative_prominence")["rows"][0]["assertion_id"]
         commitment = explorer.assertion(prominent_id)

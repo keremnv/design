@@ -1,8 +1,9 @@
 """Contract-bearing extensions over the existing WorldStore.
 
-This first slice deliberately leaves resolution semantics out. It adds only the
-state a later resolver needs to consume: a World/Contract binding, durable
-obligations, and typed semantic references to commitments and obligations.
+This slice keeps resolution separate from construction. It adds a World/Contract
+binding, durable obligations, typed semantic references, and one current
+resolution record per obligation; the resolver itself remains a runtime
+evaluation over recorded state.
 
 Commitments are, provisionally, the existing addressable assertions. This keeps
 proposition identity content-addressed while warrant work remains separate.
@@ -11,6 +12,7 @@ proposition identity content-addressed while warrant work remains separate.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+import json
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +20,7 @@ from ontology_author.world.core.model import (
     Completeness,
     ObligationState,
     RelationMode,
+    ResolutionStatus,
     Role,
     RoleType,
     SemanticRefKind,
@@ -58,6 +61,23 @@ class ContractWorldStore(WorldStore):
                 reason TEXT NOT NULL DEFAULT '',
                 contract_id TEXT NOT NULL,
                 contract_revision TEXT NOT NULL,
+                created_revision INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS _world_resolutions (
+                obligation_id TEXT PRIMARY KEY
+                    REFERENCES _world_obligations(obligation_id) ON DELETE CASCADE,
+                status TEXT NOT NULL CHECK(status IN (
+                    'RESOLVED',
+                    'NO_CANDIDATE',
+                    'INSUFFICIENT_WARRANT',
+                    'CONFLICT',
+                    'AMBIGUOUS'
+                )),
+                selected_commitment_id TEXT,
+                reason TEXT NOT NULL DEFAULT '',
+                contract_id TEXT NOT NULL,
+                contract_revision TEXT NOT NULL,
+                candidate_assessments TEXT NOT NULL,
                 created_revision INTEGER NOT NULL
             );
             CREATE TABLE IF NOT EXISTS _world_semantic_reference_roles (
@@ -164,15 +184,175 @@ class ContractWorldStore(WorldStore):
             "SELECT * FROM _world_obligations WHERE obligation_id = ?",
             (str(obligation_id),),
         ).fetchone()
-        return dict(row) if row is not None else None
+        return self._obligation_with_resolution(dict(row)) if row is not None else None
 
     def obligations(self) -> list[dict[str, Any]]:
         return [
-            dict(row)
+            self._obligation_with_resolution(dict(row))
             for row in self._db.execute(
                 "SELECT * FROM _world_obligations ORDER BY obligation_id"
             )
         ]
+
+    def record_resolution(
+        self,
+        *,
+        obligation_id: str,
+        status: ResolutionStatus | str,
+        selected_commitment_id: str | None = None,
+        reason: str = "",
+        contract_id: str | None = None,
+        contract_revision: str | None = None,
+        candidate_assessments: Sequence[Mapping[str, Any]] = (),
+    ) -> str:
+        """Replace the current Resolution for one durable Obligation."""
+
+        identity = str(obligation_id or "").strip()
+        if self.obligation(identity) is None:
+            raise WorldStoreError(f"unknown obligation {identity!r}")
+        resolution_status = ResolutionStatus(status)
+        contract = self.contract_identity()
+        if contract is None:
+            raise WorldStoreError("a Resolution requires a bound Contract revision")
+        if contract_id is not None and str(contract_id) != contract["contract_id"]:
+            raise WorldStoreError("Resolution Contract identity does not match World")
+        if contract_revision is not None and str(contract_revision) != contract["contract_revision"]:
+            raise WorldStoreError("Resolution Contract revision does not match World")
+
+        selected = str(selected_commitment_id or "").strip() or None
+        if resolution_status is ResolutionStatus.RESOLVED and selected is None:
+            raise WorldStoreError("RESOLVED Resolution requires selected Commitment")
+        if resolution_status is not ResolutionStatus.RESOLVED and selected is not None:
+            raise WorldStoreError(
+                f"{resolution_status.value} Resolution cannot select a Commitment"
+            )
+        if selected is not None:
+            found = self._db.execute(
+                "SELECT 1 FROM _world_assertions WHERE assertion_id = ?", (selected,)
+            ).fetchone()
+            if found is None:
+                raise WorldStoreError(f"unknown selected commitment {selected!r}")
+            if not self._candidate_exists(identity, selected):
+                raise WorldStoreError(
+                    f"selected commitment {selected!r} is not a candidate for "
+                    f"obligation {identity!r}"
+                )
+
+        assessments = [dict(item) for item in candidate_assessments]
+        encoded = json.dumps(assessments, sort_keys=True, separators=(",", ":"))
+        existing = self._db.execute(
+            "SELECT status, selected_commitment_id, reason, contract_id, "
+            "contract_revision, candidate_assessments "
+            "FROM _world_resolutions WHERE obligation_id = ?",
+            (identity,),
+        ).fetchone()
+        expected = (
+            resolution_status.value,
+            selected,
+            str(reason or ""),
+            contract["contract_id"],
+            contract["contract_revision"],
+            encoded,
+        )
+        if existing is not None and tuple(existing) == expected:
+            return f"resolution:{identity}"
+        with self._db:
+            next_revision = self.revision + 1
+            self._db.execute(
+                "INSERT INTO _world_resolutions "
+                "(obligation_id, status, selected_commitment_id, reason, contract_id, "
+                "contract_revision, candidate_assessments, created_revision) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(obligation_id) DO UPDATE SET "
+                "status = excluded.status, "
+                "selected_commitment_id = excluded.selected_commitment_id, "
+                "reason = excluded.reason, contract_id = excluded.contract_id, "
+                "contract_revision = excluded.contract_revision, "
+                "candidate_assessments = excluded.candidate_assessments, "
+                "created_revision = excluded.created_revision",
+                (
+                    identity,
+                    resolution_status.value,
+                    selected,
+                    str(reason or ""),
+                    contract["contract_id"],
+                    contract["contract_revision"],
+                    encoded,
+                    next_revision,
+                ),
+            )
+            self._bump_world()
+        return f"resolution:{identity}"
+
+    def _candidate_exists(self, obligation_id: str, commitment_id: str) -> bool:
+        references = list(self._db.execute(
+            "SELECT r.relation_name, r.reference_kind, w.column_name "
+            "FROM _world_semantic_reference_roles r "
+            "JOIN _world_roles w ON w.relation_name = r.relation_name "
+            "AND w.role_name = r.role_name "
+            "WHERE r.reference_kind IN ('OBLIGATION', 'COMMITMENT') "
+            "ORDER BY r.relation_name, r.role_name"
+        ))
+        grouped: dict[str, dict[str, str]] = {}
+        for row in references:
+            grouped.setdefault(str(row["relation_name"]), {})[
+                str(row["reference_kind"])
+            ] = str(row["column_name"])
+        for relation, columns in grouped.items():
+            obligation_column = columns.get("OBLIGATION")
+            commitment_column = columns.get("COMMITMENT")
+            if not obligation_column or not commitment_column:
+                continue
+            row = self._db.execute(
+                f"SELECT 1 FROM {_quote(relation)} WHERE "
+                f"{_quote(obligation_column)} = ? AND "
+                f"{_quote(commitment_column)} = ? LIMIT 1",
+                (obligation_id, commitment_id),
+            ).fetchone()
+            if row is not None:
+                return True
+        return False
+
+    def resolution(self, obligation_id: str) -> dict[str, Any] | None:
+        row = self._db.execute(
+            "SELECT * FROM _world_resolutions WHERE obligation_id = ?",
+            (str(obligation_id),),
+        ).fetchone()
+        if row is None:
+            return None
+        payload = dict(row)
+        try:
+            assessments = json.loads(payload["candidate_assessments"])
+        except (TypeError, ValueError):
+            assessments = []
+        payload["candidate_assessments"] = assessments
+        payload["resolution_id"] = f"resolution:{payload['obligation_id']}"
+        return payload
+
+    def resolutions(self) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for row in self._db.execute(
+            "SELECT obligation_id FROM _world_resolutions ORDER BY obligation_id"
+        ):
+            item = self.resolution(str(row["obligation_id"]))
+            if item is not None:
+                out.append(item)
+        return out
+
+    def _obligation_with_resolution(self, obligation: dict[str, Any]) -> dict[str, Any]:
+        resolution = self.resolution(str(obligation["obligation_id"]))
+        if resolution is None:
+            return obligation
+        obligation["state"] = (
+            ObligationState.RESOLVED.value
+            if resolution["status"] == ResolutionStatus.RESOLVED.value
+            else ObligationState.UNRESOLVED.value
+        )
+        obligation["resolution_status"] = resolution["status"]
+        obligation["resolution_reason"] = resolution["reason"]
+        obligation["selected_commitment_id"] = resolution["selected_commitment_id"]
+        obligation["candidate_assessments"] = resolution["candidate_assessments"]
+        return obligation
 
     # -- Typed semantic references ---------------------------------------
 

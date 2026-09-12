@@ -169,6 +169,31 @@ class ConstructionWorld:
     def obligations(self) -> list[dict[str, Any]]:
         return self._inner.obligations()
 
+    def resolution(self, obligation_id: str) -> dict[str, Any] | None:
+        return self._inner.resolution(obligation_id)
+
+    def resolutions(self) -> list[dict[str, Any]]:
+        return self._inner.resolutions()
+
+    def record_resolution(
+        self,
+        *,
+        obligation_id: str,
+        status: str,
+        selected_commitment_id: str | None = None,
+        reason: str = "",
+        candidate_assessments: Sequence[Mapping[str, Any]] = (),
+    ) -> str:
+        if self._inner.read_only:
+            raise ConstructionError("World is read-only")
+        return self._inner._store.record_resolution(
+            obligation_id=obligation_id,
+            status=status,
+            selected_commitment_id=selected_commitment_id,
+            reason=reason,
+            candidate_assessments=candidate_assessments,
+        )
+
     def semantic_reference_errors(self) -> list[dict[str, str]]:
         return self._inner.semantic_reference_errors()
 

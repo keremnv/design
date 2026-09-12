@@ -29,6 +29,10 @@ from ontology_author.world.runtime.commit import (
     validate_contract_admission,
     write_sidecars,
 )
+from ontology_author.world.runtime.resolution import (
+    ResolutionEvaluationError,
+    resolve_world,
+)
 from ontology_author.world.runtime.purpose import Purpose, ensure_failure_relation
 from ontology_author.world.runtime.source_helpers import Source
 from ontology_author.world.runtime.world import (
@@ -120,9 +124,9 @@ class Project:
                 _governance_payload(self.governance),
             )
             report = validate_contract_admission(world)
-            world.close()
-            world = None  # type: ignore[assignment]
             if not report.ok:
+                world.close()
+                world = None  # type: ignore[assignment]
                 discard_candidate(self.candidate_dir)
                 return RunResult(
                     succeeded=False,
@@ -131,6 +135,14 @@ class Project:
                         f"{item['relation']}:{item['assertion_id']}" for item in report.ungrounded
                     ),
                 )
+            if self.contract.resolution_warrant_kinds:
+                resolve_world(
+                    world,
+                    self.contract,
+                    conflict_checker=_resolution_conflict_checker(self.governance),
+                )
+            world.close()
+            world = None  # type: ignore[assignment]
             _replace_candidate(self.candidate_dir, self.world_dir)
             return RunResult(succeeded=True, world_dir=self.world_dir)
         except GroundingError as exc:
@@ -149,6 +161,18 @@ class Project:
                     pass
             discard_candidate(self.candidate_dir)
             return RunResult(succeeded=False, reason=exc.reason, errors=(str(exc),))
+        except ResolutionEvaluationError as exc:
+            if world is not None:
+                try:
+                    world.close()
+                except Exception:
+                    pass
+            discard_candidate(self.candidate_dir)
+            return RunResult(
+                succeeded=False,
+                reason="resolution_error",
+                errors=(str(exc),),
+            )
         except ConstructionError as exc:
             if world is not None:
                 try:
@@ -218,6 +242,13 @@ def _governance_payload(governance: Any | None) -> dict[str, Any] | None:
     if not isinstance(payload, dict):
         raise ConstructionError("governance inspection_payload() must return a mapping")
     return payload
+
+
+def _resolution_conflict_checker(governance: Any | None) -> Any | None:
+    if governance is None:
+        return None
+    checker = getattr(governance, "conflict_checker", None)
+    return checker if callable(checker) else None
 
 
 __all__ = ["Project", "WORLD_ID"]

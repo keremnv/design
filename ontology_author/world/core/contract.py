@@ -7,7 +7,7 @@ provenance is sufficient to admit one asserted semantic tuple for this Contract.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -23,6 +23,35 @@ class ContractAdmissionError(ValueError):
 
 
 @dataclass(frozen=True)
+class CandidateAssessment:
+    """Contract evaluation of one already-recorded Commitment candidate."""
+
+    commitment_id: str
+    status: str
+    reason: str
+    warrant_authorities: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        value = str(self.status).strip().upper()
+        if value not in {"SUFFICIENT", "INSUFFICIENT"}:
+            raise ValueError(f"unknown candidate assessment status {self.status!r}")
+        object.__setattr__(self, "status", value)
+        object.__setattr__(
+            self,
+            "warrant_authorities",
+            tuple(sorted({str(item) for item in self.warrant_authorities if str(item)})),
+        )
+
+    def as_payload(self) -> dict[str, object]:
+        return {
+            "commitment_id": self.commitment_id,
+            "status": self.status,
+            "reason": self.reason,
+            "warrant_authorities": list(self.warrant_authorities),
+        }
+
+
+@dataclass(frozen=True)
 class Contract:
     """A minimal Contract identity plus executable admission rules.
 
@@ -30,7 +59,9 @@ class Contract:
     explicitly list construction origins it accepts without SOURCE grounding.
     An application may additionally name the relation vocabulary that those
     semantic origins may populate; semantic-reference relations separately
-    need explicit permission.
+    need explicit permission. ``resolution_warrant_kinds`` is a separate,
+    conservative standard for deciding which recorded Warrant bases may
+    govern an Obligation; it does not affect admission.
     """
 
     contract_id: str
@@ -38,6 +69,7 @@ class Contract:
     semantic_origins: frozenset[str] = field(default_factory=frozenset)
     allow_semantic_reference_relations: bool = False
     semantic_relations: frozenset[str] = field(default_factory=frozenset)
+    resolution_warrant_kinds: frozenset[str] = field(default_factory=frozenset)
 
     def __post_init__(self) -> None:
         identity = str(self.contract_id or "").strip()
@@ -64,6 +96,15 @@ class Contract:
                 if str(item).strip()
             ),
         )
+        object.__setattr__(
+            self,
+            "resolution_warrant_kinds",
+            frozenset(
+                str(item).strip().upper()
+                for item in self.resolution_warrant_kinds
+                if str(item).strip()
+            ),
+        )
 
     @classmethod
     def default(cls) -> "Contract":
@@ -87,6 +128,57 @@ class Contract:
             "contract_id": self.contract_id,
             "contract_revision": self.contract_revision,
         }
+
+    def assess_candidate(
+        self,
+        *,
+        obligation: Mapping[str, Any],
+        commitment: Mapping[str, Any],
+        warrant: Mapping[str, Any],
+    ) -> CandidateAssessment:
+        """Assess warrant sufficiency for resolution, separately from admission.
+
+        Only structured ``extra.resolution_authority`` values recorded in the
+        provisional Warrant façade are considered. Filenames, prose, origins,
+        and the fact that a candidate was admitted are not authority.
+        """
+
+        commitment_id = str(commitment.get("commitment_id") or "")
+        obligation_id = str(obligation.get("obligation_id") or "")
+        authorities = _warrant_authorities(warrant)
+        sufficient = tuple(sorted(set(authorities) & set(self.resolution_warrant_kinds)))
+        if sufficient:
+            return CandidateAssessment(
+                commitment_id=commitment_id,
+                status="SUFFICIENT",
+                reason=(
+                    f"Commitment {commitment_id} has Contract-authorized "
+                    f"resolution authority for {obligation_id}: {', '.join(sufficient)}."
+                ),
+                warrant_authorities=authorities,
+            )
+        if not self.resolution_warrant_kinds:
+            reason = (
+                f"Contract {self.contract_id}@{self.contract_revision} has no "
+                "configured resolution warrant standard."
+            )
+        elif authorities:
+            reason = (
+                f"Commitment {commitment_id} has warrant authorities "
+                f"{', '.join(authorities)}, none accepted for resolution by "
+                f"Contract {self.contract_id}@{self.contract_revision}."
+            )
+        else:
+            reason = (
+                f"Commitment {commitment_id} has no structured resolution "
+                "authority in its Warrant."
+            )
+        return CandidateAssessment(
+            commitment_id=commitment_id,
+            status="INSUFFICIENT",
+            reason=reason,
+            warrant_authorities=authorities,
+        )
 
     def admit_assertion(
         self,
@@ -167,3 +259,26 @@ class Contract:
             f"{self.contract_id!r}",
             reason="ungrounded_world_base",
         )
+
+
+def _warrant_authorities(warrant: Mapping[str, Any]) -> tuple[str, ...]:
+    authorities: set[str] = set()
+    bases = warrant.get("bases", ())
+    if not isinstance(bases, Iterable) or isinstance(bases, (str, bytes, Mapping)):
+        return ()
+    for base in bases:
+        if not isinstance(base, Mapping):
+            continue
+        detail = base.get("detail")
+        if not isinstance(detail, Mapping):
+            continue
+        extra = detail.get("extra")
+        if not isinstance(extra, Mapping):
+            continue
+        value = extra.get("resolution_authority")
+        values = value if isinstance(value, (list, tuple, set, frozenset)) else (value,)
+        for item in values:
+            normalized = str(item or "").strip().upper()
+            if normalized:
+                authorities.add(normalized)
+    return tuple(sorted(authorities))

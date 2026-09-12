@@ -6,6 +6,7 @@ from .profile import (
     DESIGN_REFERENTS,
     DESIGN_RELATIONS,
     DESIGN_RELATION_NAMES,
+    design_commitments_conflict,
     load_design_law,
 )
 from .governance import (
@@ -36,6 +37,7 @@ __all__ = [
     "DESIGN_REFERENTS",
     "DESIGN_RELATIONS",
     "DESIGN_RELATION_NAMES",
+    "design_commitments_conflict",
     "load_design_law",
     "AuthoritativeLawSources",
     "COMPILER_ID",
