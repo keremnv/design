@@ -2,6 +2,7 @@ from profiles.design_checkout.structure import (
     extract_frontend_structure,
     write_structure_artifact,
 )
+from profiles.design_checkout.governance import write_obligation_artifact
 
 
 def construct(source, world, purpose):
@@ -28,6 +29,7 @@ def construct(source, world, purpose):
         structure,
         relevant_ids=relevant_referents,
     )
+    write_obligation_artifact(world.path.parent, generated_obligations)
 
     referent_labels = {
         "mobile_checkout": "Mobile checkout",

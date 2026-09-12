@@ -141,6 +141,9 @@ def build_app(world: Path | str, *, token: str | None = None):
     async def structure(_request):
         return await session.call(lambda adapter: adapter.structure())
 
+    async def generated_obligations(_request):
+        return await session.call(lambda adapter: adapter.generated_obligations())
+
     async def query(request):
         body = await request.json()
         sql = str(body.get("sql") or "").strip()
@@ -182,6 +185,7 @@ def build_app(world: Path | str, *, token: str | None = None):
         Route("/world/demand", guard(demand)),
         Route("/world/governance", guard(governance)),
         Route("/world/structure", guard(structure)),
+        Route("/world/obligations", guard(generated_obligations)),
         Route("/world/query", query, methods=["POST"]),
     ]
     return Starlette(lifespan=lifespan, routes=routes)

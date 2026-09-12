@@ -8,15 +8,17 @@ counterfactual adequacy test.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from ontology_author.world import Contract
 from ontology_author.world.core.origins import ConstructionOrigin
 
 from .governance import (
-    GovernanceBinding,
     GovernanceProfile,
-    GovernedDimension,
+    adopt_governance_law,
+    compile_governance_law,
+    select_authoritative_sources,
 )
-from .structure import NodeSelector
 
 
 DESIGN_REFERENTS = (
@@ -43,76 +45,23 @@ DESIGN_RELATIONS = {
 DESIGN_RELATION_NAMES = tuple(DESIGN_RELATIONS)
 
 
-DESIGN_LAW = GovernanceProfile(
-    "design-mobile-checkout-law",
-    "1",
-    dimensions=(
-        GovernedDimension(
-            "availability",
-            bindings=(
-                GovernanceBinding(
-                    "subject",
-                    selector=NodeSelector("data-region", "order-summary", "region"),
-                ),
-                GovernanceBinding(
-                    "activity",
-                    selector=NodeSelector("data-region", "payment-entry", "region"),
-                ),
-                GovernanceBinding(
-                    "context",
-                    selector=NodeSelector("data-screen", "mobile-checkout", "surface"),
-                ),
-            ),
-            question_template=(
-                "What availability relationship should hold between {subject} "
-                "and {activity} in {context}?"
-            ),
-        ),
-        GovernedDimension(
-            "priority",
-            bindings=(
-                GovernanceBinding(
-                    "more",
-                    selector=NodeSelector("data-field", "order-total", "element"),
-                ),
-                GovernanceBinding(
-                    "less",
-                    selector=NodeSelector("data-action", "promo-code", "interaction"),
-                ),
-                GovernanceBinding(
-                    "context",
-                    selector=NodeSelector(
-                        "data-context", "checkout-commitment", "context"
-                    ),
-                ),
-            ),
-            question_template=(
-                "What should dominate visual hierarchy between {more} and {less} "
-                "at {context}?"
-            ),
-        ),
-        GovernedDimension(
-            "goal_support",
-            bindings=(
-                GovernanceBinding(
-                    "subject",
-                    selector=NodeSelector("data-region", "order-summary", "region"),
-                ),
-                GovernanceBinding("goal", fixed_value="purchase_confidence"),
-                GovernanceBinding(
-                    "context",
-                    selector=NodeSelector(
-                        "data-context", "checkout-commitment", "context"
-                    ),
-                ),
-            ),
-            question_template=(
-                "What should support {goal} at {context}, and how should "
-                "{subject} contribute?"
-            ),
-        ),
-    ),
-)
+def load_design_law(project_root: Path | str) -> GovernanceProfile:
+    """Select, compile, and explicitly adopt the fixture's effective law.
+
+    This function is intentionally outside ``construction.py``. The caller
+    selects/adopts the law before invoking the ordinary Project lifecycle;
+    construction receives only the resulting effective profile.
+    """
+
+    selected = select_authoritative_sources(project_root)
+    proposed = compile_governance_law(selected)
+    return adopt_governance_law(proposed)
+
+
+# Compatibility for callers that want the checked-in fixture's effective law.
+# The dimensions are not authored here; they come through the explicit source
+# manifest and compiler above.
+DESIGN_LAW = load_design_law(Path(__file__).with_name("fixture"))
 
 
 DESIGN_CONTRACT = Contract(

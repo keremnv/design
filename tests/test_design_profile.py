@@ -16,6 +16,7 @@ from profiles.design_checkout import (
     DESIGN_REFERENTS,
     DESIGN_RELATIONS,
     extract_frontend_structure,
+    load_design_law,
 )
 
 
@@ -39,19 +40,20 @@ def _assertion_id(world, relation: str) -> str:
 
 
 def _generated_obligations(root: Path):
+    law = load_design_law(root)
     structure = extract_frontend_structure(
         (root / "Checkout.tsx").read_text(encoding="utf-8")
     )
     return {
         obligation.obligation_id: obligation
-        for obligation in DESIGN_LAW.enumerate_obligations(structure)
-    }
+        for obligation in law.enumerate_obligations(structure)
+    }, law
 
 
 def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
     root = _copy_fixture(tmp_path)
-    expected_obligations = _generated_obligations(root)
-    result = rebuild(root, contract=DESIGN_CONTRACT, governance=DESIGN_LAW)
+    expected_obligations, law = _generated_obligations(root)
+    result = rebuild(root, contract=DESIGN_CONTRACT, governance=law)
     assert result.succeeded, result.errors
 
     world = Project(root).open_world()
@@ -140,8 +142,13 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
             "contract_id": "design-mobile-checkout",
             "contract_revision": "1",
         }
-        assert explorer.identity()["governance"] == DESIGN_LAW.identity()
-        assert explorer.governance()["identity"] == DESIGN_LAW.identity()
+        assert explorer.identity()["governance"] == law.identity()
+        assert explorer.governance()["identity"] == law.identity()
+        assert explorer.governance()["state"] == "EFFECTIVE"
+        assert explorer.governance()["source_selection"]["sources"][0]["source_id"] == (
+            "checkout-design-governance"
+        )
+        assert explorer.governance()["proposed_law"]["state"] == "PROPOSED"
         assert {item["id"] for item in explorer.referents()} == set(DESIGN_REFERENTS)
 
         schema = {item["name"]: item for item in explorer.schema()}
@@ -174,6 +181,13 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
         for obligation in demand["obligations"]:
             assert obligation["state"] == "UNRESOLVED"
             assert obligation["reason"]
+            assert obligation["generated_by_rule"].startswith(
+                "rule:checkout_design_governance:"
+            )
+            assert obligation["law_provenance"]["source_id"] == (
+                "checkout-design-governance"
+            )
+            assert obligation["structural_bindings"]
             assert len(obligation["candidates"]) == 1
 
         structure = explorer.structure()
@@ -226,10 +240,12 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
     from starlette.testclient import TestClient
 
     with TestClient(build_app(root / "world" / "world.sqlite")) as client:
-        assert client.get("/world/governance").json()["identity"] == DESIGN_LAW.identity()
+        assert client.get("/world/governance").json()["identity"] == law.identity()
         assert client.get("/world/structure").json()["parser"]["kind"] == (
             "bounded-react-jsx-attribute-adapter"
         )
+        generated = client.get("/world/obligations").json()
+        assert set(generated["obligations"]) == set(expected_obligations)
 
 
 def test_design_contract_rejects_unlisted_semantic_decisions(tmp_path):

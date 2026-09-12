@@ -79,6 +79,11 @@ def _structure_path(db_path: Path) -> Path:
     return db_path.with_suffix(".structure.json")
 
 
+def _obligations_path(db_path: Path) -> Path:
+    """`world.sqlite` -> generated-law obligation provenance artifact."""
+    return db_path.with_suffix(".obligations.json")
+
+
 def _read_json_sidecar(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
@@ -137,6 +142,7 @@ class WorldExplorerAdapter:
             self._purpose_document = json.loads(purpose.read_text(encoding="utf-8"))
         self._governance_document = _read_json_sidecar(_governance_path(self.path))
         self._structure_document = _read_json_sidecar(_structure_path(self.path))
+        self._obligations_document = _read_json_sidecar(_obligations_path(self.path))
 
     def close(self) -> None:
         """Release the world without writing to it.
@@ -314,6 +320,10 @@ class WorldExplorerAdapter:
     def structure(self) -> dict[str, Any] | None:
         """The bounded descriptive frontend structure, when one was published."""
         return self._structure_document
+
+    def generated_obligations(self) -> dict[str, Any] | None:
+        """Law-generated obligation provenance, when the profile publishes it."""
+        return self._obligations_document
 
     def overview(self) -> dict[str, Any]:
         described = self._described()
@@ -1104,30 +1114,43 @@ class WorldExplorerAdapter:
 
     def _contract_frontier(self) -> list[dict[str, Any]]:
         obligations: list[dict[str, Any]] = []
+        generated = (
+            (self._obligations_document or {}).get("obligations", {})
+            if isinstance(self._obligations_document, Mapping)
+            else {}
+        )
         for item in self._world.obligations():
             obligation_id = str(item["obligation_id"])
-            obligations.append(
-                {
-                    "obligation_id": obligation_id,
-                    "question": item["question"],
-                    "relation": None,
-                    "values": {},
-                    "reason": item["reason"] or None,
-                    "demanded_by": {
-                        "kind": "contract",
-                        "name": obligation_id,
-                        "contract_id": item["contract_id"],
-                        "contract_revision": item["contract_revision"],
-                    },
-                    "state": item["state"],
-                    "assertion_id": None,
-                    "record_id": None,
-                    "grounding_ref": None,
+            provenance = generated.get(obligation_id, {})
+            obligation = {
+                "obligation_id": obligation_id,
+                "question": item["question"],
+                "relation": None,
+                "values": {},
+                "reason": item["reason"] or None,
+                "demanded_by": {
+                    "kind": "contract",
+                    "name": obligation_id,
                     "contract_id": item["contract_id"],
                     "contract_revision": item["contract_revision"],
-                    "candidates": self._contract_candidates(obligation_id),
-                }
-            )
+                },
+                "state": item["state"],
+                "assertion_id": None,
+                "record_id": None,
+                "grounding_ref": None,
+                "contract_id": item["contract_id"],
+                "contract_revision": item["contract_revision"],
+                "candidates": self._contract_candidates(obligation_id),
+            }
+            if provenance:
+                obligation.update(
+                    {
+                        "generated_by_rule": provenance.get("rule_id"),
+                        "law_provenance": provenance.get("law_provenance"),
+                        "structural_bindings": provenance.get("bindings", {}),
+                    }
+                )
+            obligations.append(obligation)
         return obligations
 
     def _contract_candidates(self, obligation_id: str) -> list[dict[str, Any]]:

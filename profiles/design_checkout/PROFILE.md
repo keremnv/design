@@ -39,6 +39,21 @@ current child order, and surface/context containment. The Governance Law then
 selects governed subjects from those descriptive facts; it does not treat the
 current arrangement as the desired answer.
 
+Governance Law is not authored directly in the constructor or in this module's
+dimension declarations. `fixture/governance-sources.json` explicitly selects
+`fixture/design-governance.md` as law-bearing. The bounded compiler in
+`governance.py` turns that human-readable source into a proposed structured
+law, and `load_design_law()` explicitly adopts it before `Project.run()` is
+called. The constructor receives only the effective law. The answer-bearing
+`checkout-requirements.md` and observational `Checkout.tsx` remain evidence
+for candidate commitments; neither is selected as constitutional law.
+
+The compiler currently recognizes only `## Availability`, `## Priority`, and
+`## Goal support` sections with labeled bindings. This is a fixture adapter,
+not a general natural-language interpreter. Each generated obligation is
+published with an adjacent `world.obligations.json` explanation linking it to
+the adopted law rule, source revision/location, and structural bindings.
+
 The law is `design-mobile-checkout-law@1` and currently has three finite rules:
 
 1. Select the order-summary region, payment-entry region, and mobile-checkout

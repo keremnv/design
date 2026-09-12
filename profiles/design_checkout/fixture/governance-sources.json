@@ -1,0 +1,9 @@
+{
+  "law_id": "design-mobile-checkout-law",
+  "sources": [
+    {
+      "source_id": "checkout-design-governance",
+      "path": "design-governance.md"
+    }
+  ]
+}
