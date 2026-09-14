@@ -55,3 +55,4 @@ exclude = [
 
 [tool.setuptools.package-data]
 "ontology_author.world" = ["CAPABILITY.md", "static/**/*"]
+"ontology_author.program_spine" = ["*.js"]
