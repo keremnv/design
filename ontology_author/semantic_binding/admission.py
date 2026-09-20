@@ -23,10 +23,12 @@ from ontology_author.authority.schemas import (
 )
 from ontology_author.authority.evaluate import (
     find_relation_bucket,
+    relation_rows_with_ids,
 )
 from ontology_author.authority.evaluate import (
     snapshot_id as authority_snapshot_id,
 )
+from ontology_author.authority.validation import observations_for_assertion
 from ontology_author.program_spine.comparison import SpineComparisonResult
 from ontology_author.world.core.model import Role, RoleType
 from ontology_author.world.core.origins import ConstructionOrigin
@@ -55,6 +57,7 @@ from .schemas import (
     SemanticCommitmentWarrant,
     SemanticPersistenceError,
     SemanticPolarity,
+    WARRANT_SCHEMA,
     copy_json,
     digest,
     write_json_artifact,
@@ -134,6 +137,15 @@ _STATUS_RANK = {
     "UNKNOWN": 3,
     "NOT_COMPARABLE": 4,
 }
+SELECTION_SCHEMA = "semantic_delta_selection/v0"
+# Canonical commitment relations scanned for persisted semantic tuples. This
+# matches the read set used by authority case assembly; membership has a
+# separate interpretation-basis maintenance path and is not selected here.
+SELECTION_COMMITMENT_RELATIONS = (
+    PROGRAM_REALIZATION_RELATION,
+    PROGRAM_RELATIONSHIP_RELATION,
+    PROGRAM_INVARIANT_RELATION,
+)
 
 
 def _as_obligation(
@@ -1197,6 +1209,126 @@ def maintain_semantic_commitment(
         "known_limitations": [
             "maintenance assesses construction basis only; it does not replace or negate semantic meaning"
         ],
+    }
+
+
+def _warrant_from_row(row: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Rebuild a persisted warrant mapping, or return None when unreadable."""
+
+    try:
+        return {
+            "contract": WARRANT_SCHEMA,
+            "assertion_id": str(row.get("assertion_id") or ""),
+            "obligation_id": str(row.get("obligation_id") or ""),
+            "snapshot_id": str(row.get("snapshot_id") or ""),
+            "evidence_refs": json.loads(str(row.get("evidence_refs") or "[]")),
+            "support_kind": str(row.get("support_kind") or ""),
+            "resolution_basis": json.loads(
+                str(row.get("resolution_basis") or "{}")
+            ),
+            "depends_on": json.loads(str(row.get("depends_on") or "[]")),
+            "admission_profile": str(row.get("admission_profile") or ""),
+            "admission_decision_id": str(
+                row.get("admission_decision_id") or ""
+            ),
+        }
+    except (TypeError, ValueError):
+        return None
+
+
+def select_affected_semantic_commitments(
+    world: ConstructionWorld,
+    comparison: SpineComparisonResult,
+) -> dict[str, Any]:
+    """Select persisted commitments whose maintenance basis is not preserved.
+
+    This is a read-only projection over a sealed World plus a ProgramDelta
+    comparison. It never invents, transfers, or re-resolves semantic claims:
+    each persisted ``SemanticCommitmentWarrant`` is evaluated with
+    :func:`maintain_semantic_commitment`, and only non-``PRESERVED`` results
+    are selected. ``UNKNOWN`` and ``NOT_COMPARABLE`` surface explicitly.
+    """
+
+    relation_names = {
+        str(row["name"]) for row in world.query("SELECT name FROM _world_relations")
+    }
+    warrant_rows = (
+        world.relation_rows(WARRANT_RELATION)
+        if WARRANT_RELATION in relation_names
+        else []
+    )
+    commitments: dict[str, tuple[str, dict[str, Any]]] = {}
+    for relation_name in SELECTION_COMMITMENT_RELATIONS:
+        if relation_name not in relation_names:
+            continue
+        for item in relation_rows_with_ids(world, relation_name):
+            key = str(item.get("_assertion_id") or "")
+            if key:
+                commitments[key] = (
+                    relation_name,
+                    {
+                        name: value
+                        for name, value in item.items()
+                        if name != "_assertion_id"
+                    },
+                )
+    selected: list[dict[str, Any]] = []
+    for row in sorted(warrant_rows, key=lambda item: str(item.get("assertion_id") or "")):
+        assertion_id = str(row.get("assertion_id") or "")
+        warrant = _warrant_from_row(row)
+        record = commitments.get(assertion_id)
+        if warrant is None or record is None:
+            selected.append(
+                {
+                    "assertion_id": assertion_id,
+                    "relation_name": (
+                        record[0] if record is not None else ""
+                    ),
+                    "tuple": copy_json(record[1]) if record is not None else {},
+                    "snapshot_id": str(row.get("snapshot_id") or ""),
+                    "maintenance": {
+                        "status": "UNKNOWN",
+                        "reason": (
+                            "persisted warrant is unreadable"
+                            if warrant is None
+                            else "persisted commitment tuple is absent"
+                        ),
+                        "transferred": False,
+                        "model_invoked": False,
+                        "assessments": [],
+                    },
+                    "warrant": None,
+                    "observations": [],
+                }
+            )
+            continue
+        maintenance = maintain_semantic_commitment(warrant, comparison)
+        if maintenance["status"] == "PRESERVED":
+            continue
+        relation_name, semantic_tuple = record
+        selected.append(
+            {
+                "assertion_id": assertion_id,
+                "relation_name": relation_name,
+                "tuple": copy_json(semantic_tuple),
+                "snapshot_id": warrant["snapshot_id"],
+                "maintenance": maintenance,
+                "warrant": copy_json(warrant),
+                "observations": [
+                    observation.as_pointer()
+                    for observation in observations_for_assertion(
+                        world, assertion_id
+                    )
+                ],
+            }
+        )
+    return {
+        "schema": SELECTION_SCHEMA,
+        "world_snapshot_id": authority_snapshot_id(world),
+        "comparison_id": comparison.receipt.comparison_id,
+        "warrants_considered": len(warrant_rows),
+        "commitments_found": len(commitments),
+        "selected": selected,
     }
 
 

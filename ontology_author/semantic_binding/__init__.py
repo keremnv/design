@@ -25,6 +25,7 @@ from .admission import (
     maintain_semantic_commitment,
     materialize_semantic_commitment_revision,
     persist_admitted_candidate,
+    select_affected_semantic_commitments,
     write_admission_decision,
 )
 from .construction import (
@@ -133,6 +134,7 @@ __all__ = [
     "maintain_semantic_commitment",
     "materialize_semantic_commitment_revision",
     "persist_admitted_candidate",
+    "select_affected_semantic_commitments",
     "semantic_candidate_schema",
     "trusted_role_signature",
     "validate_semantic_candidate",
