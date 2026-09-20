@@ -1,0 +1,57 @@
+{
+  "world_names": [
+    "yard-trace"
+  ],
+  "purpose_sha256": "9a851e79e4bb359336a25780020797b23914648ea520bc32a0b44d5d8c14d312",
+  "construction_sha256": "a41bbecc006f9b15216c6488a3faf72cb28e009f5f9b63b3febb2f08e1e8774d",
+  "sqlite_sha256": "f3b2c7980faa23e0e61445b0b786c43a5f0bb819c9fe589805d6ab7371560431",
+  "diagnostics_exists": true,
+  "sqlite_inspect": {
+    "tables": [
+      "_world_assertions",
+      "_world_completeness",
+      "_world_derivation_inputs",
+      "_world_derivation_run_inputs",
+      "_world_derivations",
+      "_world_groundings",
+      "_world_meta",
+      "_world_referents",
+      "_world_relations",
+      "_world_roles",
+      "bin_movement",
+      "dispatch_to_mill",
+      "intake",
+      "loadout",
+      "manifest",
+      "mill_receipt",
+      "mill_run",
+      "place_alias",
+      "purpose_requirement_failure"
+    ],
+    "purpose_requirement_failure": [
+      {
+        "_assertion_id": "assertion:2eb0ac7799684bb555f69861",
+        "requirement_id": "out_5003_no_mill_slip",
+        "affected_identity": "out_5003_no_mill_slip",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "manifest",
+        "subject_json": "{\"dispatch_ref\": \"PGE-OUT-5003\", \"manifest_no\": \"NS-8910\", \"reason\": \"PGE-OUT-5003 has a carrier manifest but no HFM receiving slip in the supplied extracts\"}",
+        "grounding_ref": ""
+      },
+      {
+        "_assertion_id": "assertion:1438a81e678e83d2fd06c8b7",
+        "requirement_id": "out_5004_ticket_allocation",
+        "affected_identity": "out_5004_ticket_allocation",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "loadout",
+        "subject_json": "{\"bin_label\": \"South House 14\", \"dispatch_ref\": \"PGE-OUT-5004\", \"quantity_kg\": \"19000\", \"reason\": \"two deliveries (MCR-118 and S-52) were placed in South House 14 before OUT-5004; hopper move BM-009 records no individual ticket and loadout paperwork does not allocate the 19,000 kg truck load to either receipt\"}",
+        "grounding_ref": ""
+      }
+    ]
+  },
+  "construction_changed": true,
+  "purpose_changed": false,
+  "sqlite_changed": true,
+  "created_other_worlds": false,
+  "sqlite_patched_without_construction": false
+}

@@ -1,0 +1,14 @@
+{
+  "id": "T3",
+  "relevant_world": "lab-quality",
+  "probe": "purpose-fit vs overlapping lot labels",
+  "prompt": "What moisture did the lab record for the South House 14 cargo sample, and what was the stated reason for that test? Write the answer to answer.md.",
+  "started": "2026-09-09T14:46:24.523987+00:00",
+  "ended": "2026-09-09T14:47:00.891367+00:00",
+  "exit_code": 0,
+  "workspace": "/tmp/oa-mwd-isolated-T3",
+  "isolated": true,
+  "model_requested": "composer-2.5",
+  "model_reported": "Composer 2.5",
+  "model_ok": true
+}

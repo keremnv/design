@@ -1,0 +1,76 @@
+{
+  "prompt": "Which receiving ticket supplied the 19,000 kg on PGE-OUT-5004 from South House 14? Write the answer to answer.md.",
+  "started": "2026-09-09T19:50:43.588000+00:00",
+  "ended": "2026-09-09T19:51:37.714952+00:00",
+  "exit_code": 0,
+  "timed_out": false,
+  "workspace": "/tmp/oa-downstream-maintenance-value-20260909/condition_A",
+  "isolated": true,
+  "model_requested": "composer-2.5",
+  "model_reported": "Composer 2.5",
+  "usage": {
+    "inputTokens": 19931,
+    "outputTokens": 4354,
+    "cacheReadTokens": 152207,
+    "cacheWriteTokens": 0
+  },
+  "author_commands": [],
+  "shell_commands": [
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \".tables\" && sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT * FROM relation;\" 2>/dev/null; sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \".schema\" 2>/dev/null | head -80",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT * FROM loadout WHERE dispatch_ref='PGE-OUT-5004';\" && sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT * FROM intake WHERE assigned_bin='B-14';\""
+  ],
+  "evidence_access": [
+    "evidence/bin_movements",
+    "evidence/operating_notes",
+    "evidence/elevator_receipts",
+    "/workspace/evidence",
+    "evidence_dir_present"
+  ],
+  "construction_changed": false,
+  "purpose_changed": false,
+  "sqlite_changed": false,
+  "world_names": [
+    "yard-trace"
+  ],
+  "sqlite_inspect": {
+    "tables": [
+      "_world_assertions",
+      "_world_completeness",
+      "_world_derivation_inputs",
+      "_world_derivation_run_inputs",
+      "_world_derivations",
+      "_world_groundings",
+      "_world_meta",
+      "_world_referents",
+      "_world_relations",
+      "_world_roles",
+      "dispatch_to_mill",
+      "intake",
+      "loadout",
+      "manifest",
+      "mill_receipt",
+      "mill_run",
+      "place_alias",
+      "purpose_requirement_failure"
+    ],
+    "purpose_requirement_failure": [
+      {
+        "_assertion_id": "assertion:2eb0ac7799684bb555f69861",
+        "requirement_id": "out_5003_no_mill_slip",
+        "affected_identity": "out_5003_no_mill_slip",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "manifest",
+        "subject_json": "{\"dispatch_ref\": \"PGE-OUT-5003\", \"manifest_no\": \"NS-8910\", \"reason\": \"PGE-OUT-5003 has a carrier manifest but no HFM receiving slip in the supplied extracts\"}",
+        "grounding_ref": ""
+      }
+    ],
+    "hopper_named_out5002": true,
+    "unresolved_out5004": false,
+    "control_out5001": true
+  },
+  "model_ok": true,
+  "id": "A-U2",
+  "condition": "A",
+  "task": "U2",
+  "maintain": false
+}

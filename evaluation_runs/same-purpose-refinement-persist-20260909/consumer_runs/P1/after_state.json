@@ -1,0 +1,67 @@
+{
+  "world_names": [
+    "yard-trace"
+  ],
+  "purpose_sha256": "9a851e79e4bb359336a25780020797b23914648ea520bc32a0b44d5d8c14d312",
+  "construction_sha256": "bb808f7ddd3008e33a1820997896ab406dc7c49ab14688142cafbdc147c9000d",
+  "sqlite_sha256": "060f4b31e671139f97e29cc47fdc514fd18d706a158491e635cf7372653b6a49",
+  "diagnostics_exists": true,
+  "sqlite_inspect": {
+    "tables": [
+      "_world_assertions",
+      "_world_completeness",
+      "_world_derivation_inputs",
+      "_world_derivation_run_inputs",
+      "_world_derivations",
+      "_world_groundings",
+      "_world_meta",
+      "_world_referents",
+      "_world_relations",
+      "_world_roles",
+      "dispatch_to_mill",
+      "hopper_move",
+      "hopper_ticket_named",
+      "intake",
+      "loadout",
+      "manifest",
+      "mill_receipt",
+      "mill_run",
+      "place_alias",
+      "purpose_requirement_failure"
+    ],
+    "purpose_requirement_failure": [
+      {
+        "_assertion_id": "assertion:d823a7e42f296ff791299489",
+        "requirement_id": "hopper_no_ticket_bm-006",
+        "affected_identity": "hopper_no_ticket_bm-006",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "hopper_move",
+        "subject_json": "{\"from_point\": \"BIN-12\", \"move_id\": \"BM-006\", \"quantity_kg\": \"12000\", \"reason\": \"hopper sheet material_note is 'no ticket on hopper sheet'\", \"work_order\": \"OUT-5003\"}",
+        "grounding_ref": ""
+      },
+      {
+        "_assertion_id": "assertion:23e9081feeb78fd870c30b68",
+        "requirement_id": "hopper_no_ticket_bm-009",
+        "affected_identity": "hopper_no_ticket_bm-009",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "hopper_move",
+        "subject_json": "{\"from_point\": \"BIN-14\", \"move_id\": \"BM-009\", \"quantity_kg\": \"19000\", \"reason\": \"hopper sheet material_note is 'no individual ticket'\", \"work_order\": \"OUT-5004\"}",
+        "grounding_ref": ""
+      },
+      {
+        "_assertion_id": "assertion:2eb0ac7799684bb555f69861",
+        "requirement_id": "out_5003_no_mill_slip",
+        "affected_identity": "out_5003_no_mill_slip",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "manifest",
+        "subject_json": "{\"dispatch_ref\": \"PGE-OUT-5003\", \"manifest_no\": \"NS-8910\", \"reason\": \"PGE-OUT-5003 has a carrier manifest but no HFM receiving slip in the supplied extracts\"}",
+        "grounding_ref": ""
+      }
+    ]
+  },
+  "construction_changed": true,
+  "purpose_changed": false,
+  "sqlite_changed": true,
+  "created_other_worlds": false,
+  "sqlite_patched_without_construction": false
+}

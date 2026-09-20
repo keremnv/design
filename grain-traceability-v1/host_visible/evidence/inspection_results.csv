@@ -1,0 +1,5 @@
+sample_no,tested_at,lab_ticket,local_lot,material_hint,test_name,result,unit,analyst,comment
+SMP-7714A,2025-09-02T10:30:00-05:00,LAB-4411,DR44,receipt ticket DR-44,moisture,12.9,percent,A. Reed,initial intake check
+SMP-602B,2025-09-05T13:10:00-05:00,LAB-4419,WB390 / EF18,receiving slip HFM-IN-602,aflatoxin,below limit,ppb,A. Reed,combined truck sample
+SMP-604Q,2025-09-07T14:10:00-05:00,LAB-4422,MC-118,South House 14 cargo,moisture,14.8,percent,R. Singh,customer hold review
+SMP-UNLISTED,2025-09-08T09:00:00-05:00,LAB-4428,N3 / EF-18?,route packet note,protein,12.5,percent,R. Singh,source ticket not recorded

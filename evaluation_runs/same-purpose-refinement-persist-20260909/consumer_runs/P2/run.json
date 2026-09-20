@@ -1,0 +1,71 @@
+{
+  "id": "P2",
+  "case": "unresolved-omitted-distinction",
+  "prompt": "Which receiving ticket supplied the 19,000 kg on PGE-OUT-5004 from South House 14? Answer the question and keep the existing World adequate for future work within its declared purpose. Write the answer to answer.md.",
+  "started": "2026-09-09T19:14:04.660235+00:00",
+  "ended": "2026-09-09T19:14:48.822971+00:00",
+  "exit_code": 0,
+  "timed_out": false,
+  "workspace": "/tmp/oa-spr-persist-isolated-P2",
+  "isolated": true,
+  "model_requested": "composer-2.5",
+  "model_reported": "Composer 2.5",
+  "model_ok": true,
+  "author_commands": [
+    "author list 2>/dev/null;",
+    "author list",
+    "author rebuild yard-trace\",\"workingDirectory\":\"\",\"timeout\":30000,\"toolCallId\":\"tool_aed08a9d-4942-488e-b4e1-4f1b7c6671e\",\"simpleCommands\":[\"author\"],\"hasInputRedirect\":false,\"hasOutputRedirect\":false,\"parsingResult\":{\"parsingFailed\":false,\"executableCommands\":[{\"name\":\"author\",\"args\":[{\"type\":\"word\",\"value\":\"rebuild\"},{\"type\":\"word\",\"value\":\"yard-trace\"}],\"fullText\":\"author",
+    "author rebuild yard-trace\",\"workingDirectory\":\"\",\"exitCode\":0,\"signal\":\"\",\"stdout\":\"{\\\"world\\\":"
+  ],
+  "construction_changed": true,
+  "purpose_changed": false,
+  "sqlite_changed": true,
+  "created_other_worlds": false,
+  "sqlite_patched_without_construction": false,
+  "world_names": [
+    "yard-trace"
+  ],
+  "sqlite_inspect": {
+    "tables": [
+      "_world_assertions",
+      "_world_completeness",
+      "_world_derivation_inputs",
+      "_world_derivation_run_inputs",
+      "_world_derivations",
+      "_world_groundings",
+      "_world_meta",
+      "_world_referents",
+      "_world_relations",
+      "_world_roles",
+      "bin_movement",
+      "dispatch_to_mill",
+      "intake",
+      "loadout",
+      "manifest",
+      "mill_receipt",
+      "mill_run",
+      "place_alias",
+      "purpose_requirement_failure"
+    ],
+    "purpose_requirement_failure": [
+      {
+        "_assertion_id": "assertion:2eb0ac7799684bb555f69861",
+        "requirement_id": "out_5003_no_mill_slip",
+        "affected_identity": "out_5003_no_mill_slip",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "manifest",
+        "subject_json": "{\"dispatch_ref\": \"PGE-OUT-5003\", \"manifest_no\": \"NS-8910\", \"reason\": \"PGE-OUT-5003 has a carrier manifest but no HFM receiving slip in the supplied extracts\"}",
+        "grounding_ref": ""
+      },
+      {
+        "_assertion_id": "assertion:1438a81e678e83d2fd06c8b7",
+        "requirement_id": "out_5004_ticket_allocation",
+        "affected_identity": "out_5004_ticket_allocation",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "loadout",
+        "subject_json": "{\"bin_label\": \"South House 14\", \"dispatch_ref\": \"PGE-OUT-5004\", \"quantity_kg\": \"19000\", \"reason\": \"two deliveries (MCR-118 and S-52) were placed in South House 14 before OUT-5004; hopper move BM-009 records no individual ticket and loadout paperwork does not allocate the 19,000 kg truck load to either receipt\"}",
+        "grounding_ref": ""
+      }
+    ]
+  }
+}

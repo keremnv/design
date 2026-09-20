@@ -1,0 +1,40 @@
+{
+  "tasks": [
+    {
+      "id": "T1",
+      "relevant_world": "grain-flow",
+      "probe": "purpose-fit selection / use",
+      "prompt": "A mill desk asked: which mill receiving slip accepted the truck dispatched as PGE-OUT-5001, and what mill run used that receipt? Write the answer to answer.md."
+    },
+    {
+      "id": "T2",
+      "relevant_world": "title-custody",
+      "probe": "purpose-fit vs overlapping entity names",
+      "prompt": "Who held title to ticket DR-44 after the mill accepted it, and who had custody of that lot during the Redline haul to the mill? Write the answer to answer.md."
+    },
+    {
+      "id": "T3",
+      "relevant_world": "lab-quality",
+      "probe": "purpose-fit vs overlapping lot labels",
+      "prompt": "What moisture did the lab record for the South House 14 cargo sample, and what was the stated reason for that test? Write the answer to answer.md."
+    },
+    {
+      "id": "T4",
+      "relevant_world": "grain-flow",
+      "probe": "raw-evidence fallback / unresolved cargo note",
+      "prompt": "What does the handwritten note N3 / EF-18? on the PGE-OUT-5003 packet mean, and can we treat EF-18 as the source ticket for that truck? Write the answer to answer.md."
+    },
+    {
+      "id": "T5",
+      "relevant_world": "title-custody",
+      "probe": "do not treat another World as authoritative outside its purpose",
+      "prompt": "Who currently owns the grain still sitting in South House 14? Write the answer to answer.md."
+    },
+    {
+      "id": "T6",
+      "relevant_world": "none-single",
+      "probe": "do not merge or reconcile independent Worlds",
+      "prompt": "Give me a single canonical identity for Meadow Creek / M. Creek / MC-118 / MCR-118 across this project so later work can treat them as one party. Write the answer to answer.md."
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # Ontology Author
 
-Ontology Author lets coding agents construct and maintain purpose-fit
+Ontology Author lets coding agents construct and maintain bounded
 ontologies from the evidence in your workspace.
 
 The resulting ontology is a **World**: grounded, programmable semantic state
@@ -30,7 +30,7 @@ question
 With a World, that work can become reusable project state:
 
 ```text
-workspace evidence + purpose
+workspace evidence + declared scope
   → conversational semantic construction
   → World
 
@@ -51,8 +51,8 @@ The package is not yet published to PyPI. Install the current repository
 checkout with [uv](https://docs.astral.sh/uv/):
 
 ```bash
-git clone https://github.com/keremnv/ontology-author.git
-cd ontology-author
+git clone https://github.com/keremnv/design.git
+cd design
 uv tool install .
 ```
 
@@ -104,7 +104,7 @@ convenience.
 
 ## What a World contains
 
-A World is a purpose-fit ontology represented with:
+A World is a bounded ontology represented with:
 
 ```text
 referents
@@ -166,11 +166,12 @@ its declared work, not every possible uncertainty in the workspace.
 
 ## Purpose and construction
 
-Every World has a purpose established in conversation. The attached agent
-persists its current interpretation in `PURPOSE.md`. That document is natural
-language, not a form, schema, or DSL. It normally contains a concise synthesis
-of the purpose and exact user quotations that materially establish or refine
-it.
+A World usually has a purpose established in conversation, kept as
+orientation context in `PURPOSE.md`. That document is natural language,
+not a form, schema, or DSL. It normally contains a concise synthesis of
+the purpose and exact user quotations that materially establish or refine
+it. Purpose guides construction but is not what makes something a World:
+a mechanically constructed snapshot qualifies without one.
 
 The principle is simple: a World should represent the meaning needed for its
 purpose while remaining honest about what the evidence does not establish. It
@@ -182,7 +183,7 @@ that consumers receive, not a prescribed reasoning workflow:
 ```text
 conversation + workspace
         ↓
-purpose + construction
+scoped construction
         ↓
 temporary candidate
         ↓
@@ -287,7 +288,7 @@ the coding-agent conversation and enter a later World through reconstruction.
 
 ## Multiple Worlds
 
-One project may contain several independent Worlds for different purposes:
+One project may contain several independent Worlds with different scopes:
 
 ```text
 .worlds/
@@ -296,8 +297,8 @@ One project may contain several independent Worlds for different purposes:
   product-eligibility/
 ```
 
-Each has its own purpose, construction state, diagnostics, and sealed `world/`
-bundle. The same project evidence may support several valid purpose-fit
+Each has its own scope, construction state, diagnostics, and sealed `world/`
+bundle. The same project evidence may support several valid
 conceptualizations; they are not required to be competing attempts at one
 canonical model.
 
@@ -324,7 +325,7 @@ and reconstruction require the original evidence environment.
 ## Architecture
 
 ```text
-PURPOSE + WORKSPACE
+WORKSPACE + DECLARED SCOPE
         ↓
 coding agent
         ↓
@@ -345,10 +346,12 @@ Capable intelligence lives in the host coding agent. The semantic kernel
 constrains durable output; consumers remain free to query and compute over the
 resulting World.
 
-Current product constraints are recorded in
-[`docs/FOUNDATIONS.md`](docs/FOUNDATIONS.md). Research hypotheses and staged
-experiments live in [`docs/RESEARCH_DIRECTION.md`](docs/RESEARCH_DIRECTION.md)
-and are not product specification.
+The architecture is summarized in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Current product constraints
+are recorded in [`docs/FOUNDATIONS.md`](docs/FOUNDATIONS.md). Research notes
+in [`docs/RESEARCH_DIRECTION.md`](docs/RESEARCH_DIRECTION.md) (historical)
+and [`docs/CONSTRUCTION_AND_APPLICATION_RESEARCH.md`](docs/CONSTRUCTION_AND_APPLICATION_RESEARCH.md)
+are not product specification.
 
 ## What Ontology Author is not
 
@@ -356,7 +359,7 @@ Ontology Author is not primarily a visual ontology editor, workflow engine,
 model launcher, source-ingestion framework, or MCP server. It does not write
 back to authoritative systems, and it does not claim to model everything in a
 workspace. Its positive identity is narrower: conversational construction of
-purpose-fit semantic state that can be reused computationally.
+bounded semantic state that can be reused computationally.
 
 ## Status
 

@@ -1,0 +1,14 @@
+{
+  "relations": {
+    "bin_movement": "WORLD",
+    "dispatch_to_mill": "WORLD",
+    "hopper_ticket_named": "WORLD",
+    "intake": "WORLD",
+    "loadout": "WORLD",
+    "manifest": "WORLD",
+    "mill_receipt": "WORLD",
+    "mill_run": "WORLD",
+    "place_alias": "WORLD",
+    "purpose_requirement_failure": "PURPOSE"
+  }
+}

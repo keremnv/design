@@ -1,0 +1,23 @@
+{
+  "requirements": [
+    {
+      "kind": "UNRESOLVED",
+      "name": "out_5003_no_mill_slip",
+      "note": "PGE-OUT-5003 has a carrier manifest but no HFM receiving slip in the supplied extracts",
+      "relation": "manifest"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "out_5003_hopper_tickets",
+      "note": "hopper sheet material_note records no ticket on hopper sheet",
+      "relation": "bin_movement"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "out_5004_hopper_tickets",
+      "note": "hopper sheet material_note records no individual ticket for the blended load",
+      "relation": "bin_movement"
+    }
+  ],
+  "text": "# Purpose\n\nTrace grain through Prairie Gate receiving, storage, loadout, carrier shipment, and Hearthland mill intake. When hopper or loadout paperwork names receiving tickets, preserve that named association. When a blended load is not allocated to individual tickets, leave the allocation unresolved.\n\nThis World does not determine legal title, custody during carriage, or laboratory hold status.\n\n## User basis\n\n> Trace where grain came from, including which receiving tickets were named on hopper or loadout paperwork when the extracts establish that, and leave unallocated blends unresolved.\n"
+}

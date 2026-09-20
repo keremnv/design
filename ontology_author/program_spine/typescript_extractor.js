@@ -5,7 +5,7 @@
  *
  * This process emits extraction facts and evidence descriptors.  It does not
  * emit World rows and it does not make TypeScript AST types part of the
- * program-spine contract.  The Python side owns IDs, grounding, World
+ * program-spine contract. The Python side owns IDs, grounding, World
  * projection, admission, and publication.
  */
 
@@ -110,6 +110,20 @@ function inputRecord(fileName, disposition) {
   };
 }
 
+function workspaceRelative(fileName, workspace) {
+  return path.relative(path.resolve(workspace), path.resolve(fileName)).split(path.sep).join("/");
+}
+
+// TypeScript's checker includes absolute source paths in some semantic
+// identities. Those paths belong to the temporary materialization, not to
+// the immutable source tree, so keep them workspace-relative at the adapter
+// boundary.
+function stableIdentityText(value, workspace) {
+  const raw = String(value || "").replaceAll("\\", "/");
+  const root = path.resolve(workspace).split(path.sep).join("/").replace(/\/$/, "");
+  return raw.replaceAll(`${root}/`, "");
+}
+
 function packageInfo(fileName) {
   const normalized = path.resolve(fileName).split(path.sep);
   const nodeModulesIndex = normalized.lastIndexOf("node_modules");
@@ -180,9 +194,11 @@ function configurationChain(configPath, seen = new Set()) {
 
 function extract(request) {
   const boundary = request.boundary || {};
+  const workspace = path.resolve(request.workspace || process.cwd());
   const projectPaths = (boundary.projects || []).map((item) =>
     path.resolve(typeof item === "string" ? item : item.tsconfig)
   );
+  const projectKeys = projectPaths.map((item) => workspaceRelative(item, workspace));
   if (!projectPaths.length) throw new Error("at least one TypeScript project is required");
 
   const configDiagnostics = [];
@@ -227,7 +243,7 @@ function extract(request) {
       isDeclarationFile: Boolean(sourceFile.isDeclarationFile),
       language: ts.ScriptKind[sourceFile.scriptKind] || "Unknown",
       project: projectForFile.get(canonicalPath(sourceFile.fileName)) || projectPaths[0],
-      moduleKey: `module|${canonicalPath(sourceFile.fileName)}|${projectForFile.get(canonicalPath(sourceFile.fileName)) || projectPaths[0]}`,
+      moduleKey: `module|${workspaceRelative(sourceFile.fileName, workspace)}|${workspaceRelative(projectForFile.get(canonicalPath(sourceFile.fileName)) || projectPaths[0], workspace)}`,
       analyzed: disposition === "IN_SCOPE",
     };
   });
@@ -253,7 +269,7 @@ function extract(request) {
     if (!symbol) return null;
     try {
       if (symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
-      return checker.getFullyQualifiedName(symbol);
+      return stableIdentityText(checker.getFullyQualifiedName(symbol), workspace);
     } catch (_error) {
       return null;
     }
@@ -268,27 +284,27 @@ function extract(request) {
   }
 
   function kindForDeclaration(node) {
-    if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) return ["class", "ClassUnit"];
-    if (ts.isInterfaceDeclaration(node)) return ["interface", "InterfaceUnit"];
+    if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) return ["class", "class"];
+    if (ts.isInterfaceDeclaration(node)) return ["interface", "interface"];
     if (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node)) {
-      return ["function", "CallableUnit"];
+      return ["callable", "callable"];
     }
     if (ts.isMethodDeclaration(node) || ts.isMethodSignature(node) || ts.isConstructorDeclaration(node) ||
         ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node)) {
-      return ["method", "MethodUnit"];
+      return ["method", "method"];
     }
-    if (ts.isPropertyDeclaration(node) || ts.isPropertySignature(node)) return ["field", "MemberUnit"];
-    if (ts.isParameter(node)) return ["data", "ParameterUnit"];
-    if (ts.isVariableDeclaration(node)) return ["data", "StorableUnit"];
+    if (ts.isPropertyDeclaration(node) || ts.isPropertySignature(node)) return ["data", "data"];
+    if (ts.isParameter(node)) return ["parameter", "parameter"];
+    if (ts.isVariableDeclaration(node)) return ["data", "data"];
     return null;
   }
 
-  function addElement({ descriptor, programKind, kdmKind, node, sourceFile, owner, synthetic = false, name = "" }) {
+  function addElement({ descriptor, identityKind, nativeKind, node, sourceFile, owner, synthetic = false, name = "" }) {
     const existing = elementByDescriptor.get(descriptor);
     const item = {
       descriptor,
-      programKind,
-      kdmKind,
+      identityKind,
+      nativeKind,
       synthetic,
       name,
       ownerDescriptor: owner || null,
@@ -320,11 +336,11 @@ function extract(request) {
     try {
       const signature = checker.getSignatureFromDeclaration(node);
       if (signature) {
-        return checker.signatureToString(
+        return stableIdentityText(checker.signatureToString(
           signature,
           node,
           ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope
-        );
+        ), workspace);
       }
     } catch (_error) {
       // Some incomplete declarations have no checker signature. The
@@ -348,8 +364,8 @@ function extract(request) {
       seen.add(descriptor);
       addElement({
         descriptor,
-        programKind: "signature",
-        kdmKind: "Signature",
+        identityKind: "signature",
+        nativeKind: "signature",
         node: declaration,
         sourceFile: declarationFile,
         owner: parent.descriptor,
@@ -376,12 +392,12 @@ function extract(request) {
 
   function moduleDescriptor(sourceFile) {
     const file = fileByPath.get(canonicalPath(sourceFile.fileName));
-    return file ? file.moduleKey : `module|${canonicalPath(sourceFile.fileName)}|${projectPaths[0]}`;
+    return file ? file.moduleKey : `module|${workspaceRelative(sourceFile.fileName, workspace)}|${projectKeys[0]}`;
   }
 
-  function declarationDescriptor(sourceFile, node, kdmKind, owner, symbol, name) {
-    const stableSymbol = symbol || `anonymous|${owner}|${kdmKind}|${nextOrdinal(owner, "declaration")}`;
-    return `element|${moduleDescriptor(sourceFile)}|${kdmKind}|${stableSymbol}`;
+  function declarationDescriptor(sourceFile, node, nativeKind, owner, symbol, name) {
+    const stableSymbol = symbol || `anonymous|${owner}|${nativeKind}|${nextOrdinal(owner, "declaration")}`;
+    return `element|${moduleDescriptor(sourceFile)}|${nativeKind}|${stableSymbol}`;
   }
 
   function targetFromDeclaration(declaration) {
@@ -389,20 +405,20 @@ function extract(request) {
     const sourceFile = declaration.getSourceFile();
     const pair = kindForDeclaration(declaration);
     let symbol = symbolForNode(declaration);
-    let programKind = pair ? pair[0] : "module";
-    let kdmKind = pair ? pair[1] : "CodeItem";
+    let identityKind = pair ? pair[0] : "module";
+    let nativeKind = pair ? pair[1] : "module";
     let owner = moduleDescriptor(sourceFile);
     if (ts.isConstructorDeclaration(declaration)) {
       const classTarget = targetFromDeclaration(declaration.parent);
       if (classTarget) {
-        symbol = `constructor|${classTarget.symbol}`;
+      symbol = `constructor|${classTarget.symbol}`;
         owner = classTarget.descriptor;
       }
     }
     if (ts.isVariableDeclaration(declaration) && declaration.initializer &&
         (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer))) {
-      programKind = "function";
-      kdmKind = "CallableUnit";
+      identityKind = "callable";
+      nativeKind = "callable";
       symbol = symbol || symbolForNode(declaration);
     }
     if (!symbol) return null;
@@ -410,9 +426,9 @@ function extract(request) {
     const external = sourceRecord && sourceRecord.disposition !== "IN_SCOPE";
     const packageIdentity = external && packageInfo(sourceFile.fileName);
     const descriptor = external
-      ? `external|${packageIdentity ? `${packageIdentity.name}@${packageIdentity.version}|${packageIdentity.relativeFile}` : canonicalPath(sourceFile.fileName)}|${kdmKind}|${symbol}`
-      : `element|${moduleDescriptor(sourceFile)}|${kdmKind}|${symbol}`;
-    return { descriptor, programKind, kdmKind, symbol, file: sourceFile.fileName, declaration, owner };
+      ? `external|${packageIdentity ? `${packageIdentity.name}@${packageIdentity.version}|${packageIdentity.relativeFile}` : canonicalPath(sourceFile.fileName)}|${nativeKind}|${symbol}`
+      : `element|${moduleDescriptor(sourceFile)}|${nativeKind}|${symbol}`;
+    return { descriptor, identityKind, nativeKind, symbol, file: sourceFile.fileName, declaration, owner };
   }
 
   function typeTarget(typeNode) {
@@ -422,7 +438,7 @@ function extract(request) {
     const declarations = checker.getSymbolAtLocation(typeNode)?.declarations || [];
     const target = targetFromDeclaration(declarations[0]);
     if (target) return target;
-    return { descriptor: `external|type|${symbol}`, programKind: "type", kdmKind: "Datatype", symbol, file: null, declaration: null };
+    return { descriptor: `external|type|${symbol}`, identityKind: "type", nativeKind: "type", symbol, file: null, declaration: null };
   }
 
   function targetForCall(expression, callNode) {
@@ -440,12 +456,12 @@ function extract(request) {
     const signature = checker.getResolvedSignature(callNode);
     if (signature && signature.declaration) {
       let target = targetFromDeclaration(signature.declaration);
-      if (ts.isNewExpression(callNode) && target && target.kdmKind === "ClassUnit") {
-        const constructorDescriptor = `element|${moduleDescriptor(target.declaration.getSourceFile())}|MethodUnit|constructor|${target.symbol}`;
+      if (ts.isNewExpression(callNode) && target && target.nativeKind === "class") {
+        const constructorDescriptor = `element|${moduleDescriptor(target.declaration.getSourceFile())}|method|constructor|${target.symbol}`;
         const constructor = addElement({
           descriptor: constructorDescriptor,
-          programKind: "method",
-          kdmKind: "MethodUnit",
+          identityKind: "method",
+          nativeKind: "method",
           node: target.declaration,
           sourceFile: target.declaration.getSourceFile(),
           owner: target.descriptor,
@@ -455,8 +471,8 @@ function extract(request) {
         target = {
           ...target,
           descriptor: constructor.descriptor,
-          programKind: "method",
-          kdmKind: "MethodUnit",
+          identityKind: "method",
+          nativeKind: "method",
         };
       }
       if (target) candidates.push(target);
@@ -495,7 +511,7 @@ function extract(request) {
     if (!resolved || !resolved.resolvedFileName) return null;
     const targetFile = fileByPath.get(canonicalPath(resolved.resolvedFileName));
     if (targetFile && targetFile.disposition === "IN_SCOPE") {
-      return { descriptor: targetFile.moduleKey, file: targetFile.path, programKind: "module", kdmKind: "Module" };
+      return { descriptor: targetFile.moduleKey, file: targetFile.path, identityKind: "module", nativeKind: "module" };
     }
     return {
       descriptor: (() => {
@@ -505,8 +521,8 @@ function extract(request) {
           : `external|module|${canonicalPath(resolved.resolvedFileName)}|${moduleSpecifier.text}`;
       })(),
       file: resolved.resolvedFileName,
-      programKind: "module",
-      kdmKind: "Module",
+      identityKind: "module",
+      nativeKind: "module",
     };
   }
 
@@ -527,7 +543,7 @@ function extract(request) {
         Boolean(declarationName(node.parent));
       if ((ts.isFunctionExpression(node) || ts.isArrowFunction(node)) && !symbol &&
           !assignedCallable && !containsDirectCall(node)) {
-        // An unused anonymous function has no required KDM identity in v0.
+        // An unused anonymous function has no required durable identity in v0.
         // Its source range remains available through the containing element.
         ts.forEachChild(node, (child) => visit(sourceFile, child, currentOwner));
         return;
@@ -542,8 +558,8 @@ function extract(request) {
       const synthetic = ts.isFunctionExpression(node) || ts.isArrowFunction(node);
       declarationItem = addElement({
         descriptor,
-        programKind: pair[0],
-        kdmKind: pair[1],
+        identityKind: pair[0],
+        nativeKind: pair[1],
         node,
         sourceFile,
         owner,
@@ -551,16 +567,16 @@ function extract(request) {
         name,
       });
       currentOwner = descriptor;
-      if (pair[1] === "CallableUnit" || pair[1] === "MethodUnit") {
+      if (pair[1] === "callable" || pair[1] === "method") {
         addSignatures(declarationItem, node, sourceFile);
       }
       if (ts.isVariableDeclaration(node) && node.initializer &&
           (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))) {
-        const callableDescriptor = `element|${moduleDescriptor(sourceFile)}|CallableUnit|${symbol || `anonymous|${descriptor}`}`;
+        const callableDescriptor = `element|${moduleDescriptor(sourceFile)}|callable|${symbol || `anonymous|${descriptor}`}`;
         const callable = addElement({
           descriptor: callableDescriptor,
-          programKind: "function",
-          kdmKind: "CallableUnit",
+          identityKind: "callable",
+          nativeKind: "callable",
           node: node.initializer,
           sourceFile,
           owner,
@@ -595,7 +611,7 @@ function extract(request) {
           }
           resolutions.push({
             subject,
-            relationName: "kdm_imports",
+            capability: "spine.imports/v1",
             status: "RESOLVED",
             evidence,
             candidates: [target.descriptor],
@@ -604,7 +620,7 @@ function extract(request) {
         } else {
           resolutions.push({
             subject,
-            relationName: "kdm_imports",
+            capability: "spine.imports/v1",
             status: "UNRESOLVED",
             evidence,
             candidates: [],
@@ -615,11 +631,11 @@ function extract(request) {
     }
 
     if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
-      const actionDescriptor = `element|${moduleDescriptor(sourceFile)}|ActionElement|${currentOwner}|${nextOrdinal(currentOwner, "action")}`;
+      const actionDescriptor = `element|${moduleDescriptor(sourceFile)}|call_site|${currentOwner}|${nextOrdinal(currentOwner, "call_site")}`;
       addElement({
         descriptor: actionDescriptor,
-        programKind: "action",
-        kdmKind: "ActionElement",
+        identityKind: "call_site",
+        nativeKind: "call_site",
         node,
         sourceFile,
         owner: currentOwner,
@@ -634,7 +650,7 @@ function extract(request) {
       if (status === "RESOLVED") calls.push({ from: actionDescriptor, to: targetDescriptors[0], evidence, kind: ts.isNewExpression(node) ? "constructor" : "call" });
       resolutions.push({
         subject: actionDescriptor,
-        relationName: "kdm_calls",
+        capability: "spine.calls/v1",
         status,
         evidence,
         candidates: targetDescriptors,
@@ -671,7 +687,7 @@ function extract(request) {
           const target = typeTarget(type.expression);
           if (!target) continue;
           typeRelations.push({
-            relationName: clause.token === ts.SyntaxKind.ImplementsKeyword ? "kdm_implements" : "kdm_extends",
+            relationName: clause.token === ts.SyntaxKind.ImplementsKeyword ? "program_implements" : "program_extends",
             from: declarationItem ? declarationItem.descriptor : currentOwner,
             to: target.descriptor,
             evidence: range(sourceFile, type),
@@ -683,7 +699,7 @@ function extract(request) {
     if (ts.isPropertyDeclaration(node) || ts.isParameter(node) || ts.isVariableDeclaration(node)) {
       const target = typeTarget(node.type);
       if (target && declarationItem) {
-        typeRelations.push({ relationName: "kdm_has_type", from: declarationItem.descriptor, to: target.descriptor, evidence: range(sourceFile, node.type) });
+        typeRelations.push({ relationName: "program_has_type", from: declarationItem.descriptor, to: target.descriptor, evidence: range(sourceFile, node.type) });
       }
     }
 
@@ -695,8 +711,8 @@ function extract(request) {
     if (!file || file.disposition !== "IN_SCOPE") continue;
     const module = addElement({
       descriptor: file.moduleKey,
-      programKind: "module",
-      kdmKind: "Module",
+      identityKind: "module",
+      nativeKind: "module",
       node: sourceFile,
       sourceFile,
       owner: null,
@@ -704,8 +720,8 @@ function extract(request) {
     });
     const compilation = addElement({
       descriptor: `element|${module.descriptor}|CompilationUnit`,
-      programKind: "file",
-      kdmKind: "CompilationUnit",
+      identityKind: "source_unit",
+      nativeKind: "source_unit",
       node: sourceFile,
       sourceFile,
       owner: module.descriptor,

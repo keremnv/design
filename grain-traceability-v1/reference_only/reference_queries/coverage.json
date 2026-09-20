@@ -1,0 +1,16 @@
+{
+  "reference_model": "grain-traceability-v1-reference",
+  "coverage": [
+    {"question": "CQ-01", "views": ["material_event_history", "uses_container"]},
+    {"question": "CQ-02", "views": ["material_event_history", "derived_from"]},
+    {"question": "CQ-03", "views": ["material_event_history", "uses_container"]},
+    {"question": "CQ-04", "views": ["location_at_time"]},
+    {"question": "CQ-05", "views": ["sample_source_owner", "ownership_intervals"]},
+    {"question": "CQ-06", "views": ["material_event_history", "occurs_at"]},
+    {"question": "CQ-07", "views": ["shipment_source_contributions", "uses_container"]},
+    {"question": "CQ-08", "views": ["custody_intervals"]},
+    {"question": "CQ-09", "views": ["custody_intervals", "shipment_source_contributions"]},
+    {"question": "CQ-10", "views": ["material_event_history", "identified_as"]}
+  ],
+  "coverage_assertion": "Every standard-backed hidden question has a named reference view and an explicit interpretation in reference_queries/queries.sql."
+}

@@ -1,0 +1,20 @@
+{
+  "id": "R2",
+  "case": "unresolved-missing-distinction",
+  "prompt": "Which receiving ticket supplied the 19,000 kg on PGE-OUT-5004 from South House 14? Write the answer to answer.md.",
+  "started": "2026-09-09T18:05:57.103502+00:00",
+  "ended": "2026-09-09T18:06:33.728730+00:00",
+  "exit_code": 0,
+  "workspace": "/tmp/oa-spr-isolated-R2",
+  "isolated": true,
+  "model_requested": "composer-2.5",
+  "model_reported": "Composer 2.5",
+  "model_ok": true,
+  "construction_changed": false,
+  "purpose_changed": false,
+  "sqlite_changed": false,
+  "created_other_worlds": false,
+  "world_names": [
+    "yard-trace"
+  ]
+}

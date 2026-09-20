@@ -1,0 +1,26 @@
+{
+  "id": "inspection_downstream_scope",
+  "family": "inspection_downstream_scope",
+  "title": "Inspection downstream scope",
+  "description": "From a lab sample, report established downstream shipment, processor receipt, and processed output when World evidence links them. Preserve unresolved ticket identity and unallocated bin blends.",
+  "parameters": [
+    {
+      "name": "sample",
+      "type": "string",
+      "required": true,
+      "description": "Lab sample token (e.g. SMP-7714A)."
+    }
+  ],
+  "output": {
+    "type": "object",
+    "required": [
+      "computation",
+      "world_binding",
+      "query",
+      "sample",
+      "established_source_ticket",
+      "established_downstream",
+      "unresolved"
+    ]
+  }
+}

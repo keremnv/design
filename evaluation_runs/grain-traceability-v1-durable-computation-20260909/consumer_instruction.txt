@@ -1,0 +1,5 @@
+Read PURPOSE.md, world-context.md, and evaluation_tasks.json. Answer every held-out task using only the files in this workspace. Work independently and preserve unsupported or ambiguous conclusions as unresolved.
+
+In the DURABLE condition, first inspect application/catalog.json and use the supplied parameterized computations where useful. You may inspect the World or write temporary queries if needed, but do not access files outside the workspace. Do not assume that a computation's output is authoritative if the World does not support it.
+
+Write the complete structured answer set to final_answer.md before finishing.

@@ -1,0 +1,56 @@
+[
+  {
+    "id": "A-D1",
+    "case": "positive-semantic-reuse",
+    "world_materializes_named_hopper": false,
+    "correct_tickets": true,
+    "world_native_named_association": false,
+    "unsupported_commitments": ["kg split of EF-18 as 2150 kg"],
+    "timed_out": true,
+    "notes": "FIFO reconstruction from intake+loadout quantities; then searched missing source files"
+  },
+  {
+    "id": "B-D1",
+    "case": "positive-semantic-reuse",
+    "world_materializes_named_hopper": true,
+    "correct_tickets": true,
+    "world_native_named_association": true,
+    "unsupported_commitments": [],
+    "timed_out": false,
+    "notes": "queried hopper_ticket_named / BM-004"
+  },
+  {
+    "id": "A-D2",
+    "case": "uncertainty-reuse",
+    "world_materializes_explicit_unresolved_5004": false,
+    "refused_unsupported_sole_source": true,
+    "used_explicit_unresolved_record": false,
+    "unsupported_commitments": [],
+    "timed_out": false,
+    "notes": "re-derived from two B-14 intakes plus ticket-less loadout"
+  },
+  {
+    "id": "B-D2",
+    "case": "uncertainty-reuse",
+    "world_materializes_explicit_unresolved_5004": true,
+    "refused_unsupported_sole_source": true,
+    "used_explicit_unresolved_record": true,
+    "unsupported_commitments": [],
+    "timed_out": false,
+    "notes": "BM-009 no individual ticket plus out_5004_hopper_tickets"
+  },
+  {
+    "id": "A-D3",
+    "case": "unrelated-control",
+    "correct": true,
+    "unsupported_commitments": [],
+    "timed_out": false
+  },
+  {
+    "id": "B-D3",
+    "case": "unrelated-control",
+    "correct": true,
+    "unsupported_commitments": [],
+    "timed_out": false
+  }
+]

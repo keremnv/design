@@ -1,0 +1,111 @@
+{
+  "requirements": [
+    {
+      "kind": "REQUIRE",
+      "name": "intake_recorded",
+      "note": "",
+      "relation": "intake_receipt"
+    },
+    {
+      "kind": "REQUIRE",
+      "name": "storage_recorded",
+      "note": "",
+      "relation": "storage_move"
+    },
+    {
+      "kind": "REQUIRE",
+      "name": "loadout_recorded",
+      "note": "",
+      "relation": "loadout_event"
+    },
+    {
+      "kind": "REQUIRE",
+      "name": "manifest_recorded",
+      "note": "",
+      "relation": "manifest_event"
+    },
+    {
+      "kind": "REQUIRE",
+      "name": "mill_intake_recorded",
+      "note": "",
+      "relation": "mill_receipt"
+    },
+    {
+      "kind": "MATERIALIZABLE",
+      "name": "intake_rows",
+      "relation": "intake_receipt"
+    },
+    {
+      "kind": "MATERIALIZABLE",
+      "name": "shipment_links",
+      "relation": "outbound_same_movement"
+    },
+    {
+      "cardinality": "ONE",
+      "kind": "UNIQUE",
+      "name": "one_manifest_per_dispatch",
+      "per": [
+        "dispatch_ref"
+      ],
+      "relation": "outbound_same_movement"
+    },
+    {
+      "cardinality": "ONE",
+      "kind": "UNIQUE",
+      "name": "one_mill_slip_per_manifest",
+      "per": [
+        "manifest_no"
+      ],
+      "relation": "inbound_same_movement"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "m_creek_account",
+      "note": "Intake uses M. Creek; commercial desk has claims from both Meadow Creek Farms and Meadow Creek Grain and has no account key that selects one.",
+      "relation": "intake_receipt"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "out_5001_ticket_composition",
+      "note": "North House 12 already held DR-44, WB-390, and EF-18 before this spout load. The loadout comment does not allocate the truck back to receiving tickets.",
+      "relation": "loadout_from_bin"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "out_5002_quantity_split",
+      "note": "Hopper note names WB-390 and EF-18 together; the loadout does not allocate the blended 26000 kg to individual tickets.",
+      "relation": "hopper_names_ticket"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "out_5003_material_identity",
+      "note": "No ticket on the hopper sheet. N3 is a route code elsewhere; the handwritten cargo note is not a validated source ticket.",
+      "relation": "manifest_event"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "out_5003_mill_receipt",
+      "note": "Truck left with a carrier manifest, but no HFM receiving slip is in the supplied extracts. Consignee is HFM-E; North-log completeness does not speak to East.",
+      "relation": "inbound_same_movement"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "out_5004_ticket_composition",
+      "note": "South House 14 held MCR-118 and S-52; the loadout desk did not record which delivery supplied which part of the truck.",
+      "relation": "loadout_from_bin"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "smp_unlisted_source_ticket",
+      "note": "Lab comment records that the source ticket was not recorded; the route-packet note is not treated as a ticket.",
+      "relation": "lab_test"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "unrecorded_ownership",
+      "note": "Ownership export contains recorded changes, not a guarantee that an unrecorded agreement did not exist.",
+      "relation": "ownership_event"
+    }
+  ],
+  "text": "# Purpose\n\nTrace grain through Prairie Gate receiving and storage, carrier outbound shipment, and Hearthland processing when evidence establishes those links, and keep material identity, ownership, and event linkage unresolved when it does not.\n\n## User basis\n\n> Build a reusable World that lets us trace grain through receiving, storage, processing, and outbound shipment, including determining where material came from, what happened to it, and where it went when the available evidence establishes those links. Preserve uncertainty where material identity or event linkage cannot be established.\n\n> Produce the smallest grounded World that is sufficient for the declared purpose. Preserve unsupported meaning as unresolved rather than guessing.\n"
+}

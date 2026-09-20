@@ -1,0 +1,122 @@
+{
+  "prompt": "A mill clerk asked whether Meadow Creek ticket MCR-118 can be certified as the sole Prairie Gate source of mill receipt HFM-IN-604. Write the answer to answer.md.",
+  "started": "2026-09-09T19:51:38.000236+00:00",
+  "ended": "2026-09-09T19:52:19.137291+00:00",
+  "exit_code": 0,
+  "timed_out": false,
+  "workspace": "/tmp/oa-dmv-down-B-D2",
+  "isolated": true,
+  "model_requested": "composer-2.5",
+  "model_reported": "Composer 2.5",
+  "usage": {
+    "inputTokens": 15383,
+    "outputTokens": 3253,
+    "cacheReadTokens": 158912,
+    "cacheWriteTokens": 0
+  },
+  "author_commands": [
+    "author list"
+  ],
+  "shell_commands": [
+    "author list 2>/dev/null || true; ls -la /workspace/.worlds 2>/dev/null || true",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \".tables\" 2>/dev/null; echo \"---\"; sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;\" 2>/dev/null",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"\nSELECT 'mill_receipt' as tbl, * FROM mill_receipt WHERE mill_receipt LIKE '%604%' OR mill_receipt LIKE '%HFM%';\nSELECT 'intake' as tbl, * FROM intake LIMIT 5;\nSELECT 'hopper_ticket_named' as tbl, * FROM hopper_ticket_named WHERE ticket LIKE '%118%' OR ticket LIKE '%MCR%';\nSELECT 'loadout' as tbl, * FROM loadout LIMIT 5;\nSELECT 'dispatch_to_mill' as tbl, * FROM dispatch_to_mill LIMIT 5;\n\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"\nSELECT name, description FROM _world_relations ORDER BY name;\nSELECT referent_id, label FROM _world_referents WHERE referent_id LIKE '%118%' OR referent_id LIKE '%604%' OR label LIKE '%118%' OR label LIKE '%604%';\n\"",
+    "for t in mill_receipt intake hopper_ticket_named loadout dispatch_to_mill manifest mill_run bin_movement; do echo \"=== $t ===\"; sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"PRAGMA table_info($t);\"; done",
+    "sqlite3 -header -column /workspace/.worlds/yard-trace/world/world.sqlite \"\nSELECT * FROM mill_receipt WHERE local_receipt LIKE '%604%' OR bill_reference LIKE '%604%';\nSELECT * FROM intake WHERE ticket_id LIKE '%118%' OR receipt_no LIKE '%118%';\nSELECT * FROM hopper_ticket_named WHERE ticket_id LIKE '%118%' OR ticket_code LIKE '%118%';\nSELECT * FROM dispatch_to_mill WHERE mill_receipt LIKE '%604%';\nSELECT * FROM loadout;\nSELECT * FROM manifest;\nSELECT * FROM bin_movement;\nSELECT * FROM mill_run WHERE input_receipt LIKE '%604%';\n\"",
+    "sqlite3 -header -column /workspace/.worlds/yard-trace/world/world.sqlite \"\nSELECT * FROM place_alias;\nSELECT * FROM intake;\nSELECT * FROM _world_groundings LIMIT 20;\n\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"\nSELECT bm.move_id, bm.work_order, bm.material_note, bm.quantity_kg, htn.ticket_code\nFROM bin_movement bm\nLEFT JOIN hopper_ticket_named htn ON bm.move_id = htn.move_id\nWHERE bm.work_order LIKE 'OUT-5004%' OR bm.from_point = 'BIN-14' OR bm.to_point = 'BIN-14'\nORDER BY bm.logged_at;\n\""
+  ],
+  "evidence_access": [
+    "evidence/operating_notes"
+  ],
+  "construction_changed": false,
+  "purpose_changed": false,
+  "sqlite_changed": false,
+  "world_names": [
+    "yard-trace"
+  ],
+  "sqlite_inspect": {
+    "tables": [
+      "_world_assertions",
+      "_world_completeness",
+      "_world_derivation_inputs",
+      "_world_derivation_run_inputs",
+      "_world_derivations",
+      "_world_groundings",
+      "_world_meta",
+      "_world_referents",
+      "_world_relations",
+      "_world_roles",
+      "bin_movement",
+      "dispatch_to_mill",
+      "hopper_ticket_named",
+      "intake",
+      "loadout",
+      "manifest",
+      "mill_receipt",
+      "mill_run",
+      "place_alias",
+      "purpose_requirement_failure"
+    ],
+    "purpose_requirement_failure": [
+      {
+        "_assertion_id": "assertion:2eb0ac7799684bb555f69861",
+        "requirement_id": "out_5003_no_mill_slip",
+        "affected_identity": "out_5003_no_mill_slip",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "manifest",
+        "subject_json": "{\"dispatch_ref\": \"PGE-OUT-5003\", \"manifest_no\": \"NS-8910\", \"reason\": \"PGE-OUT-5003 has a carrier manifest but no HFM receiving slip in the supplied extracts\"}",
+        "grounding_ref": ""
+      },
+      {
+        "_assertion_id": "assertion:597b56f4cc9f80fbae965074",
+        "requirement_id": "out_5003_hopper_tickets",
+        "affected_identity": "out_5003_hopper_tickets",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "bin_movement",
+        "subject_json": "{\"move_id\": \"BM-006\", \"reason\": \"hopper sheet material_note records no ticket on hopper sheet\", \"work_order\": \"OUT-5003\"}",
+        "grounding_ref": ""
+      },
+      {
+        "_assertion_id": "assertion:f460c37c8b50da070764bb16",
+        "requirement_id": "out_5004_hopper_tickets",
+        "affected_identity": "out_5004_hopper_tickets",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "bin_movement",
+        "subject_json": "{\"move_id\": \"BM-009\", \"reason\": \"hopper sheet material_note records no individual ticket for the blended load\", \"work_order\": \"OUT-5004\"}",
+        "grounding_ref": ""
+      }
+    ],
+    "hopper_named_out5002": true,
+    "unresolved_out5004": true,
+    "control_out5001": true
+  },
+  "model_ok": true,
+  "id": "B-D2",
+  "condition": "B",
+  "task": "D2",
+  "case": "uncertainty-reuse",
+  "gold": {
+    "must_not_commit": [
+      "sole source",
+      "only MCR-118",
+      "certified"
+    ],
+    "must_refuse_or_unresolved": true,
+    "unsupported_if_yes": true
+  },
+  "raw_evidence_unavailable": true,
+  "construction_absent": true,
+  "answer_text": "# Answer\n\n**No.** Meadow Creek ticket MCR-118 cannot be certified as the sole Prairie Gate source of mill receipt HFM-IN-604.\n\n## What the records do establish\n\n- **MCR-118** was received at Prairie Gate on 2025-09-07 (20,850 kg from M. Creek) and was moved into **South House 14 (bin B-14)**. The receiving hopper sheet for that move (BM-007) names MCR-118.\n- **HFM-IN-604** is tied to Prairie Gate dispatch **PGE-OUT-5004** (manifest RL-9127, bill reference RL-5004-Q). That dispatch loaded **19,000 kg** from **South House 14** on 2025-09-07 and was received at Hearthland as **18,800 kg**.\n\nSo MCR-118 and the grain that became HFM-IN-604 both passed through the same bin. That is as far as the extracts support a direct link.\n\n## Why sole-source certification is not supported\n\n1. **The loadout was a blend with no ticket allocation.** The hopper sheet for OUT-5004 (BM-009) records **\"no individual ticket\"** for the 19,000 kg moved from B-14 to the load pit. The paperwork does not assign that shipment to MCR-118 alone\u2014or to any single receiving ticket.\n\n2. **B-14 held more than one ticket before loadout.** In addition to MCR-118 (20,850 kg), ticket **S-52** from Sunnyside Acres (15,900 kg) was also moved into the same bin (BM-008) before OUT-5004 was loaded.\n\n3. **Ticket-to-mill allocation is left unresolved.** Under the yard-trace purpose, when a blended load is not allocated to individual tickets on hopper or loadout paperwork, that allocation must remain unresolved. OUT-5004 / HFM-IN-604 is explicitly in that category.\n\n## Conclusion for the mill clerk\n\nMCR-118 is a documented Prairie Gate receiving ticket that entered the bin from which PGE-OUT-5004 was loaded, but the supplied records do **not** establish that HFM-IN-604 came solely from MCR-118. S-52 was also in that bin, and the loadout hopper sheet names no individual ticket for the blended shipment. Do not certify MCR-118 as the sole source on these extracts.\n",
+  "score": {
+    "correct": false,
+    "missing_required": [],
+    "unsupported_commitments": [
+      "sole source",
+      "certified"
+    ],
+    "refused_or_unresolved": true,
+    "yes_commit": true
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "shipment_source_status",
+  "family": "shipment_source_status",
+  "title": "Shipment source status",
+  "description": "For an outbound dispatch, report established contributing inbound identities, established source location, commercial scopes (not treated as bin allocation), and whether source allocation remains unresolved.",
+  "parameters": [
+    {
+      "name": "dispatch",
+      "type": "string",
+      "required": true,
+      "description": "Dispatch, movement, loadout, or manifest token (e.g. PGE-OUT-5001, LD-18, RL-8841)."
+    }
+  ],
+  "output": {
+    "type": "object",
+    "required": [
+      "computation",
+      "world_binding",
+      "query",
+      "movement",
+      "source_location",
+      "established_contributing_identities",
+      "commercial_scopes",
+      "source_allocation_unresolved",
+      "unresolved"
+    ]
+  }
+}

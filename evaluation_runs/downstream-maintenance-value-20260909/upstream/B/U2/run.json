@@ -1,0 +1,99 @@
+{
+  "prompt": "Which receiving ticket supplied the 19,000 kg on PGE-OUT-5004 from South House 14? Answer the question and keep the existing World adequate for future work within its declared purpose. Write the answer to answer.md.",
+  "started": "2026-09-09T19:51:01.626537+00:00",
+  "ended": "2026-09-09T19:51:37.851676+00:00",
+  "exit_code": 0,
+  "timed_out": false,
+  "workspace": "/tmp/oa-downstream-maintenance-value-20260909/condition_B",
+  "isolated": true,
+  "model_requested": "composer-2.5",
+  "model_reported": "Composer 2.5",
+  "usage": {
+    "inputTokens": 16221,
+    "outputTokens": 2450,
+    "cacheReadTokens": 127072,
+    "cacheWriteTokens": 0
+  },
+  "author_commands": [
+    "author list"
+  ],
+  "shell_commands": [
+    "author list 2>/dev/null || ls -la /workspace/.worlds/ 2>/dev/null",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"\nSELECT * FROM bin_movement WHERE work_order='OUT-5004';\nSELECT * FROM hopper_ticket_named WHERE work_order='OUT-5004';\nSELECT * FROM loadout WHERE dispatch_ref='PGE-OUT-5004';\nSELECT * FROM intake WHERE assigned_bin='B-14';\n\""
+  ],
+  "evidence_access": [
+    "evidence/bin_movements",
+    "evidence/operating_notes",
+    "evidence/elevator_receipts",
+    "/workspace/evidence",
+    "evidence_dir_present"
+  ],
+  "construction_changed": false,
+  "purpose_changed": false,
+  "sqlite_changed": false,
+  "world_names": [
+    "yard-trace"
+  ],
+  "sqlite_inspect": {
+    "tables": [
+      "_world_assertions",
+      "_world_completeness",
+      "_world_derivation_inputs",
+      "_world_derivation_run_inputs",
+      "_world_derivations",
+      "_world_groundings",
+      "_world_meta",
+      "_world_referents",
+      "_world_relations",
+      "_world_roles",
+      "bin_movement",
+      "dispatch_to_mill",
+      "hopper_ticket_named",
+      "intake",
+      "loadout",
+      "manifest",
+      "mill_receipt",
+      "mill_run",
+      "place_alias",
+      "purpose_requirement_failure"
+    ],
+    "purpose_requirement_failure": [
+      {
+        "_assertion_id": "assertion:2eb0ac7799684bb555f69861",
+        "requirement_id": "out_5003_no_mill_slip",
+        "affected_identity": "out_5003_no_mill_slip",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "manifest",
+        "subject_json": "{\"dispatch_ref\": \"PGE-OUT-5003\", \"manifest_no\": \"NS-8910\", \"reason\": \"PGE-OUT-5003 has a carrier manifest but no HFM receiving slip in the supplied extracts\"}",
+        "grounding_ref": ""
+      },
+      {
+        "_assertion_id": "assertion:597b56f4cc9f80fbae965074",
+        "requirement_id": "out_5003_hopper_tickets",
+        "affected_identity": "out_5003_hopper_tickets",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "bin_movement",
+        "subject_json": "{\"move_id\": \"BM-006\", \"reason\": \"hopper sheet material_note records no ticket on hopper sheet\", \"work_order\": \"OUT-5003\"}",
+        "grounding_ref": ""
+      },
+      {
+        "_assertion_id": "assertion:f460c37c8b50da070764bb16",
+        "requirement_id": "out_5004_hopper_tickets",
+        "affected_identity": "out_5004_hopper_tickets",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "bin_movement",
+        "subject_json": "{\"move_id\": \"BM-009\", \"reason\": \"hopper sheet material_note records no individual ticket for the blended load\", \"work_order\": \"OUT-5004\"}",
+        "grounding_ref": ""
+      }
+    ],
+    "hopper_named_out5002": true,
+    "unresolved_out5004": true,
+    "control_out5001": true
+  },
+  "model_ok": true,
+  "id": "B-U2",
+  "condition": "B",
+  "task": "U2",
+  "maintain": true
+}

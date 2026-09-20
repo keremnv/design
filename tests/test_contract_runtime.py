@@ -64,7 +64,7 @@ def _workspace(tmp_path: Path, construction: str) -> Path:
 
 def test_design_contract_constructs_and_publishes_first_slice(tmp_path):
     root = _workspace(tmp_path, DESIGN_CONSTRUCTION)
-    result = rebuild(root, contract=DESIGN_CONTRACT)
+    result = rebuild(root, contract=DESIGN_CONTRACT, purpose=root / "PURPOSE.md")
     assert result.succeeded, result.errors
 
     world = Project(root).open_world()

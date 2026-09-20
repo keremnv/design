@@ -184,10 +184,9 @@ def test_mobile_checkout_profile_constructs_through_project_lifecycle(tmp_path):
         ).issubset(schema)
         assert "candidate_for" not in schema
 
-        demand = explorer.demand()
-        assert demand is not None
-        assert demand["demanded"] == 0
-        assert demand["obligations"] == []
+        assert explorer.demand() is None
+        assert not (root / "world" / "world.purpose.json").exists()
+        assert "purpose_requirement_failure" not in schema
 
         governed = explorer.obligations()
         assert governed["contract"] == {

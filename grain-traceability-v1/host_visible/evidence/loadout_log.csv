@@ -1,0 +1,5 @@
+dispatch_id,loaded_at,spout,truck_tag,dispatch_ref,bin_label,quantity_kg,route_code,desk_comment
+LD-18,2025-09-04T09:40:00-05:00,Spout 3,RLT-088,PGE-OUT-5001,North House 12,39000,NORTH-2,seal 8841
+LD-19,2025-09-04T13:15:00-05:00,Spout 3,NST-204,PGE-OUT-5002,North House 12,26000,NORTH-2,seal 8848
+LD-20,2025-09-05T07:10:00-05:00,Spout 2,NST-219,PGE-OUT-5003,North House 12,12000,EAST-1,seal 8910
+LD-21,2025-09-07T10:30:00-05:00,Spout 1,RLT-091,PGE-OUT-5004,South House 14,19000,NORTH-2,seal 9127

@@ -1,0 +1,29 @@
+{
+  "experiment": "grain-traceability-v1-durable-computation-20260909",
+  "tasks": [
+    {
+      "task_id": "DEV-SRC-001",
+      "family": "shipment_source_status",
+      "request": "For outbound dispatch PGE-OUT-5001, determine which inbound material identity or identities are established as contributing, what source location is established, and whether any source allocation remains unresolved.",
+      "parameters": {"dispatch": "PGE-OUT-5001"}
+    },
+    {
+      "task_id": "DEV-PROV-001",
+      "family": "processor_receipt_provenance",
+      "request": "For processor receipt HFM-IN-601, summarize its established upstream dispatch/material path, processing output if any, and any unresolved link.",
+      "parameters": {"processor_receipt": "HFM-IN-601"}
+    },
+    {
+      "task_id": "DEV-CUST-001",
+      "family": "custody_owner_at",
+      "request": "At 2025-09-03T12:00:00-05:00, determine the recorded owner and custodian of material DR-44.",
+      "parameters": {"material": "DR-44", "timestamp": "2025-09-03T12:00:00-05:00"}
+    },
+    {
+      "task_id": "DEV-INSP-001",
+      "family": "inspection_downstream_scope",
+      "request": "Determine what downstream shipment, processor receipt, and processed output are established as affected by inspection sample SMP-7714A, preserving any unresolved scope.",
+      "parameters": {"sample": "SMP-7714A"}
+    }
+  ]
+}

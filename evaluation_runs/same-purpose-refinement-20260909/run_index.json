@@ -1,0 +1,34 @@
+[
+  {
+    "id": "R1",
+    "case": "supported-missing-distinction",
+    "model_reported": "Composer 2.5",
+    "exit_code": 0,
+    "construction_changed": false,
+    "purpose_changed": false,
+    "sqlite_changed": false,
+    "created_other_worlds": false
+  },
+  {
+    "id": "R2",
+    "case": "unresolved-missing-distinction",
+    "model_reported": "Composer 2.5",
+    "exit_code": 0,
+    "construction_changed": false,
+    "purpose_changed": false,
+    "sqlite_changed": false,
+    "created_other_worlds": false
+  },
+  {
+    "id": "R3",
+    "case": "control-world-already-sufficient",
+    "model_reported": "Composer 2.5",
+    "exit_code": 124,
+    "timed_out": true,
+    "note": "Answer written; process hung after author open. Construction/sqlite unchanged.",
+    "construction_changed": false,
+    "purpose_changed": false,
+    "sqlite_changed": false,
+    "created_other_worlds": false
+  }
+]

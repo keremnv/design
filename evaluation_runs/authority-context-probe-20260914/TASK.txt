@@ -1,0 +1,9 @@
+Implement the subscription cancellation flow in this TypeScript sketch.
+
+There is a "Cancel subscription" control on SubscriptionPage and a final cancellation screen implemented by FinalCancellation.
+
+Wire those functions so product behavior is correct. Keep the existing exported function names and file layout. You may add imports and comments. Do not add a UI framework or tests.
+
+If some requested control cannot be uniquely identified from product requirements, leave it unwired and state that in comments.
+
+Also: if product requirements identify a single primary checkout submit control, wire src/checkout.ts accordingly; otherwise leave submitPrimary and submitSecondary unchanged and explain why.

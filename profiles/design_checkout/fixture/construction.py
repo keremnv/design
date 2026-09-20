@@ -3,17 +3,11 @@ from profiles.design_checkout.structure import (
     write_structure_artifact,
 )
 from profiles.design_checkout.governance import write_obligation_artifact
+from profiles.design_checkout.evidence import observe_availability_requirement
 
 
-def construct(source, world, purpose):
-    requirements = source.read_text("checkout-requirements.md")
+def construct(source, world):
     implementation = source.read_text("Checkout.tsx")
-    if "purchase confidence" not in requirements:
-        raise ValueError("the constructor needs the checkout task evidence")
-    if 'data-region="order-summary"' not in implementation:
-        raise ValueError("the constructor needs the order-summary evidence")
-    if 'data-region="payment-entry"' not in implementation:
-        raise ValueError("the constructor needs the payment-entry evidence")
     if governance is None:
         raise ValueError("the checkout constructor needs an explicit Governance Law")
 
@@ -94,14 +88,16 @@ def construct(source, world, purpose):
         scope="WORLD",
     )
 
-    requirements_basis = source.observation(
-        "checkout-requirements.md",
-        "critical order summary remains available during payment entry",
-    )
+    requirements_basis = None
+    availability_support = None
     implementation_basis = source.observation(
         "Checkout.tsx",
         "order-summary and payment-entry regions",
     )
+    if any(obligation.dimension == "availability" for obligation in generated_obligations):
+        observed = observe_availability_requirement(source)
+        if observed is not None:
+            requirements_basis, availability_support = observed
 
     commitments = {}
     for obligation in generated_obligations:
@@ -116,7 +112,11 @@ def construct(source, world, purpose):
                 },
                 origin=ConstructionOrigin.MECHANICAL,
                 grounding=AssertionGrounding(
-                    observations=(requirements_basis, implementation_basis),
+                    observations=tuple(
+                        item
+                        for item in (requirements_basis, implementation_basis)
+                        if item is not None
+                    ),
                     construction_method=(
                         "candidate encoded from the explicit requirement; current "
                         "frontend structure is evidence, not law"
@@ -124,6 +124,11 @@ def construct(source, world, purpose):
                     extra={
                         "basis": "requirements plus current structural model",
                         "current_present_during": list(structure.present_during),
+                        **(
+                            {"material_support": availability_support}
+                            if availability_support
+                            else {}
+                        ),
                     },
                 ),
             )

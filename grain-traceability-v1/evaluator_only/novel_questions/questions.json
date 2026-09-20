@@ -1,0 +1,15 @@
+{
+  "benchmark_id": "grain-traceability-v1",
+  "questions": [
+    {"id": "NQ-01", "prompt": "Which inbound loads contributed to outbound shipment PGE-OUT-5002?", "capability": "multi-source composition"},
+    {"id": "NQ-02", "prompt": "Which downstream shipments contain material that occupied BIN-12, and which of those have individual source allocation?", "capability": "storage-to-downstream reuse with unresolvedness"},
+    {"id": "NQ-03", "prompt": "What happened to grain received during 2025-09-03 09:00:00-05:00 through 2025-09-03 12:00:00-05:00?", "capability": "interval-scoped forward trace"},
+    {"id": "NQ-04", "prompt": "Which processor receipts have complete upstream provenance back to an identified inbound load or loads?", "capability": "complete versus partial chain"},
+    {"id": "NQ-05", "prompt": "Which traceability chains remain unresolved, and what part of each chain is unresolved?", "capability": "explicit uncertainty inventory"},
+    {"id": "NQ-06", "prompt": "What specific missing linkage prevents complete provenance for PGE-OUT-5003?", "capability": "missing-event diagnosis"},
+    {"id": "NQ-07", "prompt": "At 2025-09-04 13:10:00-05:00, who owned and who had custody of the WB-390 material?", "capability": "ownership/custody separation and temporal ordering"},
+    {"id": "NQ-08", "prompt": "Which downstream material is affected by inspection result SMP-602B?", "capability": "inspection impact propagation"},
+    {"id": "NQ-09", "prompt": "Which apparent identity matches should not be committed as established?", "capability": "unsupported identity rejection"},
+    {"id": "NQ-10", "prompt": "Is there a processor receiving record for PGE-OUT-5003 at HFM-N, and can the evidence justify saying that HFM-E has no such record?", "capability": "completeness-sensitive negative reasoning"}
+  ]
+}

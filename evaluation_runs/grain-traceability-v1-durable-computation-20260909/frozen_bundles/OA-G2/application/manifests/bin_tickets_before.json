@@ -1,0 +1,13 @@
+{
+  "id": "bin_tickets_before",
+  "description": "Tickets with ticket_into_bin into the named house whose storage_move.logged_at is at or before timestamp. Bin aliases (B-12, North House 12) are accepted.",
+  "parameters": {
+    "bin": {"type": "string", "required": true},
+    "timestamp": {"type": "string", "required": true, "format": "ISO-8601"}
+  },
+  "result": {
+    "tickets": "array of {scale_ticket, bin, move_id, logged_at, quantity_kg}",
+    "ticket_ids": "string[]"
+  },
+  "invoke": "application/run bin_tickets_before --bin BIN-12 --timestamp 2025-09-04T09:40:00-05:00"
+}

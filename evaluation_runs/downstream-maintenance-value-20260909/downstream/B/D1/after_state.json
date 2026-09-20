@@ -1,0 +1,70 @@
+{
+  "world_names": [
+    "yard-trace"
+  ],
+  "purpose_sha256": null,
+  "construction_sha256": null,
+  "sqlite_sha256": "8b0b5e34a1c7b7731bb4c702fd02dffae90fbbf7db8166cc9793df2171c15d24",
+  "has_construction": false,
+  "has_evidence": false,
+  "has_purpose_md": false,
+  "construction_changed": false,
+  "purpose_changed": false,
+  "sqlite_changed": false,
+  "sqlite_inspect": {
+    "tables": [
+      "_world_assertions",
+      "_world_completeness",
+      "_world_derivation_inputs",
+      "_world_derivation_run_inputs",
+      "_world_derivations",
+      "_world_groundings",
+      "_world_meta",
+      "_world_referents",
+      "_world_relations",
+      "_world_roles",
+      "bin_movement",
+      "dispatch_to_mill",
+      "hopper_ticket_named",
+      "intake",
+      "loadout",
+      "manifest",
+      "mill_receipt",
+      "mill_run",
+      "place_alias",
+      "purpose_requirement_failure"
+    ],
+    "purpose_requirement_failure": [
+      {
+        "_assertion_id": "assertion:2eb0ac7799684bb555f69861",
+        "requirement_id": "out_5003_no_mill_slip",
+        "affected_identity": "out_5003_no_mill_slip",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "manifest",
+        "subject_json": "{\"dispatch_ref\": \"PGE-OUT-5003\", \"manifest_no\": \"NS-8910\", \"reason\": \"PGE-OUT-5003 has a carrier manifest but no HFM receiving slip in the supplied extracts\"}",
+        "grounding_ref": ""
+      },
+      {
+        "_assertion_id": "assertion:597b56f4cc9f80fbae965074",
+        "requirement_id": "out_5003_hopper_tickets",
+        "affected_identity": "out_5003_hopper_tickets",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "bin_movement",
+        "subject_json": "{\"move_id\": \"BM-006\", \"reason\": \"hopper sheet material_note records no ticket on hopper sheet\", \"work_order\": \"OUT-5003\"}",
+        "grounding_ref": ""
+      },
+      {
+        "_assertion_id": "assertion:f460c37c8b50da070764bb16",
+        "requirement_id": "out_5004_hopper_tickets",
+        "affected_identity": "out_5004_hopper_tickets",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "bin_movement",
+        "subject_json": "{\"move_id\": \"BM-009\", \"reason\": \"hopper sheet material_note records no individual ticket for the blended load\", \"work_order\": \"OUT-5004\"}",
+        "grounding_ref": ""
+      }
+    ],
+    "hopper_named_out5002": true,
+    "unresolved_out5004": true,
+    "control_out5001": true
+  }
+}

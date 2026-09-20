@@ -1,0 +1,6 @@
+receipt_no,scale_ticket,arrival_local,commodity,grower_name,net_kg,receiving_lane,assigned_bin,owner_at_intake,grade_note
+ER-7714,DR-44,2025-09-02T08:15:00-05:00,hard red wheat,Cedar Ridge Farm,39900,Lane 2,B-12,Cedar Ridge Farm,13.1 protein
+ER-7721,WB-390,2025-09-03T09:20:00-05:00,hard red wheat,Willow Bend Farms,23850,Lane 1,B-12,Willow Bend Farms,12.7 protein
+ER-7729,EF-18,2025-09-03T11:05:00-05:00,hard red wheat,East Fork Co-op,17900,Lane 1,B-12,East Fork Co-op,12.9 protein
+ER-7744,MCR-118,2025-09-07T07:40:00-05:00,hard red wheat,M. Creek,20850,Lane 3,B-14,M. Creek,12.4 protein
+ER-7750,S-52,2025-09-07T08:10:00-05:00,hard red wheat,Sunnyside Acres,15900,Lane 3,B-14,Sunnyside Acres,12.6 protein

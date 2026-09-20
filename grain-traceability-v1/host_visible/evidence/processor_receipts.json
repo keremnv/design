@@ -1,0 +1,54 @@
+{
+  "site_directory": {
+    "HFM-N": "Hearthland Feed Mill - North, 4420 Mill Road",
+    "HFM-E": "Hearthland Feed Mill - East, 19 Grain Loop"
+  },
+  "receiving_log": [
+    {
+      "local_receipt": "HFM-IN-601",
+      "received_at": "2025-09-05T11:05:00-05:00",
+      "dock": "N-2",
+      "bill_reference": "RL-5001-A",
+      "origin_label": "PG-OUT-5001",
+      "received_kg": 38700,
+      "silo": "S-4",
+      "commodity": "HRW wheat"
+    },
+    {
+      "local_receipt": "HFM-IN-602",
+      "received_at": "2025-09-05T10:50:00-05:00",
+      "dock": "N-1",
+      "bill_reference": "NS-5002-B",
+      "origin_label": "PG-OUT-5002",
+      "received_kg": 25500,
+      "silo": "S-5",
+      "commodity": "HRW wheat"
+    },
+    {
+      "local_receipt": "HFM-IN-604",
+      "received_at": "2025-09-07T13:02:00-05:00",
+      "dock": "N-3",
+      "bill_reference": "RL-5004-Q",
+      "origin_label": "PG-OUT-5004",
+      "received_kg": 18800,
+      "silo": "S-7",
+      "commodity": "HRW wheat"
+    }
+  ],
+  "mill_runs": [
+    {
+      "run_no": "MILL-2206",
+      "started_at": "2025-09-05T14:20:00-05:00",
+      "input_receipts": ["HFM-IN-601"],
+      "output_batch": "FEED-2206",
+      "output_name": "starter feed"
+    },
+    {
+      "run_no": "MILL-2207",
+      "started_at": "2025-09-05T15:10:00-05:00",
+      "input_receipts": ["HFM-IN-602"],
+      "output_batch": "FEED-2207",
+      "output_name": "grower feed"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "relations": {
+    "bin_transfer": "WORLD",
+    "carrier_departure": "WORLD",
+    "commercial_scope": "WORLD",
+    "consignee_is_not_receipt": "WORLD",
+    "elevator_intake": "WORLD",
+    "elevator_loadout": "WORLD",
+    "extract_coverage": "WORLD",
+    "known_as": "WORLD",
+    "lab_result": "WORLD",
+    "location": "WORLD",
+    "mill_intake": "WORLD",
+    "mill_process": "WORLD",
+    "ownership_event": "WORLD",
+    "purpose_requirement_failure": "PURPOSE",
+    "ticket_named_on_move": "WORLD"
+  }
+}

@@ -276,7 +276,7 @@ function LegacyFrontierTable({
       {problem ? <ProblemNotice message={problem} title="Unable to load obligations" /> : null}
       {demand || problem ? null : (
         <p className="table__problem">
-          No purpose is loaded, so this world has no obligations to be short of.
+          No Purpose demand is loaded.
         </p>
       )}
 

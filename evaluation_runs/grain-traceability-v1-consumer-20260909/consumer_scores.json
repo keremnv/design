@@ -1,0 +1,16 @@
+{
+  "benchmark": "grain-traceability-v1",
+  "question_set": "frozen novel NQ-01..NQ-10",
+  "replicates_per_condition": 2,
+  "question_verdicts": {
+    "RAW": {"CORRECT": 18, "CORRECTLY_UNRESOLVED": 12, "PARTIAL": 2, "INCORRECT": 0, "UNSUPPORTED_CLOSURE": 0, "INCORRECTLY_UNRESOLVED": 0},
+    "REFERENCE": {"CORRECT": 20, "CORRECTLY_UNRESOLVED": 12, "PARTIAL": 0, "INCORRECT": 0, "UNSUPPORTED_CLOSURE": 0, "INCORRECTLY_UNRESOLVED": 0},
+    "OA-1": {"CORRECT": 18, "CORRECTLY_UNRESOLVED": 12, "PARTIAL": 2, "INCORRECT": 0, "UNSUPPORTED_CLOSURE": 0, "INCORRECTLY_UNRESOLVED": 0},
+    "OA-2": {"CORRECT": 18, "CORRECTLY_UNRESOLVED": 12, "PARTIAL": 2, "INCORRECT": 0, "UNSUPPORTED_CLOSURE": 0, "INCORRECTLY_UNRESOLVED": 0}
+  },
+  "partial_case": "NQ-01: WB-390 and EF-18 contributors represented, but 15000/11000 kg split not materialized",
+  "reference_caveat": "Reference matches the frozen gold split, but the split is not established by host-visible records; it was copied from evaluator canonical truth during reference materialization.",
+  "reference_grounding_sensitivity": {"NQ-01": "gold_match_but_not_host_evidence_grounded"},
+  "native_source_reads": {"RAW": [true, true], "REFERENCE": [false, false], "OA-1": [false, false], "OA-2": [false, false]},
+  "consumer_completion": {"RAW": "2/2", "REFERENCE": "2/2", "OA-1": "2/2", "OA-2": "2/2"}
+}

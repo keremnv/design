@@ -1,0 +1,15 @@
+{
+  "run_id": "OA-2-SYNOPSIS-2",
+  "world": "OA-2",
+  "condition": "SYNOPSIS",
+  "replicate": 2,
+  "world_hash": "1eebe0f15eacb711080db8826d7bc2bad39da3ff28658afcfa5fb5f30da7e9d3",
+  "started": "2026-09-09T07:23:29.012996+00:00",
+  "ended": "2026-09-09T07:25:09.964748+00:00",
+  "exit_code": 0,
+  "workspace": "/tmp/grain-traceability-v1-world-context-20260909/attempt1/workspaces/OA-2-SYNOPSIS-2",
+  "codex_home": "/tmp/grain-traceability-v1-world-context-20260909/attempt1/codex-home/OA-2-SYNOPSIS-2",
+  "run_output": "/tmp/grain-traceability-v1-world-context-20260909/attempt1/runs/OA-2-SYNOPSIS-2",
+  "native_sources_visible": false,
+  "context_visible": true
+}

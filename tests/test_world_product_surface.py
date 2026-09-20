@@ -98,11 +98,11 @@ def _world(tmp_path: Path, name: str) -> Path:
 def test_named_worlds_are_independent_and_read_only(tmp_path):
     alpha = _world(tmp_path, "alpha")
     beta = _world(tmp_path, "beta")
-    assert rebuild(alpha).succeeded
-    assert rebuild(beta).succeeded
+    assert rebuild(alpha, purpose=alpha / "PURPOSE.md").succeeded
+    assert rebuild(beta, purpose=beta / "PURPOSE.md").succeeded
     before = (beta / "world" / "world.sqlite").read_bytes()
 
-    assert rebuild(alpha).succeeded
+    assert rebuild(alpha, purpose=alpha / "PURPOSE.md").succeeded
     assert (beta / "world" / "world.sqlite").read_bytes() == before
     assert [item.name for item in discover(tmp_path)] == ["alpha", "beta"]
 
@@ -128,7 +128,7 @@ def test_named_worlds_are_independent_and_read_only(tmp_path):
 def test_selection_is_explicit_when_multiple_worlds_exist(tmp_path):
     for name in ("alpha", "beta"):
         workspace = _world(tmp_path, name)
-        assert rebuild(workspace).succeeded
+        assert rebuild(workspace, purpose=workspace / "PURPOSE.md").succeeded
     try:
         select(tmp_path)
     except WorldSelectionError as error:
@@ -154,7 +154,7 @@ def test_attach_preserves_existing_harness_configuration(tmp_path):
 
 def test_bundled_inspector_is_read_only(tmp_path):
     workspace = _world(tmp_path, "inspector")
-    assert rebuild(workspace).succeeded
+    assert rebuild(workspace, purpose=workspace / "PURPOSE.md").succeeded
     from starlette.testclient import TestClient
 
     with TestClient(build_app(workspace / "world" / "world.sqlite")) as client:
@@ -172,7 +172,7 @@ def test_bundled_inspector_is_read_only(tmp_path):
 
 def test_installed_explorer_reads_the_world_bundle(tmp_path):
     workspace = _world(tmp_path, "explorer")
-    assert rebuild(workspace).succeeded
+    assert rebuild(workspace, purpose=workspace / "PURPOSE.md").succeeded
     with WorldExplorerAdapter(workspace / "world" / "world.sqlite") as explorer:
         assert explorer.overview()["world_id"] == "v0"
         assert {item["name"] for item in explorer.schema()} >= {"account", "customer_order"}
@@ -205,20 +205,20 @@ def test_purpose_markdown_preserves_exact_user_basis(tmp_path):
 
 def test_failed_rebuild_leaves_world_byte_stable(tmp_path):
     workspace = _world(tmp_path, "stable")
-    assert rebuild(workspace).succeeded
+    assert rebuild(workspace, purpose=workspace / "PURPOSE.md").succeeded
     before = (workspace / "world" / "world.sqlite").read_bytes()
     (workspace / "construction.py").write_text(
         "def construct(source, world, purpose):\n    raise RuntimeError('no')\n",
         encoding="utf-8",
     )
-    result = rebuild(workspace)
+    result = rebuild(workspace, purpose=workspace / "PURPOSE.md")
     assert not result.succeeded
     assert (workspace / "world" / "world.sqlite").read_bytes() == before
 
 
 def test_table_search_filters_before_paging_and_combines_with_subject(tmp_path):
     workspace = _world(tmp_path, "table-search")
-    assert rebuild(workspace).succeeded
+    assert rebuild(workspace, purpose=workspace / "PURPOSE.md").succeeded
     with WorldExplorerAdapter(workspace / "world" / "world.sqlite") as explorer:
         result = explorer.rows("account", search="  LTD  ", limit=1, offset=1)
         assert result["total"] == 2
@@ -277,6 +277,9 @@ def test_attached_capability_exposes_construction_surface_without_package_inspec
             "WORLD BASE",
             "SOURCE grounding",
             "PURPOSE-scoped",
+            "author open",
+            "remains running",
+            "not needed to verify",
         ):
             assert token in attached
         assert "ontology_author.world.core" not in attached
@@ -300,7 +303,7 @@ def test_capability_example_constructs_from_the_documented_namespace(tmp_path):
     )
     workspace = create(tmp_path / ".worlds" / "capability-example")
     (workspace / "construction.py").write_text(example, encoding="utf-8")
-    result = rebuild(workspace)
+    result = rebuild(workspace, purpose="Determine legal identity for each account.")
     assert result.succeeded, result.errors
 
     world = Project(workspace).open_world()

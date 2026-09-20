@@ -1,4 +1,4 @@
-"""Project root: PURPOSE.md + construction.py → candidate → World.
+"""Project root: construction.py (+ optional legacy Purpose) → World.
 
 ``construction.py`` is the current authoring shape, not ontology. Evidence is
 the ordinary project tree.
@@ -6,6 +6,7 @@ the ordinary project tree.
 
 from __future__ import annotations
 
+import inspect
 import sys
 from pathlib import Path
 from typing import Any
@@ -33,7 +34,7 @@ from ontology_author.world.runtime.resolution import (
     ResolutionEvaluationError,
     resolve_world,
 )
-from ontology_author.world.runtime.purpose import Purpose, ensure_failure_relation
+from ontology_author.world.runtime.purpose import Purpose
 from ontology_author.world.runtime.source_helpers import Source
 from ontology_author.world.runtime.world import (
     ConstructionError,
@@ -52,7 +53,6 @@ class Project:
         project_root: Path | str | None = None,
         contract: Contract | None = None,
         governance: Any | None = None,
-        constructor_authority: Any | None = None,
         evidence_authority: Any | None = None,
         adjudication_authority: Any | None = None,
     ) -> None:
@@ -66,7 +66,6 @@ class Project:
         self.world_dir = self.root / "world"
         self.contract = contract or Contract.default()
         self.governance = governance
-        self.constructor_authority = constructor_authority
         # This is intentionally not exposed to construction.py.  It is an
         # external runtime binding used only after the candidate has recorded
         # its Warrant bases.
@@ -82,12 +81,21 @@ class Project:
     def world_path(self) -> Path:
         return self.world_dir / "world.sqlite"
 
-    def run(self, construction: Path | str | None = None) -> RunResult:
+    def run(
+        self,
+        construction: Path | str | None = None,
+        *,
+        purpose: str | Path | None = None,
+    ) -> RunResult:
+        """Construct and publish a candidate World.
+
+        ``purpose=None`` is the governed path: no Purpose object or Purpose
+        relation is created, and ``PURPOSE.md`` is never read implicitly.
+        An explicit text-or-path request still builds the legacy Purpose
+        context for old three-argument constructors; those constructors
+        receive ``None`` when no purpose was requested.
+        """
         construction_path = Path(construction) if construction else self.root / "construction.py"
-        purpose_text = ""
-        purpose_file = self.root / "PURPOSE.md"
-        if purpose_file.exists():
-            purpose_text = purpose_file.read_text(encoding="utf-8")
 
         discard_candidate(self.candidate_dir)
         self.candidate_dir.mkdir(parents=True)
@@ -96,15 +104,12 @@ class Project:
             db_path,
             world_id=WORLD_ID,
             contract=self.contract,
-            constructor_authority=self.constructor_authority,
         )
-        purpose: Purpose | None = None
+        purpose_context: Purpose | None = None
         try:
-            ensure_failure_relation(world)
-            purpose = Purpose(world, text=purpose_text)
             source = Source(self.project_root)
             namespace = _construction_namespace(
-                source, world, purpose, self.contract, self.governance
+                source, world, self.contract, self.governance
             )
             if not construction_path.exists():
                 raise ConstructionError("construction.py missing")
@@ -117,20 +122,36 @@ class Project:
                 exec(compile(code, str(construction_path), "exec"), namespace, namespace)
                 construct = namespace.get("construct")
                 if not callable(construct):
-                    raise ConstructionError("construction.py must define construct(source, world, purpose)")
-                construct(source, world, purpose)
+                    raise ConstructionError(
+                        "construction.py must define construct(source, world[, purpose])"
+                    )
+                purpose_text = _purpose_text_for_run(purpose)
+                if purpose_text is not None:
+                    purpose_context = Purpose(world, text=purpose_text)
+                    namespace["purpose"] = purpose_context
+                _invoke_constructor(construct, source, world, purpose_context)
             finally:
                 for path in inserted:
                     try:
                         sys.path.remove(path)
                     except ValueError:
                         pass
+            from ontology_author.world.runtime.construction_receipt import (
+                build_construction_receipt,
+            )
+
             write_sidecars(
                 world,
-                purpose.payload(),
+                purpose_context.payload() if purpose_context is not None else None,
                 _governance_payload(self.governance),
                 _evidence_authority_payload(self.evidence_authority),
                 _adjudication_authority_payload(self.adjudication_authority),
+                build_construction_receipt(
+                    entrypoint=construction_path,
+                    workspace=self.root,
+                    runtime_world_id=WORLD_ID,
+                    contract_identity=self.contract.identity(),
+                ),
             )
             report = validate_contract_admission(world)
             if not report.ok:
@@ -154,6 +175,7 @@ class Project:
                     conflict_checker=_resolution_conflict_checker(self.governance),
                     evidence_authority=self.evidence_authority,
                     adjudication_authority=self.adjudication_authority,
+                    source=source,
                 )
             world.close()
             world = None  # type: ignore[assignment]
@@ -217,7 +239,6 @@ class Project:
 def _construction_namespace(
     source: Source,
     world: ConstructionWorld,
-    purpose: Purpose,
     contract: Contract,
     governance: Any | None,
 ) -> dict[str, Any]:
@@ -225,11 +246,9 @@ def _construction_namespace(
         "Source": Source,
         "source": source,
         "world": world,
-        "purpose": purpose,
         "Contract": Contract,
         "contract": contract,
         "governance": governance,
-        "constructor_authority": world.constructor_authority,
         "Role": Role,
         "RoleType": RoleType,
         "SemanticRefKind": SemanticRefKind,
@@ -242,6 +261,91 @@ def _construction_namespace(
         "GroundingError": GroundingError,
         "ConstructionError": ConstructionError,
     }
+
+
+def _purpose_text_for_run(requested: str | Path | None) -> str | None:
+    """Resolve an explicit Purpose request; ``None`` always disables it."""
+
+    if requested is None:
+        return None
+    if isinstance(requested, Path):
+        if not requested.is_file():
+            raise ConstructionError(f"purpose file does not exist: {requested}")
+        return requested.read_text(encoding="utf-8")
+    if isinstance(requested, str):
+        candidate = Path(requested)
+        try:
+            if "\n" not in requested and "\r" not in requested and candidate.is_file():
+                return candidate.read_text(encoding="utf-8")
+        except OSError:
+            # A long or otherwise non-filesystem-shaped string is Purpose
+            # text, not a path.  It is still a valid explicit request.
+            pass
+        return requested
+    raise ConstructionError("purpose must be text, a file path, or None")
+
+
+def _invoke_constructor(
+    construct: Any,
+    source: Source,
+    world: ConstructionWorld,
+    purpose: Purpose | None,
+) -> None:
+    """Call either the current two-argument or legacy three-argument shape."""
+
+    try:
+        signature = inspect.signature(construct)
+    except (TypeError, ValueError):
+        if purpose is None:
+            construct(source, world)
+        else:
+            construct(source, world, purpose)
+        return
+
+    if purpose is not None:
+        try:
+            signature.bind(source, world, purpose)
+        except TypeError:
+            try:
+                signature.bind(source, world, purpose=purpose)
+            except TypeError:
+                try:
+                    signature.bind(source, world)
+                except TypeError as exc:
+                    raise ConstructionError(
+                        "construction.py construct must accept (source, world) or "
+                        "(source, world, purpose)"
+                    ) from exc
+                construct(source, world)
+            else:
+                construct(source, world, purpose=purpose)
+        else:
+            construct(source, world, purpose)
+        return
+
+    try:
+        signature.bind(source, world)
+    except TypeError:
+        try:
+            signature.bind(source, world, None)
+        except TypeError:
+            try:
+                signature.bind(source, world, purpose=None)
+            except TypeError as exc:
+                raise ConstructionError(
+                    "construction.py construct must accept (source, world) or "
+                    "(source, world, purpose)"
+                ) from exc
+            construct(source, world, purpose=None)
+        else:
+            # Passing None here preserves a required legacy parameter without
+            # inventing a no-op Purpose object.  Code that actually calls a
+            # Purpose method will fail clearly at construction time and can
+            # opt in to one.
+            construct(source, world, None)
+        return
+
+    construct(source, world)
 
 
 def _governance_payload(governance: Any | None) -> dict[str, Any] | None:

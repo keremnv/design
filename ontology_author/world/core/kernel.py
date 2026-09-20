@@ -52,7 +52,7 @@ class SemanticWorld:
             self._store = ContractWorldStore(
                 self.path,
                 world_id=world_id,
-                purpose_ref="",
+                purpose_ref=None,
                 contract_id=contract_id,
                 contract_revision=contract_revision,
             )
@@ -130,7 +130,7 @@ class SemanticWorld:
     def adjudications_for_obligation(self, obligation_id: str) -> list[dict[str, Any]]:
         return self._store.adjudications_for_obligation(obligation_id)
 
-    def record_resolution(
+    def _materialize_resolution(
         self,
         *,
         obligation_id: str,
@@ -141,7 +141,7 @@ class SemanticWorld:
         adjudication_assessments: Sequence[Mapping[str, Any]] = (),
         resolution_basis: Sequence[Mapping[str, Any]] = (),
     ) -> str:
-        return self._store.record_resolution(
+        return self._store._materialize_resolution(
             obligation_id=obligation_id,
             status=status,
             selected_commitment_id=selected_commitment_id,
@@ -379,22 +379,6 @@ class SemanticWorld:
             if str(path.get("origin") or "").strip()
         }
         return sorted(origins)
-
-    def origin_for_assertion(self, assertion_id: str) -> str:
-        """Compatibility accessor for assertions with exactly one origin.
-
-        A proposition with multiple support-path origins has no honest scalar
-        answer. Callers that need the complete information must use
-        :meth:`origins_for_assertion`.
-        """
-
-        origins = self.origins_for_assertion(assertion_id)
-        if len(origins) != 1:
-            raise OriginMetadataError(
-                f"assertion {assertion_id!r} has multiple construction origins; "
-                "use origins_for_assertion"
-            )
-        return origins[0]
 
     def origin_account(self) -> dict[str, int]:
         counts = {origin.value: 0 for origin in ConstructionOrigin}

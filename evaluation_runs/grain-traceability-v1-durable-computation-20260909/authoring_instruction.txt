@@ -1,0 +1,7 @@
+Build a small reusable set of deterministic application computations that supports the supplied development workload over this sealed World.
+
+The computations must accept parameters rather than encode individual task answers and must operate only on the sealed World. You may inspect and query the World freely and choose any SQL/Python structure that is useful. Produce the smallest reusable application interface that captures computations worth reusing across similar future requests.
+
+Create an application/ directory containing executable entrypoints, machine-readable manifests, and a compact catalog. Every computation must be deterministic, parameterized, bound to this World, and callable without reading its source code. It may use only the World and supplied parameters: no native evidence, network, LLM, or World mutation.
+
+Use the development tasks to exercise the interface. Do not look for or assume any held-out tasks or gold. Finish by writing AUTHORING_REPORT.md describing the interface and tests you performed. The final durable output is the application/ directory.

@@ -1,0 +1,20 @@
+{
+  "maintenance": "Answer the question and keep the existing World adequate for future work within its declared purpose.",
+  "tasks": [
+    {
+      "id": "P1",
+      "case": "supported-omitted-distinction",
+      "prompt": "A yard clerk asked: which receiving tickets were written on the hopper sheet for the 26,000 kg movement out of North House 12 for work order OUT-5002 / dispatch PGE-OUT-5002? Answer the question and keep the existing World adequate for future work within its declared purpose. Write the answer to answer.md."
+    },
+    {
+      "id": "P2",
+      "case": "unresolved-omitted-distinction",
+      "prompt": "Which receiving ticket supplied the 19,000 kg on PGE-OUT-5004 from South House 14? Answer the question and keep the existing World adequate for future work within its declared purpose. Write the answer to answer.md."
+    },
+    {
+      "id": "P3",
+      "case": "already-sufficient-control",
+      "prompt": "A mill desk asked: which mill receiving slip accepted the truck dispatched as PGE-OUT-5001, and what mill run used that receipt? Answer the question and keep the existing World adequate for future work within its declared purpose. Write the answer to answer.md."
+    }
+  ]
+}

@@ -1,20 +1,22 @@
 # Ontology Author capability
 
-Ontology Author enables coding agents to construct and maintain purpose-fit
+Ontology Author enables coding agents to construct and maintain bounded
 ontologies called Worlds from the evidence in the current workspace.
 
-A World is a purpose-relative semantic abstraction, not a universal model of
-the workspace. Purpose determines which distinctions must survive; it does not
-prescribe schema, relation names, or one correct conceptualization. Different
-Worlds over the same evidence may make different valid conceptual carvings.
-Shared evidence does not imply World-level conceptual identity. Do not merge,
-broaden, or reconcile Worlds merely because their grounding overlaps. If a
-needed distinction is missing inside the same purpose, revise construction and
-rebuild. Capable intelligence belongs in this conversation; the kernel
-constrains durable output.
+A World is a bounded semantic abstraction, not a universal model of
+the workspace. Its declared scope determines which distinctions must survive;
+it does not prescribe schema, relation names, or one correct
+conceptualization. Different Worlds over the same evidence may make
+different valid conceptual carvings. Shared evidence does not imply
+World-level conceptual identity. Do not merge, broaden, or reconcile
+Worlds merely because their grounding overlaps. If a needed distinction
+is missing inside the same scope, revise construction and rebuild.
+Capable intelligence belongs in this conversation; the kernel constrains
+durable output. A World may record a purpose as orientation context, but
+purpose is not what makes something a World.
 
 A World is a sealed, read-only semantic artifact: named typed relations,
-referents, grounding, derivations, purpose-relative unresolvedness, origins,
+referents, grounding, derivations, explicit unresolvedness, origins,
 and revisions. Conversation is the construction control plane. Work with the
 user to understand purpose, inspect project evidence, author or maintain
 construction, test queries, and rebuild as meaning or evidence changes.
@@ -25,9 +27,13 @@ model launcher. Do not patch `world/world.sqlite`. Use the installed commands:
 ```text
 author create <world-name>            # initialize .worlds/<name>/
 author rebuild <world-name>           # construct, validate, and replace world/
-author open <world-name>              # inspect the sealed World locally
+author open <world-name>              # inspect locally; remains running
 author list                           # discover project-local Worlds
 ```
+
+`author open` starts a long-running local inspector and remains running until
+stopped. It is not needed to verify a successful rebuild; query
+`world/world.sqlite` or read `diagnostics.json`.
 
 `author create <name>` creates the World workspace but does not currently
 generate `construction.py`. Write that file before `author rebuild`.
@@ -64,13 +70,23 @@ resolution belong in the conversation and enter a later rebuild.
 `.worlds/<name>/construction.py` is the runtime entrypoint. It must define:
 
 ```python
+def construct(source, world):
+    ...
+```
+
+An older form also declares a Purpose input:
+
+```python
 def construct(source, world, purpose):
     ...
 ```
 
-The runtime supplies `source`, `world`, and `purpose`. It also injects the
-stable authoring vocabulary into the construction namespace, so construction
-need not import these names from Ontology Author internals:
+That form is legacy compatibility only. The runtime never reads
+`PURPOSE.md` implicitly; a Purpose object is created only for an explicit
+Purpose request, and legacy three-argument constructors receive `None`
+otherwise. The runtime also injects the stable authoring vocabulary into
+the construction namespace, so construction need not import these names from
+Ontology Author internals:
 
 ```text
 Role  RoleType  RelationMode  ConstructionOrigin
@@ -121,7 +137,7 @@ source.grounding(table, location)
 BASE assertion. `location` is a reconstructible native locator such as a
 row key, not copied source content.
 
-### Purpose
+### Purpose (legacy explicit-only context)
 
 ```python
 purpose.unresolved(name, subject={...}, relation=None, reason="")
@@ -130,7 +146,8 @@ purpose.unresolved(name, subject={...}, relation=None, reason="")
 `purpose.require_*` helpers (`require`, `require_unique`,
 `require_materializable`, `require_interpreted`, `require_numeric`) are
 optional deterministic purpose checks. They are not a required construction
-shape.
+shape. These helpers exist only when a Purpose was explicitly requested;
+correctness never depends on parsing `PURPOSE.md` prose.
 
 ## Output rules
 
@@ -141,6 +158,9 @@ Mechanical validation is a hard output boundary, not proof that the World is
 adequate or true.
 
 ## Example
+
+The example below uses the legacy Purpose form, so it requires an
+explicit Purpose request at rebuild time; otherwise `purpose` is `None`.
 
 ```python
 def construct(source, world, purpose):
@@ -178,7 +198,8 @@ def construct(source, world, purpose):
 ```
 
 The reusable bundle is `.worlds/<name>/world/` and includes `world.sqlite` plus
-its semantic sidecars. Query it directly with SQLite or Python. The bundle is
-portable for semantic consumption; project evidence is needed for provenance
-verification, and the World construction state plus project evidence is needed
-for reconstruction.
+its semantic sidecars. A generated `world.construction-receipt.json` records
+which `construction.py` produced the bundle. Query it directly with SQLite or
+Python. The bundle is portable for semantic consumption; project evidence is
+needed for provenance verification, and the World construction state plus
+project evidence is needed for reconstruction.

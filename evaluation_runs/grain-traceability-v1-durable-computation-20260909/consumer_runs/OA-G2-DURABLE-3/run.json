@@ -1,0 +1,52 @@
+{
+  "run_id": "OA-G2-DURABLE-3",
+  "world": "OA-G2",
+  "condition": "DURABLE",
+  "replicate": 3,
+  "model": "cursor-grok-4.6-medium",
+  "reasoning": "medium",
+  "started": "2026-09-09T08:46:38.619745+00:00",
+  "ended": "2026-09-09T08:49:23.738825+00:00",
+  "duration_seconds": 165.11908,
+  "exit_code": 0,
+  "workspace": "/tmp/grain-traceability-v1-durable-computation-20260909-consumers/workspaces/OA-G2-DURABLE-3",
+  "output": "/home/kerem/Desktop/Personal Projects/generalauthor/evaluation_runs/grain-traceability-v1-durable-computation-20260909/consumer_runs/OA-G2-DURABLE-3",
+  "native_sources_visible": false,
+  "telemetry": {
+    "usage": {
+      "inputTokens": 116131,
+      "outputTokens": 7024,
+      "cacheReadTokens": 115072,
+      "cacheWriteTokens": 0
+    },
+    "tool_actions": 19,
+    "read_paths": [
+      "/workspace/INSTRUCTION.md",
+      "/workspace/PURPOSE.md",
+      "/workspace/application/catalog.json",
+      "/workspace/application/engine.py",
+      "/workspace/application/manifests/custody_owner_at.json",
+      "/workspace/application/manifests/inspection_downstream_scope.json",
+      "/workspace/application/manifests/processor_receipt_provenance.json",
+      "/workspace/application/manifests/shipment_source_status.json",
+      "/workspace/application/run",
+      "/workspace/evaluation_tasks.json",
+      "/workspace/final_answer.md",
+      "/workspace/world-context.md",
+      "/workspace/world/world.admission.json",
+      "/workspace/world/world.purpose.json"
+    ],
+    "command_texts": [
+      "cd /workspace && for args in \\\n  \"shipment_source_status --dispatch PGE-OUT-5002\" \\\n  \"shipment_source_status --dispatch PGE-OUT-5003\" \\\n  \"shipment_source_status --dispatch PGE-OUT-5004\" \\\n  \"processor_receipt_provenance --processor_receipt HFM-IN-602\" \\\n  \"processor_receipt_provenance --processor_receipt HFM-IN-604\" \\\n  \"custody_owner_at --material WB-390 --timestamp 2025-09-04T13:10:00-05:00\" \\\n  \"custody_owner_at --material EF-18 --timestamp 2025-09-03T12:00:00-05:00\" \\\n  \"inspection_downstream_scope --sample SMP-602B\" \\\n  \"inspection_downstream_scope --sample SMP-604Q\" \\\n  \"inspection_downstream_scope --sample SMP-UNLISTED\"; do\n  echo \"========== $args ==========\"\n  application/run $args\ndone\n",
+      "cd /workspace && python3 - <<'PY'\nimport sqlite3, json\nconn = sqlite3.connect(\"file:world/world.sqlite?mode=ro\", uri=True)\nconn.row_factory = sqlite3.Row\n\ndef show(sql):\n    print(\"\\n==\", sql)\n    for r in conn.execute(sql):\n        print(dict(r))\n\nfor t in [\"intake_receipt\",\"ownership_event\",\"lab_test\",\"loadout_event\",\"loadout_from_bin\",\"hopper_names_ticket\",\"ticket_into_bin\",\"storage_move\",\"manifest_event\",\"mill_receipt\",\"mill_process\",\"outbound_same_movement\",\"inbound_same_movement\",\"established_shipment\",\"purpose_requirement_failure\",\"identifier_alias\"]:\n    print(\"\\n########\", t)\n    cols = [c[1] for c in conn.execute(f\"PRAGMA table_info({t})\")]\n    print(\"cols\", cols)\n    for r in conn.execute(f\"SELECT * FROM {t}\"):\n        print(dict(r))\nPY\n"
+    ],
+    "application_invocations": 1,
+    "sqlite_actions": 1,
+    "python_actions": 1,
+    "schema_inspection_actions": 1,
+    "ad_hoc_semantic_query_actions": 1,
+    "native_source_reads": false,
+    "catalog_reads": true,
+    "computation_source_reads": true
+  }
+}

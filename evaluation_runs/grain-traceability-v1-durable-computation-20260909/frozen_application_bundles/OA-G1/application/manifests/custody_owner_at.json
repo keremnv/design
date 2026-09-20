@@ -1,0 +1,33 @@
+{
+  "id": "custody_owner_at",
+  "family": "custody_owner_at",
+  "title": "Custody and owner at timestamp",
+  "description": "At an instant, return the recorded owner and custodian (holder) of a material identity from covering ownership events. Empty owner_after is not treated as an established owner.",
+  "parameters": [
+    {
+      "name": "material",
+      "type": "string",
+      "required": true,
+      "description": "Material, ticket, or ownership scope token (e.g. DR-44)."
+    },
+    {
+      "name": "timestamp",
+      "type": "string",
+      "required": true,
+      "description": "ISO-8601 timestamp with offset (e.g. 2025-09-03T12:00:00-05:00)."
+    }
+  ],
+  "output": {
+    "type": "object",
+    "required": [
+      "computation",
+      "world_binding",
+      "query",
+      "material",
+      "owner",
+      "custodian",
+      "covering_events",
+      "unresolved"
+    ]
+  }
+}

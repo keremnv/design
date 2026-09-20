@@ -1,0 +1,48 @@
+{
+  "run_id": "OA-G2-SYNOPSIS-3",
+  "world": "OA-G2",
+  "condition": "SYNOPSIS",
+  "replicate": 3,
+  "model": "cursor-grok-4.6-medium",
+  "reasoning": "medium",
+  "started": "2026-09-09T08:43:43.578264+00:00",
+  "ended": "2026-09-09T08:46:38.610591+00:00",
+  "duration_seconds": 175.032327,
+  "exit_code": 0,
+  "workspace": "/tmp/grain-traceability-v1-durable-computation-20260909-consumers/workspaces/OA-G2-SYNOPSIS-3",
+  "output": "/home/kerem/Desktop/Personal Projects/generalauthor/evaluation_runs/grain-traceability-v1-durable-computation-20260909/consumer_runs/OA-G2-SYNOPSIS-3",
+  "native_sources_visible": false,
+  "telemetry": {
+    "usage": {
+      "inputTokens": 71472,
+      "outputTokens": 9028,
+      "cacheReadTokens": 136704,
+      "cacheWriteTokens": 0
+    },
+    "tool_actions": 15,
+    "read_paths": [
+      "/home/kerem/.cursor/projects/workspace/agent-tools/a0ced622-f32e-4643-b4fe-a017d7521a0e.txt",
+      "/workspace/INSTRUCTION.md",
+      "/workspace/PURPOSE.md",
+      "/workspace/evaluation_tasks.json",
+      "/workspace/final_answer.md",
+      "/workspace/world-context.md",
+      "/workspace/world/world.admission.json",
+      "/workspace/world/world.purpose.json",
+      "/workspace/world/world.sqlite.origins.json"
+    ],
+    "command_texts": [
+      "find /workspace -type f 2>/dev/null; ls -la /workspace /workspace/world /workspace/application 2>/dev/null",
+      "sqlite3 /workspace/world/world.sqlite \".tables\" && echo \"====SCHEMA====\" && sqlite3 /workspace/world/world.sqlite \".schema\"",
+      "python3 - <<'PY'\nimport sqlite3\ncon = sqlite3.connect('/workspace/world/world.sqlite')\ncur = con.cursor()\ntables = [r[0] for r in cur.execute(\"SELECT name FROM sqlite_master WHERE type='table' ORDER BY 1\")]\nprint(\"TABLES:\", tables)\nfor t in tables:\n    print('\\n====', t, '====')\n    cols = list(cur.execute(f'PRAGMA table_info({t})'))\n    print('COLS:', cols)\n    try:\n        n = cur.execute(f'SELECT COUNT(*) FROM \"{t}\"').fetchone()[0]\n        print('COUNT:', n)\n        rows = cur.execute(f'SELECT * FROM \"{t}\"').fetchall()\n        # print all if small\n        if n <= 200:\n            for row in rows:\n                print(row)\n        else:\n            for row in rows[:20]:\n                print(row)\n            print('... truncated')\n    except Exception as e:\n        print('ERR', e)\nPY"
+    ],
+    "application_invocations": 0,
+    "sqlite_actions": 2,
+    "python_actions": 1,
+    "schema_inspection_actions": 2,
+    "ad_hoc_semantic_query_actions": 2,
+    "native_source_reads": false,
+    "catalog_reads": false,
+    "computation_source_reads": false
+  }
+}

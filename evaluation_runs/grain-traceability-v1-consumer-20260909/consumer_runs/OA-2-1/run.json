@@ -1,0 +1,10 @@
+{
+  "condition": "OA-2",
+  "replicate": 1,
+  "started": "2026-09-08T22:32:59.176383+00:00",
+  "ended": "2026-09-08T22:34:43.187771+00:00",
+  "exit_code": 0,
+  "workspace": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/workspaces/OA-2-1",
+  "codex_home": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/codex-home/OA-2-1",
+  "run_output": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/runs/OA-2-1"
+}

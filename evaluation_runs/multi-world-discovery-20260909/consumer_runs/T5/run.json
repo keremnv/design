@@ -1,0 +1,14 @@
+{
+  "id": "T5",
+  "relevant_world": "title-custody",
+  "probe": "do not treat another World as authoritative outside its purpose",
+  "prompt": "Who currently owns the grain still sitting in South House 14? Write the answer to answer.md.",
+  "started": "2026-09-09T15:09:34.185326+00:00",
+  "ended": "2026-09-09T15:10:39.018847+00:00",
+  "exit_code": 0,
+  "workspace": "/tmp/oa-mwd-isolated-T5",
+  "isolated": true,
+  "model_requested": "composer-2.5",
+  "model_reported": "Composer 2.5",
+  "model_ok": true
+}

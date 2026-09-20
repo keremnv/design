@@ -1,0 +1,55 @@
+[
+  {
+    "manifest_no": "RL-8841",
+    "carrier": "Redline Haulage",
+    "vehicle": "RLT-088",
+    "departed_local": "2025-09-04T09:52:00-05:00",
+    "pickup_site": "PG-ELEV",
+    "consignee_code": "HFM-N",
+    "consignee_name": "Hearthland Feed Mill - North",
+    "bill_of_lading": "RL-5001-A",
+    "cargo_mark": "PGE-OUT-5001",
+    "driver": "J. Ortega",
+    "weight_kg": 39000
+  },
+  {
+    "manifest_no": "NS-8848",
+    "carrier": "Northstar Bulk Transport",
+    "vehicle": "NST-204",
+    "departed_local": "2025-09-04T13:23:00-05:00",
+    "pickup_site": "PG-ELEV",
+    "consignee_code": "HFM-N",
+    "consignee_name": "Hearthland Feed Mill - North",
+    "bill_of_lading": "NS-5002-B",
+    "cargo_mark": "PGE-OUT-5002",
+    "driver": "L. Chen",
+    "weight_kg": 26000
+  },
+  {
+    "manifest_no": "NS-8910",
+    "carrier": "Northstar Bulk Transport",
+    "vehicle": "NST-219",
+    "departed_local": "2025-09-05T07:24:00-05:00",
+    "pickup_site": "PG-ELEV",
+    "consignee_code": "HFM-E",
+    "consignee_name": "Hearthland Feed Mill - East",
+    "bill_of_lading": "NS-5003-C",
+    "cargo_mark": "N3 / EF-18?",
+    "driver": "M. Patel",
+    "weight_kg": 12000,
+    "route_note": "N3 is a route code; handwritten cargo note is not confirmed as a scale ticket"
+  },
+  {
+    "manifest_no": "RL-9127",
+    "carrier": "Redline Haulage",
+    "vehicle": "RLT-091",
+    "departed_local": "2025-09-07T10:41:00-05:00",
+    "pickup_site": "PG-ELEV",
+    "consignee_code": "HFM-N",
+    "consignee_name": "Hearthland Feed Mill - North",
+    "bill_of_lading": "RL-5004-Q",
+    "cargo_mark": "PGE-OUT-5004",
+    "driver": "J. Ortega",
+    "weight_kg": 19000
+  }
+]

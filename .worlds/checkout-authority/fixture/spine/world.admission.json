@@ -1,0 +1,18 @@
+{
+  "relations": {
+    "program_capability": "WORLD",
+    "program_entity": "WORLD",
+    "program_entity_kind": "WORLD",
+    "program_extends": "WORLD",
+    "program_has_type": "WORLD",
+    "program_identity_descriptor": "WORLD",
+    "program_implements": "WORLD",
+    "program_imports": "WORLD",
+    "program_input": "WORLD",
+    "program_invokes": "WORLD",
+    "program_resolution": "WORLD",
+    "program_resolution_candidate": "WORLD",
+    "program_snapshot": "WORLD",
+    "structural_context": "WORLD"
+  }
+}

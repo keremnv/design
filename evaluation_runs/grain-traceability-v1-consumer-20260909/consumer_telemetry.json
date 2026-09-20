@@ -1,0 +1,21 @@
+{
+  "model": "gpt-6-astra",
+  "reasoning": "medium",
+  "codex_cli": "0.153.4",
+  "replicates": 2,
+  "runs": [
+    {"id":"RAW-1","condition":"RAW","duration_seconds":71.3,"exit_code":0,"native_source_reads":true,"source_specific_reconciliation":true,"tool_actions":4,"completed":true},
+    {"id":"RAW-2","condition":"RAW","duration_seconds":78.6,"exit_code":0,"native_source_reads":true,"source_specific_reconciliation":true,"tool_actions":5,"completed":true},
+    {"id":"REFERENCE-1","condition":"REFERENCE","duration_seconds":106.8,"exit_code":0,"native_source_reads":false,"source_specific_reconciliation":false,"tool_actions":6,"completed":true,"failed_probe_retried":true},
+    {"id":"REFERENCE-2","condition":"REFERENCE","duration_seconds":96.5,"exit_code":0,"native_source_reads":false,"source_specific_reconciliation":false,"tool_actions":6,"completed":true,"failed_probe_retried":true},
+    {"id":"OA1-C1","condition":"OA-1","duration_seconds":98.6,"exit_code":0,"native_source_reads":false,"source_specific_reconciliation":false,"tool_actions":8,"completed":true,"failed_probe_retried":true},
+    {"id":"OA1-C2","condition":"OA-1","duration_seconds":97.5,"exit_code":0,"native_source_reads":false,"source_specific_reconciliation":false,"tool_actions":8,"completed":true,"failed_probe_retried":true},
+    {"id":"OA2-C1","condition":"OA-2","duration_seconds":104.0,"exit_code":0,"native_source_reads":false,"source_specific_reconciliation":false,"tool_actions":8,"completed":true,"failed_probe_retried":true},
+    {"id":"OA2-C2","condition":"OA-2","duration_seconds":102.7,"exit_code":0,"native_source_reads":false,"source_specific_reconciliation":false,"tool_actions":8,"completed":true,"failed_probe_retried":true}
+  ],
+  "infrastructure_attempts": [
+    {"attempt":1,"status":"not_scored","cause":"read-only Codex home prevented app-server initialization"},
+    {"attempt":2,"status":"not_scored","cause":"read-only /dev prevented pseudo-terminal creation"},
+    {"attempt":3,"status":"scored","cause":"writable private Codex home and usable /dev"}
+  ]
+}

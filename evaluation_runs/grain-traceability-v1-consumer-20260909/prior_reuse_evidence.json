@@ -1,0 +1,22 @@
+{
+  "classification": "mixed_cumulative_evidence",
+  "supports": {
+    "conditional_world_correctness_parity": true,
+    "world_advantage_in_some_tasks": true,
+    "raw_advantage_against_inadequate_world": true,
+    "source_free_world_consumption": true,
+    "repeated_native_source_interpretation_removed": true,
+    "work_character_shift": true,
+    "clean_organic_world_vs_engineered_reference": false
+  },
+  "campaigns": [
+    {"id":"philips_frontier_organic_reuse_v1","classifications":["CORRECTNESS_PARITY","SOURCE_INDEPENDENCE","SEMANTIC_RECONSTRUCTION_REMOVED","WORK_CHARACTER_SHIFT"]},
+    {"id":"philips_reuse_raw_vs_product_v1","classifications":["RAW_ADVANTAGE","SOURCE_INDEPENDENCE","SEMANTIC_RECONSTRUCTION_REMOVED","WORK_CHARACTER_SHIFT","INCONCLUSIVE"]},
+    {"id":"bom_llm_world_programming_v1_v3_composer25","classifications":["WORLD_ADVANTAGE","SOURCE_INDEPENDENCE","SEMANTIC_RECONSTRUCTION_REMOVED","WORK_CHARACTER_SHIFT"]},
+    {"id":"end_to_end_v1","classifications":["RAW_ADVANTAGE","SOURCE_INDEPENDENCE","WORK_CHARACTER_SHIFT","SEMANTIC_RECONSTRUCTION_REMOVED"]},
+    {"id":"world_read_programming_v1","classifications":["REUSE_WITHOUT_RAW_COMPARATOR","SOURCE_INDEPENDENCE"]},
+    {"id":"autonomous_world_exploration_v1","classifications":["REUSE_WITHOUT_RAW_COMPARATOR","SOURCE_INDEPENDENCE","INCONCLUSIVE"]},
+    {"id":"npdes_end_to_end_programmability_v0","classifications":["REUSE_WITHOUT_RAW_COMPARATOR","SOURCE_INDEPENDENCE"]},
+    {"id":"nih_public_access_v1","classifications":["REUSE_WITHOUT_RAW_COMPARATOR","SOURCE_INDEPENDENCE"]}
+  ]
+}

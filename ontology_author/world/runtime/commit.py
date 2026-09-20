@@ -51,28 +51,24 @@ def validate_contract_admission(world: ConstructionWorld) -> ValidationReport:
     return ValidationReport(ok=True)
 
 
-def validate_world_base_source(world: ConstructionWorld) -> ValidationReport:
-    """Compatibility name for the Contract-backed publication validator."""
-
-    return validate_contract_admission(world)
-
-
 def write_sidecars(
     world: ConstructionWorld,
-    purpose_payload: dict[str, Any],
+    purpose_payload: dict[str, Any] | None = None,
     governance_payload: dict[str, Any] | None = None,
     evidence_authority_payload: dict[str, Any] | None = None,
     adjudication_authority_payload: dict[str, Any] | None = None,
+    construction_receipt_payload: dict[str, Any] | None = None,
 ) -> None:
     directory = world.path.parent
     (directory / "world.admission.json").write_text(
         json.dumps(world.admission_payload(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    (directory / "world.purpose.json").write_text(
-        json.dumps(purpose_payload, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    if purpose_payload is not None:
+        (directory / "world.purpose.json").write_text(
+            json.dumps(purpose_payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     if governance_payload is not None:
         (directory / "world.governance.json").write_text(
             json.dumps(governance_payload, indent=2, sort_keys=True) + "\n",
@@ -88,6 +84,12 @@ def write_sidecars(
             json.dumps(adjudication_authority_payload, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
+    if construction_receipt_payload is not None:
+        from ontology_author.world.runtime.construction_receipt import (
+            write_construction_receipt,
+        )
+
+        write_construction_receipt(directory, construction_receipt_payload)
 
 
 def _replace_candidate(candidate: Path, world: Path) -> None:

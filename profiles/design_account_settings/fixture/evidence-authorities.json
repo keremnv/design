@@ -1,0 +1,14 @@
+{
+  "authority_id": "design-account-settings-evidence",
+  "revision": "1",
+  "bindings": [
+    {
+      "source_id": "file://account-settings-requirements.md",
+      "authority": "APPROVED_REQUIREMENT"
+    },
+    {
+      "source_id": "file://AccountSettings.tsx",
+      "authority": "IMPLEMENTATION_OBSERVATION"
+    }
+  ]
+}

@@ -14,13 +14,17 @@ def _project() -> dict:
 
 def test_runtime_dependencies_are_minimal_and_explicit():
     project = _project()["project"]
-    assert set(project["dependencies"]) == {"starlette>=0.37,<1", "uvicorn>=0.29"}
+    assert set(project["dependencies"]) == {
+        "starlette>=0.37,<1",
+        "uvicorn>=0.29",
+        "requests>=2.31.0",
+    }
     assert set(project["optional-dependencies"]) == {"dev"}
 
 
 def test_legacy_graph_and_agent_dependencies_are_not_packaged():
     project = _project()
-    assert set(project["project"]["scripts"]) == {"author"}
+    assert set(project["project"]["scripts"]) == {"author", "governance"}
     assert project["tool"]["setuptools"]["packages"]["find"]["include"] == [
         "ontology_author*",
     ]

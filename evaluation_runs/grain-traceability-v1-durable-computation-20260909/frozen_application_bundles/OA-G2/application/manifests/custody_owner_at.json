@@ -1,0 +1,16 @@
+{
+  "id": "custody_owner_at",
+  "description": "Select the covering ownership_event for material at timestamp using [effective_start, effective_end) with empty end as open. Owner is owner_after; custodian is holder_after. Always surfaces the unrecorded_ownership completeness caveat.",
+  "parameters": {
+    "material": {"type": "string", "required": true},
+    "timestamp": {"type": "string", "required": true, "format": "ISO-8601"}
+  },
+  "result": {
+    "recorded_owner": "string or null",
+    "recorded_custodian": "string or null",
+    "covering_event": "ownership_event fields or null",
+    "owner_recorded": "boolean",
+    "custodian_recorded": "boolean"
+  },
+  "invoke": "application/run custody_owner_at --material DR-44 --timestamp 2025-09-03T12:00:00-05:00"
+}

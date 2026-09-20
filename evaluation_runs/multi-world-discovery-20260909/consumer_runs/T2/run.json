@@ -1,0 +1,14 @@
+{
+  "id": "T2",
+  "relevant_world": "title-custody",
+  "probe": "purpose-fit vs overlapping entity names",
+  "prompt": "Who held title to ticket DR-44 after the mill accepted it, and who had custody of that lot during the Redline haul to the mill? Write the answer to answer.md.",
+  "started": "2026-09-09T14:52:34.971251+00:00",
+  "ended": "2026-09-09T14:53:13.419228+00:00",
+  "exit_code": 0,
+  "workspace": "/tmp/oa-mwd-isolated-T2",
+  "isolated": true,
+  "model_requested": "composer-2.5",
+  "model_reported": "Composer 2.5",
+  "model_ok": true
+}

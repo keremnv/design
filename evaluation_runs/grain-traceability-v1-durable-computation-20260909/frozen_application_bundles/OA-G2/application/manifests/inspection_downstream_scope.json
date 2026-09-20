@@ -1,0 +1,14 @@
+{
+  "id": "inspection_downstream_scope",
+  "description": "From a lab sample, resolve local_lot aliases. If material_hint names a mill receipt, downstream is that slip and any mill_process output. Otherwise follow ticket_into_bin into later loadouts: hopper-named exclusive allocation is established; unnamed bin occupants stay unresolved.",
+  "parameters": {
+    "sample": {"type": "string", "required": true}
+  },
+  "result": {
+    "sampled_identities": "string[]",
+    "established_affected": "{shipments, processor_receipts, processed_outputs}",
+    "possible_unallocated": "same shape for links that remain unresolved",
+    "unresolved_scope": "array"
+  },
+  "invoke": "application/run inspection_downstream_scope --sample SMP-7714A"
+}

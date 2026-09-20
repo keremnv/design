@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -9,8 +10,10 @@ from pathlib import Path
 import pytest
 
 from ontology_author.program_spine import (
+    SpineConstructionReceipt,
     TypeScriptBoundary,
     build_typescript_spine,
+    load_receipt,
     localize_source_range,
     validate_typescript_spine,
 )
@@ -57,10 +60,10 @@ def _project(tmp_path: Path, files: dict[str, str], *, package_roots=("src",), w
     return result, world, boundary
 
 
-def _labels_by_metaclass(world: ConstructionWorld, metaclass: str) -> list[tuple[str, str]]:
+def _labels_by_kind(world: ConstructionWorld, kind: str) -> list[tuple[str, str]]:
     rows = [
-        row for row in world.relation_rows("kdm_element_type")
-        if row["metaclass"] == metaclass
+        row for row in world.relation_rows("program_entity_kind")
+        if row["kind"] == kind
     ]
     return [
         (str(row["entity"]), str(world.query(
@@ -70,7 +73,7 @@ def _labels_by_metaclass(world: ConstructionWorld, metaclass: str) -> list[tuple
     ]
 
 
-def test_required_kdm_entities_universe_imports_and_calls(tmp_path):
+def test_required_native_entities_universe_imports_and_calls(tmp_path):
     result, world, boundary = _project(
         tmp_path,
         {
@@ -86,40 +89,162 @@ def test_required_kdm_entities_universe_imports_and_calls(tmp_path):
     )
     try:
         assert result.snapshot_id
-        assert {row["metaclass"] for row in world.relation_rows("kdm_element_type")} >= {
-            "CompilationUnit",
-            "ClassUnit",
-            "InterfaceUnit",
-            "CallableUnit",
-            "MethodUnit",
-            "Signature",
-            "ParameterUnit",
-            "MemberUnit",
-            "ActionElement",
+        assert {row["kind"] for row in world.relation_rows("program_entity_kind")} >= {
+            "source_unit",
+            "class",
+            "interface",
+            "callable",
+            "method",
+            "signature",
+            "parameter",
+            "data",
+            "call_site",
         }
         assert len(world.relation_rows("program_entity")) == len(
-            world.relation_rows("kdm_element_type")
+            world.relation_rows("program_entity_kind")
         )
-        assert len(world.relation_rows("kdm_imports")) == 1
-        assert any(row["status"] == "RESOLVED" for row in world.relation_rows("typescript_resolution"))
-        assert world.relation_rows("kdm_calls")
-        assert any(label == "unattachedHelper" for _, label in _labels_by_metaclass(world, "CallableUnit"))
-        assert any(row["kind"] == "action" for row in world.relation_rows("program_entity"))
+        assert len(world.relation_rows("program_identity_descriptor")) == len(
+            world.relation_rows("program_entity")
+        )
+        assert len(world.relation_rows("program_imports")) == 1
+        assert any(row["status"] == "RESOLVED" for row in world.relation_rows("program_resolution"))
+        assert world.relation_rows("program_invokes")
+        assert any(label == "unattachedHelper" for _, label in _labels_by_kind(world, "callable"))
+        assert any(row["kind"] == "call_site" for row in world.relation_rows("program_entity"))
         assert set(result.capabilities) == {
-            "program_universe",
-            "source_evidence",
-            "code_structure",
-            "imports",
-            "calls",
-            "external_endpoints",
+            "spine.program_universe/v1",
+            "spine.source_evidence/v1",
+            "spine.code_structure/v1",
+            "spine.imports/v1",
+            "spine.calls/v1",
+            "spine.external_endpoints/v1",
+            "spine.type_relations/v1",
         }
-        assert all(value == "COMPLETE" for value in result.capabilities.values())
+        assert all(value in {"COMPLETE", "STATIC_COMPLETE"} for value in result.capabilities.values())
         assert boundary.payload(tmp_path)["projects"] == ["tsconfig.json"]
     finally:
         world.close()
 
 
-def test_call_site_is_owned_action_element_and_exactly_grounded(tmp_path):
+def test_construction_receipt_is_inspectable_and_discloses_known_losses(tmp_path):
+    result, world, _ = _project(
+        tmp_path,
+        {"src/index.ts": "export function run(): void {}\n"},
+    )
+    try:
+        receipt_path = tmp_path / "world" / "spine.construction.receipt.json"
+        manifest = json.loads((tmp_path / "world" / "typescript.manifest.json").read_text())
+        receipt = load_receipt(receipt_path)
+        assert receipt.validate(manifest) == []
+        assert manifest["receipt"]["sha256"] == hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+        assert receipt.conformance["status"] == "PASS"
+        assert receipt.snapshot["core_contract"] == {"id": "spine_core", "version": "v1"}
+        assert {item["id"] for item in receipt.capabilities} >= {
+            "spine.code_structure",
+            "spine.imports",
+            "spine.calls",
+            "spine.type_relations",
+            "spine.component_usage",
+        }
+        component_usage = next(item for item in receipt.capabilities if item["id"] == "spine.component_usage")
+        assert component_usage["status"] == "NOT_PRODUCED"
+        assert component_usage["completeness_receipt_refs"] == []
+        assert any(item["category"] == "DOES_NOT_REPRESENT" for item in receipt.losses)
+        assert receipt.identity_surfaces
+        assert receipt.comparison_readiness["observations"]
+        assert result.snapshot_id == receipt.snapshot["id"]
+    finally:
+        world.close()
+
+
+def test_receipt_cannot_broaden_authoritative_completeness(tmp_path):
+    _, world, _ = _project(tmp_path, {"src/index.ts": "export function run(): void {}\n"})
+    try:
+        receipt = load_receipt(tmp_path / "world" / "spine.construction.receipt.json")
+        manifest = json.loads((tmp_path / "world" / "typescript.manifest.json").read_text())
+        payload = receipt.to_dict()
+        code = next(item for item in payload["capabilities"] if item["id"] == "spine.code_structure")
+        code["completeness_basis"] = "all possible runtime program structure"
+        broadened = SpineConstructionReceipt.from_dict(payload)
+        errors = validate_typescript_spine(world, manifest, broadened)
+        assert any("changes capability basis" in error or "broadens capability" in error for error in errors)
+    finally:
+        world.close()
+
+
+def test_not_produced_is_distinct_from_empty_complete_receipt():
+    payload = {
+        "receipt_version": "spine_construction_receipt/v1",
+        "construction_id": "example",
+        "conformance": {"status": "PASS", "diagnostics": []},
+        "snapshot": {
+            "id": "snapshot",
+            "source_state": "source",
+            "declared_boundary": {},
+            "effective_inputs": [{"path": "tsconfig.json"}],
+            "configuration": {},
+            "extractor": {"id": "example", "version": "v1"},
+            "core_contract": {"id": "spine_core", "version": "v1"},
+            "capability_profiles": [],
+        },
+        "capabilities": [{
+            "id": "spine.calls", "version": "v1", "status": "NOT_PRODUCED",
+            "scope": "no extraction performed", "completeness_basis": "not claimed",
+            "completeness_receipt_refs": [], "known_gaps": ["not produced"],
+        }],
+        "identity_surfaces": [],
+        "resolution_summary": {},
+        "boundary_summary": {"IN_SCOPE": 0, "EXTERNAL_BOUNDARY": 0, "ANALYSIS_SUPPORT": 0},
+        "losses": [],
+        "representative_examples": [],
+        "comparison_readiness": {"observations": []},
+        "acceptance": None,
+    }
+    receipt = SpineConstructionReceipt.from_dict(payload)
+    assert receipt.validate() == []
+    payload["capabilities"][0]["status"] = "COMPLETE"
+    payload["capabilities"][0]["completeness_basis"] = "empty recognized call universe"
+    payload["capabilities"][0]["completeness_receipt_refs"] = ["assertion-example"]
+    assert SpineConstructionReceipt.from_dict(payload).validate() == []
+
+
+def test_world_uses_native_public_schema_without_legacy_ontology_names(tmp_path):
+    _, world, _ = _project(tmp_path, {"src/index.ts": "export function run(): void {}\n"})
+    try:
+        names = {
+            row["name"]
+            for row in world.query("SELECT name FROM _world_relations")
+        }
+        assert {
+            "program_entity_kind",
+            "structural_context",
+            "program_imports",
+            "program_invokes",
+            "program_resolution",
+        } <= names
+        assert not any(name.lower().startswith("kdm") for name in names)
+        assert not any(name in {"CallableUnit", "MethodUnit", "ActionElement"} for name in names)
+    finally:
+        world.close()
+
+
+def test_malformed_receipt_fails_admission(tmp_path):
+    _, world, _ = _project(tmp_path, {"src/index.ts": "export function run(): void {}\n"})
+    try:
+        manifest = json.loads((tmp_path / "world" / "typescript.manifest.json").read_text())
+        receipt = load_receipt(tmp_path / "world" / "spine.construction.receipt.json")
+        manifest.pop("receipt")
+        errors = validate_typescript_spine(world, manifest, receipt)
+        assert any("receipt" in error for error in errors)
+        malformed = receipt.to_dict()
+        malformed["conformance"]["status"] = "BROKEN"
+        invalid = SpineConstructionReceipt.from_dict(malformed)
+        assert any("invalid receipt conformance status" in error for error in invalid.validate(manifest))
+    finally:
+        world.close()
+
+
+def test_call_site_has_structural_context_and_exact_grounding(tmp_path):
     _, world, _ = _project(
         tmp_path,
         {
@@ -127,18 +252,18 @@ def test_call_site_is_owned_action_element_and_exactly_grounded(tmp_path):
         },
     )
     try:
-        actions = {
+        call_sites = {
             row["entity"]
-            for row in world.relation_rows("kdm_element_type")
-            if row["metaclass"] == "ActionElement"
+            for row in world.relation_rows("program_entity_kind")
+            if row["kind"] == "call_site"
         }
-        assert len(actions) == 1
-        action = next(iter(actions))
-        assert any(row["owned_element"] == action for row in world.relation_rows("kdm_ownership"))
-        call = world.relation_rows("kdm_calls")[0]
-        assert call["from"] == action
+        assert len(call_sites) == 1
+        call_site = next(iter(call_sites))
+        assert any(row["child"] == call_site for row in world.relation_rows("structural_context"))
+        call = world.relation_rows("program_invokes")[0]
+        assert call["call_site"] == call_site
         assertion = world.query(
-            "SELECT assertion_id FROM _world_assertions WHERE relation_name='kdm_calls'"
+            "SELECT assertion_id FROM _world_assertions WHERE relation_name='program_invokes'"
         )[0]["assertion_id"]
         groundings = world.query(
             "SELECT detail FROM _world_groundings WHERE subject_type='ASSERTION' AND subject_id=?",
@@ -166,8 +291,8 @@ def test_external_package_is_preserved_as_boundary_stub(tmp_path):
     try:
         external = [row for row in world.relation_rows("program_entity") if row["boundary"] == "EXTERNAL_BOUNDARY"]
         assert external
-        assert any(row["kind"] == "function" for row in external)
-        assert any(row["to"] in {item["entity"] for item in external} for row in world.relation_rows("kdm_calls"))
+        assert any(row["kind"] == "callable" for row in external)
+        assert any(row["target"] in {item["entity"] for item in external} for row in world.relation_rows("program_invokes"))
         assert not any(
             row["boundary"] == "IN_SCOPE" and "node_modules" in row["entity"]
             for row in world.relation_rows("program_entity")
@@ -198,13 +323,13 @@ def test_demo_world_keeps_presence_sparse_significance_and_external_endpoint(tmp
         },
     )
     try:
-        labels = {label for _, label in _labels_by_metaclass(world, "CallableUnit")}
+        labels = {label for _, label in _labels_by_kind(world, "callable")}
         assert {"submitOrder", "unattachedHelper"} <= labels
         assert {"PurchaseButton", "CheckoutPage"} <= {
-            label for _, label in _labels_by_metaclass(world, "ClassUnit")
+            label for _, label in _labels_by_kind(world, "class")
         }
         assert any(row["boundary"] == "EXTERNAL_BOUNDARY" for row in world.relation_rows("program_entity"))
-        assert world.relation_rows("kdm_calls")
+        assert world.relation_rows("program_invokes")
     finally:
         world.close()
 
@@ -232,15 +357,15 @@ def test_unresolved_dynamic_call_has_outcome_without_guessed_edge(tmp_path):
         {"src/index.ts": "const handlers: Record<string, () => void> = {}; export function run(k: string) { handlers[k](); }\n"},
     )
     try:
-        outcomes = [row for row in world.relation_rows("typescript_resolution") if row["relation_name"] == "kdm_calls"]
+        outcomes = [row for row in world.relation_rows("program_resolution") if row["capability"] == "spine.calls/v1"]
         assert len(outcomes) == 1
         assert outcomes[0]["status"] in {"UNRESOLVED", "MULTIPLE_CANDIDATES"}
-        assert not world.relation_rows("kdm_calls")
+        assert not world.relation_rows("program_invokes")
     finally:
         world.close()
 
 
-def test_nested_and_anonymous_callables_use_profile_identities(tmp_path):
+def test_nested_and_anonymous_callables_use_native_identities(tmp_path):
     _, world, _ = _project(
         tmp_path,
         {
@@ -253,7 +378,7 @@ def test_nested_and_anonymous_callables_use_profile_identities(tmp_path):
         },
     )
     try:
-        callable_labels = [label for _, label in _labels_by_metaclass(world, "CallableUnit")]
+        callable_labels = [label for _, label in _labels_by_kind(world, "callable")]
         assert "outer" in callable_labels
         assert "nested" in callable_labels
         assert "namedArrow" in callable_labels
@@ -275,16 +400,16 @@ def test_overloads_have_signatures_and_call_targets_bound_callable(tmp_path):
         },
     )
     try:
-        assert len(_labels_by_metaclass(world, "Signature")) >= 3
+        assert len(_labels_by_kind(world, "signature")) >= 3
         outcome = next(
-            row for row in world.relation_rows("typescript_resolution")
-            if row["relation_name"] == "kdm_calls"
+            row for row in world.relation_rows("program_resolution")
+            if row["capability"] == "spine.calls/v1"
         )
         assert outcome["status"] == "RESOLVED"
         details = json.loads(outcome["details"])
         assert details["selectedSignature"]
         assert details["candidateSignatures"]
-        assert len(world.relation_rows("kdm_calls")) >= 1
+        assert len(world.relation_rows("program_invokes")) >= 1
     finally:
         world.close()
 
@@ -301,12 +426,12 @@ def test_union_method_call_retains_multiple_candidates_without_positive_edge(tmp
     )
     try:
         outcome = next(
-            row for row in world.relation_rows("typescript_resolution")
-            if row["relation_name"] == "kdm_calls"
+            row for row in world.relation_rows("program_resolution")
+            if row["capability"] == "spine.calls/v1"
         )
         assert outcome["status"] == "MULTIPLE_CANDIDATES"
-        assert len(world.relation_rows("typescript_resolution_candidate")) >= 2
-        assert not world.relation_rows("kdm_calls")
+        assert len(world.relation_rows("program_resolution_candidate")) >= 2
+        assert not world.relation_rows("program_invokes")
     finally:
         world.close()
 
@@ -360,7 +485,7 @@ def test_same_immutable_input_reconstructs_identical_world_facts(tmp_path):
     try:
         first_rows = {
             relation: world.relation_rows(relation)
-            for relation in ("program_entity", "kdm_element_type", "kdm_ownership", "program_capability")
+            for relation in ("program_entity", "program_entity_kind", "structural_context", "program_capability")
         }
         world.close()
         world = None
@@ -399,7 +524,7 @@ def test_admission_rejects_relation_endpoint_missing_from_program_universe(tmp_p
         with sqlite3.connect(database) as connection:
             connection.execute(
                 "DELETE FROM program_entity WHERE entity_id IN "
-                "(SELECT to_id FROM kdm_calls LIMIT 1)"
+                "(SELECT target_id FROM program_invokes LIMIT 1)"
             )
     finally:
         os.chmod(database, mode)

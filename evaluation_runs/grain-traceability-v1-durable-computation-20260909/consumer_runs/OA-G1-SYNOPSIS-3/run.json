@@ -1,0 +1,51 @@
+{
+  "run_id": "OA-G1-SYNOPSIS-3",
+  "world": "OA-G1",
+  "condition": "SYNOPSIS",
+  "replicate": 3,
+  "model": "cursor-grok-4.6-medium",
+  "reasoning": "medium",
+  "started": "2026-09-09T08:37:33.678457+00:00",
+  "ended": "2026-09-09T08:40:39.023843+00:00",
+  "duration_seconds": 185.345386,
+  "exit_code": 0,
+  "workspace": "/tmp/grain-traceability-v1-durable-computation-20260909-consumers/workspaces/OA-G1-SYNOPSIS-3",
+  "output": "/home/kerem/Desktop/Personal Projects/generalauthor/evaluation_runs/grain-traceability-v1-durable-computation-20260909/consumer_runs/OA-G1-SYNOPSIS-3",
+  "native_sources_visible": false,
+  "telemetry": {
+    "usage": {
+      "inputTokens": 169732,
+      "outputTokens": 8673,
+      "cacheReadTokens": 180224,
+      "cacheWriteTokens": 0
+    },
+    "tool_actions": 20,
+    "read_paths": [
+      "/home/kerem/.cursor/projects/workspace/agent-tools/3c0c38b5-1aa8-4e4b-a3bc-881276ba8d31.txt",
+      "/home/kerem/.cursor/projects/workspace/agent-transcripts",
+      "/workspace/INSTRUCTION.md",
+      "/workspace/PURPOSE.md",
+      "/workspace/evaluation_tasks.json",
+      "/workspace/final_answer.md",
+      "/workspace/world-context.md",
+      "/workspace/world/world.admission.json",
+      "/workspace/world/world.purpose.json",
+      "/workspace/world/world.sqlite.origins.json"
+    ],
+    "command_texts": [
+      "ls -la /workspace /workspace/world /workspace/application 2>/dev/null; find /workspace -type f 2>/dev/null | head -100",
+      "sqlite3 /workspace/world/world.sqlite \".tables\" && echo \"====SCHEMA====\" && sqlite3 /workspace/world/world.sqlite \".schema\"",
+      "python3 - <<'PY'\nimport sqlite3\ncon = sqlite3.connect('/workspace/world/world.sqlite')\ncur = con.cursor()\ntables = cur.execute(\"SELECT name FROM sqlite_master WHERE type='table' ORDER BY name\").fetchall()\nprint('TABLES:')\nfor t in tables:\n    print(' ', t[0])\nprint()\nfor t in tables:\n    print('====', t[0], '====')\n    cols = cur.execute(f'PRAGMA table_info({t[0]})').fetchall()\n    print('COLS:', [c[1] for c in cols])\n    n = cur.execute(f'SELECT COUNT(*) FROM {t[0]}').fetchone()[0]\n    print('COUNT:', n)\n    rows = cur.execute(f'SELECT * FROM {t[0]}').fetchall()\n    col_names = [c[1] for c in cols]\n    for r in rows:\n        d = dict(zip(col_names, r))\n        print(d)\n    print()\nPY",
+      "python3 - <<'PY'\nimport sqlite3, json\ncon = sqlite3.connect('/workspace/world/world.sqlite')\ncon.row_factory = sqlite3.Row\ncur = con.cursor()\n\nsemantic = [\n 'bin_transfer','carrier_departure','commercial_scope','consignee_is_not_receipt',\n 'elevator_intake','elevator_loadout','extract_coverage','lab_result','location',\n 'mill_intake','mill_process','ownership_event','purpose_requirement_failure','ticket_named_on_move'\n]\nfor t in semantic:\n    print('='*80)\n    print(t)\n    rows = cur.execute(f'SELECT * FROM {t}').fetchall()\n    for r in rows:\n        print(dict(r))\n    print()\n\nprint('='*80)\nprint('known_as')\nrows = cur.execute('SELECT * FROM known_as ORDER BY system, token').fetchall()\nfor r in rows:\n    print(dict(r))\nPY",
+      "python3 - <<'PY'\nimport sqlite3, json\ncon = sqlite3.connect('/workspace/world/world.sqlite')\ncon.row_factory = sqlite3.Row\ncur = con.cursor()\n\nfor t in ['elevator_loadout','extract_coverage','lab_result','location','mill_intake','mill_process','ownership_event','purpose_requirement_failure','ticket_named_on_move']:\n    print('='*80)\n    print(t)\n    rows = cur.execute(f'SELECT * FROM {t}').fetchall()\n    for r in rows:\n        d = dict(r)\n        d.pop('_assertion_id', None)\n        print(json.dumps(d, indent=2))\n    print()\nPY"
+    ],
+    "application_invocations": 0,
+    "sqlite_actions": 4,
+    "python_actions": 3,
+    "schema_inspection_actions": 2,
+    "ad_hoc_semantic_query_actions": 4,
+    "native_source_reads": false,
+    "catalog_reads": false,
+    "computation_source_reads": false
+  }
+}

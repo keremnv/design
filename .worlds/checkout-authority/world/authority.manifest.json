@@ -1,0 +1,11 @@
+{
+  "construction_id": "checkout-authority-v0",
+  "profile": "authority-construction-v0",
+  "program_snapshot_id": "ae2542b6b3eeb3482aafddd584a3dfff",
+  "program_world": "/home/kerem/Desktop/Personal Projects/design/.worlds/checkout-authority/fixture/spine",
+  "purpose": "cancellation-flow-v1",
+  "receipt": {
+    "path": "authority.construction.receipt.json",
+    "sha256": "d2bb8764b8b41031fe8496e325637666f355be771baafc4e39fd640fa7cd8ef4"
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "run_id": "OA-G2-DURABLE-1",
+  "world": "OA-G2",
+  "condition": "DURABLE",
+  "replicate": 1,
+  "model": "cursor-grok-4.6-medium",
+  "reasoning": "medium",
+  "started": "2026-09-09T08:43:45.438182+00:00",
+  "ended": "2026-09-09T08:47:13.166402+00:00",
+  "duration_seconds": 207.72822,
+  "exit_code": 0,
+  "workspace": "/tmp/grain-traceability-v1-durable-computation-20260909-consumers/workspaces/OA-G2-DURABLE-1",
+  "output": "/home/kerem/Desktop/Personal Projects/generalauthor/evaluation_runs/grain-traceability-v1-durable-computation-20260909/consumer_runs/OA-G2-DURABLE-1",
+  "native_sources_visible": false,
+  "telemetry": {
+    "usage": {
+      "inputTokens": 182205,
+      "outputTokens": 9733,
+      "cacheReadTokens": 128512,
+      "cacheWriteTokens": 0
+    },
+    "tool_actions": 26,
+    "read_paths": [
+      "/workspace",
+      "/workspace/INSTRUCTION.md",
+      "/workspace/PURPOSE.md",
+      "/workspace/application/catalog.json",
+      "/workspace/application/engine.py",
+      "/workspace/application/manifests/custody_owner_at.json",
+      "/workspace/application/manifests/inspection_downstream_scope.json",
+      "/workspace/application/manifests/processor_receipt_provenance.json",
+      "/workspace/application/manifests/shipment_source_status.json",
+      "/workspace/application/run",
+      "/workspace/evaluation_tasks.json",
+      "/workspace/final_answer.md",
+      "/workspace/world-context.md",
+      "/workspace/world/world.admission.json",
+      "/workspace/world/world.purpose.json"
+    ],
+    "command_texts": [
+      "./application/run shipment_source_status --dispatch PGE-OUT-5002 && echo '---' && ./application/run shipment_source_status --dispatch PGE-OUT-5003 && echo '---' && ./application/run shipment_source_status --dispatch PGE-OUT-5004",
+      "./application/run processor_receipt_provenance --processor_receipt HFM-IN-602 && echo '---' && ./application/run processor_receipt_provenance --processor_receipt HFM-IN-604",
+      "./application/run custody_owner_at --material WB-390 --timestamp '2025-09-04T13:10:00-05:00' && echo '---' && ./application/run custody_owner_at --material EF-18 --timestamp '2025-09-03T12:00:00-05:00'",
+      "./application/run inspection_downstream_scope --sample SMP-602B && echo '---' && ./application/run inspection_downstream_scope --sample SMP-604Q && echo '---' && ./application/run inspection_downstream_scope --sample SMP-UNLISTED",
+      "sqlite3 world/world.sqlite \".tables\" && echo '==== lab_test' && sqlite3 -header -column world/world.sqlite \"SELECT * FROM lab_test;\" && echo '==== loadout_event' && sqlite3 -header -column world/world.sqlite \"SELECT * FROM loadout_event;\" && echo '==== hopper' && sqlite3 -header -column world/world.sqlite \"SELECT * FROM hopper_names_ticket;\" && echo '==== ticket_into_bin' && sqlite3 -header -column world/world.sqlite \"SELECT * FROM ticket_into_bin;\" && echo '==== loadout_from_bin' && sqlite3 -header -column world/world.sqlite \"SELECT * FROM loadout_from_bin;\" && echo '==== mill_receipt' && sqlite3 -header -column world/world.sqlite \"SELECT * FROM mill_receipt;\" && echo '==== mill_process' && sqlite3 -header -column world/world.sqlite \"SELECT * FROM mill_process;\" && echo '==== established_shipment' && sqlite3 -header -column world/world.sqlite \"SELECT * FROM established_shipment;\" && echo '==== ownership' && sqlite3 -header -column world/world.sqlite \"SELECT * FROM ownership_event;\" && echo '==== intake' && sqlite3 -header -column world/world.sqlite \"SELECT * FROM intake_receipt;\" && echo '==== identifier_alias' && sqlite3 -header -column world/world.sqlite \"SELECT * FROM identifier_alias;\" && echo '==== inbound' && sqlite3 -header -column world/world.sqlite \"SELECT * FROM inbound_same_movement;\" && echo '==== outbound' && sqlite3 -header -column world/world.sqlite \"SELECT * FROM outbound_same_movement;\" && echo '==== purpose_requirement_failure' && sqlite3 -header -column world/world.sqlite \"SELECT requirement_id, affected_identity, failure_kind FROM purpose_requirement_failure;\"",
+      "python3 - <<'PY'\nimport sqlite3\nfrom pathlib import Path\np = Path('/workspace/world/world.sqlite')\nconn = sqlite3.connect(f'file:{p}?mode=ro', uri=True)\nconn.row_factory = sqlite3.Row\nfor t in conn.execute(\"SELECT name FROM sqlite_master WHERE type='table' ORDER BY 1\"):\n    print('TABLE', t[0])\nprint('\\n=== lab_test ===')\nfor r in conn.execute('SELECT * FROM lab_test'):\n    print(dict(r))\nprint('\\n=== storage_move ===')\nfor r in conn.execute('SELECT * FROM storage_move ORDER BY logged_at'):\n    print(dict(r))\nprint('\\n=== intake ===')\nfor r in conn.execute('SELECT * FROM intake_receipt'):\n    print(dict(r))\nprint('\\n=== ownership ===')\nfor r in conn.execute('SELECT * FROM ownership_event'):\n    print(dict(r))\nprint('\\n=== manifest ===')\nfor r in conn.execute('SELECT * FROM manifest_event'):\n    print(dict(r))\nprint('\\n=== hopper ===')\nfor r in conn.execute('SELECT * FROM hopper_names_ticket'):\n    print(dict(r))\nprint('\\n=== identifier_alias ===')\nfor r in conn.execute('SELECT * FROM identifier_alias'):\n    print(dict(r))\nprint('\\n=== purpose_requirement_failure ===')\nfor r in conn.execute('SELECT * FROM purpose_requirement_failure'):\n    print(dict(r))\nPY",
+      "python3 - <<'PY'\nimport sqlite3\nfrom pathlib import Path\nconn = sqlite3.connect('file:/workspace/world/world.sqlite?mode=ro', uri=True)\nconn.row_factory = sqlite3.Row\nprint('=== extract_coverage ===')\nfor r in conn.execute('SELECT * FROM extract_coverage'):\n    print(dict(r))\nprint('=== established_shipment ===')\nfor r in conn.execute('SELECT * FROM established_shipment'):\n    print(dict(r))\nprint('=== inbound_same_movement ===')\nfor r in conn.execute('SELECT * FROM inbound_same_movement'):\n    print(dict(r))\nprint('=== outbound_same_movement ===')\nfor r in conn.execute('SELECT * FROM outbound_same_movement'):\n    print(dict(r))\nprint('=== mill_process ===')\nfor r in conn.execute('SELECT * FROM mill_process'):\n    print(dict(r))\nprint('=== mill_receipt ===')\nfor r in conn.execute('SELECT * FROM mill_receipt'):\n    print(dict(r))\nprint('=== loadout_event ===')\nfor r in conn.execute('SELECT * FROM loadout_event'):\n    print(dict(r))\nprint('=== loadout_from_bin ===')\nfor r in conn.execute('SELECT * FROM loadout_from_bin'):\n    print(dict(r))\nprint('=== ticket_into_bin ===')\nfor r in conn.execute('SELECT * FROM ticket_into_bin'):\n    print(dict(r))\nprint('=== completeness ===')\nfor r in conn.execute('SELECT * FROM _world_completeness'):\n    print(dict(r))\nPY"
+    ],
+    "application_invocations": 4,
+    "sqlite_actions": 3,
+    "python_actions": 2,
+    "schema_inspection_actions": 1,
+    "ad_hoc_semantic_query_actions": 3,
+    "native_source_reads": false,
+    "catalog_reads": true,
+    "computation_source_reads": true
+  }
+}

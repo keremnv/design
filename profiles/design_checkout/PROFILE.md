@@ -75,6 +75,13 @@ not a general natural-language interpreter. Each generated obligation is
 published with an adjacent `world.obligations.json` explanation linking it to
 the adopted law rule, source revision/location, and structural bindings.
 
+For this profile, `PURPOSE.md` is historical orientation. It is not the
+normative construction contract. Demand is the generated governed questions;
+mechanism is `construction.py`; adequacy is the executable tests in
+`tests/test_design_checkout_adequacy.py`; the sealed World plus its generated
+receipt explain what was produced. See
+[the construction-contract experiment](../../docs/DESIGN_CHECKOUT_CONSTRUCTION_CONTRACT.md).
+
 The law is `design-mobile-checkout-law@1` and currently has three finite rules:
 
 1. Select the order-summary region, payment-entry region, and mobile-checkout

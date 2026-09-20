@@ -1,0 +1,82 @@
+[
+  {
+    "condition": "OA-1",
+    "replicate": 1,
+    "started": "2026-09-08T22:32:34.014371+00:00",
+    "ended": "2026-09-08T22:34:12.661205+00:00",
+    "exit_code": 0,
+    "workspace": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/workspaces/OA-1-1",
+    "codex_home": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/codex-home/OA-1-1",
+    "run_output": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/runs/OA-1-1"
+  },
+  {
+    "condition": "OA-1",
+    "replicate": 2,
+    "started": "2026-09-08T22:32:41.276660+00:00",
+    "ended": "2026-09-08T22:34:18.747130+00:00",
+    "exit_code": 0,
+    "workspace": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/workspaces/OA-1-2",
+    "codex_home": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/codex-home/OA-1-2",
+    "run_output": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/runs/OA-1-2"
+  },
+  {
+    "condition": "OA-2",
+    "replicate": 1,
+    "started": "2026-09-08T22:32:59.176383+00:00",
+    "ended": "2026-09-08T22:34:43.187771+00:00",
+    "exit_code": 0,
+    "workspace": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/workspaces/OA-2-1",
+    "codex_home": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/codex-home/OA-2-1",
+    "run_output": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/runs/OA-2-1"
+  },
+  {
+    "condition": "OA-2",
+    "replicate": 2,
+    "started": "2026-09-08T22:33:09.448193+00:00",
+    "ended": "2026-09-08T22:34:52.142590+00:00",
+    "exit_code": 0,
+    "workspace": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/workspaces/OA-2-2",
+    "codex_home": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/codex-home/OA-2-2",
+    "run_output": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/runs/OA-2-2"
+  },
+  {
+    "condition": "RAW",
+    "replicate": 1,
+    "started": "2026-09-08T22:31:22.692674+00:00",
+    "ended": "2026-09-08T22:32:34.011820+00:00",
+    "exit_code": 0,
+    "workspace": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/workspaces/RAW-1",
+    "codex_home": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/codex-home/RAW-1",
+    "run_output": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/runs/RAW-1"
+  },
+  {
+    "condition": "RAW",
+    "replicate": 2,
+    "started": "2026-09-08T22:31:22.692185+00:00",
+    "ended": "2026-09-08T22:32:41.273456+00:00",
+    "exit_code": 0,
+    "workspace": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/workspaces/RAW-2",
+    "codex_home": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/codex-home/RAW-2",
+    "run_output": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/runs/RAW-2"
+  },
+  {
+    "condition": "REFERENCE",
+    "replicate": 1,
+    "started": "2026-09-08T22:31:22.689202+00:00",
+    "ended": "2026-09-08T22:33:09.445392+00:00",
+    "exit_code": 0,
+    "workspace": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/workspaces/REFERENCE-1",
+    "codex_home": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/codex-home/REFERENCE-1",
+    "run_output": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/runs/REFERENCE-1"
+  },
+  {
+    "condition": "REFERENCE",
+    "replicate": 2,
+    "started": "2026-09-08T22:31:22.689539+00:00",
+    "ended": "2026-09-08T22:32:59.174171+00:00",
+    "exit_code": 0,
+    "workspace": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/workspaces/REFERENCE-2",
+    "codex_home": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/codex-home/REFERENCE-2",
+    "run_output": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/runs/REFERENCE-2"
+  }
+]

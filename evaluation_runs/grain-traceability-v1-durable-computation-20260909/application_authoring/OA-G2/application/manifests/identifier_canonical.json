@@ -1,0 +1,14 @@
+{
+  "id": "identifier_canonical",
+  "description": "Resolve a site, bin, ticket, vehicle, or dispatch spelling through identifier_alias.",
+  "parameters": {
+    "identifier": {"type": "string", "required": true}
+  },
+  "result": {
+    "canonical": "string",
+    "forms": "string[]",
+    "kinds": "string[]",
+    "known": "boolean"
+  },
+  "invoke": "application/run identifier_canonical --identifier DR44"
+}

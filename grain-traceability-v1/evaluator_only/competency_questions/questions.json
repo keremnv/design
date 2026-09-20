@@ -1,0 +1,76 @@
+{
+  "benchmark_id": "grain-traceability-v1",
+  "question_policy": "Questions are answered against the frozen host-visible evidence. A response may distinguish established, underdetermined, not_recorded, and not justified by completeness.",
+  "questions": [
+    {
+      "id": "CQ-01",
+      "family": "published_baseline",
+      "prompt": "Which containers or operational holding points are associated with the movement that produced outbound shipment PGE-OUT-5001?",
+      "published_lineage": {"publication": "Ameri et al. 2020, Enabling Traceability in Agri-Food Supply Chains Using an Ontological Approach", "source_question_theme": "containers used in a specified transfer event", "source_location": "baseline validation CQ list, p. 7"},
+      "capability": "event participation and container reconciliation"
+    },
+    {
+      "id": "CQ-02",
+      "family": "published_baseline",
+      "prompt": "Which recorded receiving, storage, loadout, transport, and processor events are related to inbound load DR-44?",
+      "published_lineage": {"publication": "Ameri et al. 2020", "source_question_theme": "transfer events related to a specified load", "source_location": "baseline validation CQ list, p. 7"},
+      "capability": "event-to-material traceability"
+    },
+    {
+      "id": "CQ-03",
+      "family": "published_baseline",
+      "prompt": "Which holding points and transport containers has inbound load DR-44 been in contact with?",
+      "published_lineage": {"publication": "Ameri et al. 2020", "source_question_theme": "containers contacted by a specified load", "source_location": "baseline validation CQ list, p. 7"},
+      "capability": "material history across operational containers"
+    },
+    {
+      "id": "CQ-04",
+      "family": "published_baseline",
+      "prompt": "Where was inbound load WB-390 at 2025-09-04 12:00:00-05:00?",
+      "published_lineage": {"publication": "Ameri et al. 2020", "source_question_theme": "location of a load at a specified date/time", "source_location": "baseline validation CQ list and worked query, pp. 7-9"},
+      "capability": "temporal location reconstruction"
+    },
+    {
+      "id": "CQ-05",
+      "family": "published_elevator_processor",
+      "prompt": "Who held source ownership of the load from which sample SMP-7714A was taken?",
+      "published_lineage": {"publication": "Ameri et al. 2023, Agri-Food Supply Chain Traceability Supported by a Formal Ontology: A Grain Elevator to Processor Use Case", "source_question_theme": "source ownership of the load from which a named sample was taken", "source_location": "use-case competency-question paragraph, p. 3"},
+      "capability": "sample-to-load-to-source-owner traceability"
+    },
+    {
+      "id": "CQ-06",
+      "family": "published_elevator_processor",
+      "prompt": "What was the source location for the transport of outbound shipment PGE-OUT-5001?",
+      "published_lineage": {"publication": "Ameri et al. 2023", "source_question_theme": "source location for a transported load", "source_location": "use-case competency-question paragraph, p. 3"},
+      "capability": "transport origin"
+    },
+    {
+      "id": "CQ-07",
+      "family": "published_elevator_processor",
+      "prompt": "From which storage bin did PGE-OUT-5001 originate, and which loadout point transferred it into the truck?",
+      "published_lineage": {"publication": "Ameri et al. 2023", "source_question_theme": "originating bin and loadout bin for a transported load", "source_location": "use-case competency-question paragraph, p. 3"},
+      "capability": "storage and loadout provenance"
+    },
+    {
+      "id": "CQ-08",
+      "family": "published_elevator_processor",
+      "prompt": "Which parties had custody of PGE-OUT-5001, and over what intervals?",
+      "published_lineage": {"publication": "Ameri et al. 2023", "source_question_theme": "custody change event participants and time", "source_location": "use-case description, pp. 2-5; adapted as an explicit question"},
+      "capability": "custody intervals distinct from ownership"
+    },
+    {
+      "id": "CQ-09",
+      "family": "published_elevator_processor",
+      "prompt": "Which parties had custody of the blended shipment PGE-OUT-5002, and over what intervals?",
+      "published_lineage": {"publication": "Ameri et al. 2023", "source_question_theme": "custody change event participants and time", "source_location": "use-case description, pp. 2-5; adapted as an explicit question"},
+      "capability": "custody of an aggregated load"
+    },
+    {
+      "id": "CQ-10",
+      "family": "published_elevator_processor",
+      "prompt": "Which processor receiving record corresponds to the carrier movement identified by bill of lading NS-5002-B?",
+      "published_lineage": {"publication": "Ameri et al. 2023", "source_question_theme": "cross-context identification of a transported load at a processor", "source_location": "transformation and identifier discussion, pp. 5-6; adapted as an explicit question"},
+      "capability": "carrier-to-processor identifier reconciliation"
+    }
+  ]
+}

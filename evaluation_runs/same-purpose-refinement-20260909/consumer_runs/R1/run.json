@@ -1,0 +1,20 @@
+{
+  "id": "R1",
+  "case": "supported-missing-distinction",
+  "prompt": "A yard clerk asked: which receiving tickets were written on the hopper sheet for the 26,000 kg movement out of North House 12 for work order OUT-5002 / dispatch PGE-OUT-5002? Write the answer to answer.md.",
+  "started": "2026-09-09T18:05:24.801114+00:00",
+  "ended": "2026-09-09T18:05:57.084704+00:00",
+  "exit_code": 0,
+  "workspace": "/tmp/oa-spr-isolated-R1",
+  "isolated": true,
+  "model_requested": "composer-2.5",
+  "model_reported": "Composer 2.5",
+  "model_ok": true,
+  "construction_changed": false,
+  "purpose_changed": false,
+  "sqlite_changed": false,
+  "created_other_worlds": false,
+  "world_names": [
+    "yard-trace"
+  ]
+}

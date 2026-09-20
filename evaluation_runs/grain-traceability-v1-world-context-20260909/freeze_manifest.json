@@ -1,0 +1,91 @@
+{
+  "experiment": "grain-traceability-v1-world-context-20260909",
+  "status": "FROZEN_BEFORE_CONSUMER_EXECUTION",
+  "benchmark": {
+    "id": "grain-traceability-v1",
+    "commit": "17e1314f10d8b491b4462f821876a0a42642f1f8",
+    "purpose_sha256": "06ff902ff04add77e6e95002da0a0cc3a331e9cb32e6273d4f67e305627b5743",
+    "questions_sha256": "4a8332a1c6c196b66406f9e289b8619d7c09bb63ea06d8e8be68a94776a13922"
+  },
+  "product": {
+    "name": "Ontology Author",
+    "version": "0.1.0",
+    "commit": "17e1314f10d8b491b4462f821876a0a42642f1",
+    "harness": "Codex CLI 0.153.4 via codex exec",
+    "model": "gpt-6-astra",
+    "reasoning": "medium",
+    "isolation": "bwrap isolated workspaces; writable private Codex home; native sources absent"
+  },
+  "renderer": {
+    "version": "world-context-renderer-v1.0.0",
+    "source": "world_context_renderer.py",
+    "source_sha256": "6751de4cac301cd12d87b333c5e11712301c89c9fadf3466f669d657299a93f3",
+    "spec": "world_context_spec.md",
+    "spec_sha256": "b287480147773727a9a161c739ba9bf88525d1d60b232e23b5638dbdea987f23",
+    "llm_generated": false,
+    "optional_verbose_metadata_control": false
+  },
+  "frozen_worlds": {
+    "OA-1": {
+      "world_hash": "d39faa9ed9e40b03fea7cd329033ae7756664f4dae533ff83a6c7c725006b116",
+      "world_sqlite_sha256": "817d294ee4d32c8ff01b27dd13e436658a3076fd79241e8e973b7c7059873a0e",
+      "purpose_sidecar_sha256": "65115af05c77ada452d580a618195f219a5f4a2593d98e62c78d0cdc699b1be6",
+      "origins_sidecar_sha256": "159fad5895e821eb67072e5a11a34c20d829c02bb73c33f568044450a70b1608",
+      "admission_sidecar_sha256": "d984e2783b71efb83f420838960fb1d1361f1d2c5378082d01d7d38704c15ef7",
+      "context": {
+        "path": "contexts/OA-1-world-context.md",
+        "sha256": "121b037b7474bdee6b7f75f2bf31035fd05f78983ec2c69fa1110ff16a7e91af",
+        "bytes": 4118,
+        "characters": 4077,
+        "words": 488
+      }
+    },
+    "OA-2": {
+      "world_hash": "1eebe0f15eacb711080db8826d7bc2bad39da3ff28658afcfa5fb5f30da7e9d3",
+      "world_sqlite_sha256": "5f490eb794d65b977bec9a4cc1e97c9416a809da44acac893cca680abbd2fafb",
+      "purpose_sidecar_sha256": "327a4a44ef8c0f4b57905d847f80bd84c27fdb9e78a8cdca73a9186670f628bc",
+      "origins_sidecar_sha256": "d5a3bc7a4fe4e7e77f193447cf0aecc6d583fbc2e6fb9be1f656f0257c37b103",
+      "admission_sidecar_sha256": "0759d432cb11d6713a2ffb6e10b61406aeed51bd27a7f35a4b1bc07cd842569b",
+      "context": {
+        "path": "contexts/OA-2-world-context.md",
+        "sha256": "eff6c43e90fd7aafee645d6bef5a7edf0675a2c34796fbccc7e7ad351cd97ca4",
+        "bytes": 3773,
+        "characters": 3736,
+        "words": 464
+      }
+    }
+  },
+  "consumer_protocol": {
+    "instruction_sha256": "c9507cc9542ec737d1b4314983c28022deaf63692548038a615daab416837b80",
+    "run_harness": "run_consumers.py",
+    "run_harness_sha256": "a55f058cebc7b9c74f4a4714a17d3f05da97cd511d44fb81087124b576819d65",
+    "conditions": ["DISCOVERY", "SYNOPSIS"],
+    "worlds": ["OA-1", "OA-2"],
+    "replicates_per_cell": 3,
+    "consumer_prompt": "Read INSTRUCTION.md and answer every question in consumer_questions.md. You have only the files mounted in this workspace. Work independently, use local tools as useful, and finish with the complete answer set.",
+    "questions": "frozen NQ-01..NQ-10 from consumer_questions.md",
+    "native_source_files_visible": false
+  },
+  "hypotheses": {
+    "H1": "SYNOPSIS is semantically non-inferior and does not increase false closure.",
+    "H2": "SYNOPSIS reduces mean fresh-consumer input tokens.",
+    "H3": "SYNOPSIS reduces explicit schema/metadata orientation actions.",
+    "H4": "SYNOPSIS reduces time/actions before the first task-relevant semantic query.",
+    "H5": "Any benefit appears for both OA-1 and OA-2."
+  },
+  "token_extraction": {
+    "procedure_reference": "evaluation_runs/grain-traceability-v1-consumer-20260909/token_analysis.md",
+    "procedure_sha256": "7b63ca1bb8e0034e4146b82dfae370e6cdf781e7402350409e6356d955c4410c",
+    "event": "sole turn.completed usage object",
+    "reported_total": "input_tokens + output_tokens",
+    "reasoning_output_added": false
+  },
+  "freeze_checks": {
+    "contexts_generated_before_consumers": true,
+    "contexts_manually_audited_for_prohibited_content": true,
+    "gold_or_evaluator_files_read_by_renderer": false,
+    "native_source_files_read_by_renderer": false,
+    "worlds_modified": false,
+    "prior_artifacts_modified": false
+  }
+}

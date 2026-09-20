@@ -1,0 +1,47 @@
+{
+  "world_names": [
+    "yard-trace"
+  ],
+  "purpose_sha256": "9a851e79e4bb359336a25780020797b23914648ea520bc32a0b44d5d8c14d312",
+  "construction_sha256": "003e88b22df2cae38e059e53dcc1a1054ec56db234e9fa01f8152bea0cb660b8",
+  "sqlite_sha256": "6ee84c54c52a7747be8c3e857b4551e56499392230f21f0fb069fd5097d7b285",
+  "diagnostics_exists": true,
+  "sqlite_inspect": {
+    "tables": [
+      "_world_assertions",
+      "_world_completeness",
+      "_world_derivation_inputs",
+      "_world_derivation_run_inputs",
+      "_world_derivations",
+      "_world_groundings",
+      "_world_meta",
+      "_world_referents",
+      "_world_relations",
+      "_world_roles",
+      "dispatch_to_mill",
+      "intake",
+      "loadout",
+      "manifest",
+      "mill_receipt",
+      "mill_run",
+      "place_alias",
+      "purpose_requirement_failure"
+    ],
+    "purpose_requirement_failure": [
+      {
+        "_assertion_id": "assertion:2eb0ac7799684bb555f69861",
+        "requirement_id": "out_5003_no_mill_slip",
+        "affected_identity": "out_5003_no_mill_slip",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "manifest",
+        "subject_json": "{\"dispatch_ref\": \"PGE-OUT-5003\", \"manifest_no\": \"NS-8910\", \"reason\": \"PGE-OUT-5003 has a carrier manifest but no HFM receiving slip in the supplied extracts\"}",
+        "grounding_ref": ""
+      }
+    ]
+  },
+  "construction_changed": false,
+  "purpose_changed": false,
+  "sqlite_changed": false,
+  "created_other_worlds": false,
+  "sqlite_patched_without_construction": false
+}

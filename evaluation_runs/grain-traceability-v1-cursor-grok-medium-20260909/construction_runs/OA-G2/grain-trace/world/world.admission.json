@@ -1,0 +1,21 @@
+{
+  "relations": {
+    "established_shipment": "WORLD",
+    "extract_coverage": "WORLD",
+    "hopper_names_ticket": "WORLD",
+    "identifier_alias": "WORLD",
+    "inbound_same_movement": "WORLD",
+    "intake_receipt": "WORLD",
+    "lab_test": "WORLD",
+    "loadout_event": "WORLD",
+    "loadout_from_bin": "WORLD",
+    "manifest_event": "WORLD",
+    "mill_process": "WORLD",
+    "mill_receipt": "WORLD",
+    "outbound_same_movement": "WORLD",
+    "ownership_event": "WORLD",
+    "purpose_requirement_failure": "PURPOSE",
+    "storage_move": "WORLD",
+    "ticket_into_bin": "WORLD"
+  }
+}

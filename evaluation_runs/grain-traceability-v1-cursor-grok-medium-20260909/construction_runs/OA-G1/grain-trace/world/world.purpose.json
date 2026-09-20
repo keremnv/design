@@ -1,0 +1,93 @@
+{
+  "requirements": [
+    {
+      "kind": "REQUIRE",
+      "name": "trace-grain-flow",
+      "note": "Trace receiving, storage, processing, and outbound shipment when evidence establishes the links.",
+      "relation": null
+    },
+    {
+      "cardinality": "ONE",
+      "kind": "UNIQUE",
+      "name": "one-mill-intake-per-receipt",
+      "per": [
+        "receipt"
+      ],
+      "relation": "mill_intake"
+    },
+    {
+      "cardinality": "ONE",
+      "kind": "UNIQUE",
+      "name": "one-carrier-departure-per-movement",
+      "per": [
+        "movement"
+      ],
+      "relation": "carrier_departure"
+    },
+    {
+      "kind": "MATERIALIZABLE",
+      "name": "has-elevator-intakes",
+      "relation": "elevator_intake"
+    },
+    {
+      "kind": "MATERIALIZABLE",
+      "name": "has-mill-process",
+      "relation": "mill_process"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "physical-ticket-allocation-PGE-OUT-5001",
+      "note": "BIN-12 already held DR-44, WB-390, and EF-18 before LD-18. No hopper sheet names tickets for OUT-5001. Loadout does not allocate a blended truck back to receiving tickets unless the desk comment says so. Ownership records commercially scope DR-44 to RL-8841 / HFM-IN-601; that is not a bin allocation.",
+      "relation": "elevator_loadout"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "physical-ticket-allocation-PGE-OUT-5003",
+      "note": "Hopper sheet has no ticket. Handwritten cargo mark N3 / EF-18? is not a validated source ticket; N3 is used as a route code elsewhere.",
+      "relation": "carrier_departure"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "mill-receipt-absent-PGE-OUT-5003",
+      "note": "12,000 kg truck on PGE-OUT-5003 left with a carrier manifest, but no HFM receiving slip is in the supplied extracts. Consignee is HFM-E. HFM-North log completeness does not support a conclusion about East mill receiving.",
+      "relation": "mill_intake"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "mcr-118-grower-identity",
+      "note": "Intake uses M. Creek for the MCR-118 delivery. The commercial desk has claims from both Meadow Creek Farms and Meadow Creek Grain and has no account key that selects one.",
+      "relation": "elevator_intake"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "physical-ticket-allocation-PGE-OUT-5004",
+      "note": "PGE-OUT-5004 left from South House 14 after two deliveries were placed there. The loadout desk did not record which delivery supplied which part of that truck. Hopper note is no individual ticket.",
+      "relation": "elevator_loadout"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "lab-sample-SMP-UNLISTED-source-ticket",
+      "note": "Source ticket not recorded; route packet note is not a validated source ticket.",
+      "relation": "lab_result"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "lab-sample-SMP-604Q-ticket",
+      "note": "Sample is labeled South House 14 cargo / MC-118. After MCR-118 and S-52 were both placed in BIN-14, the cargo is not allocated to one delivery.",
+      "relation": "lab_result"
+    },
+    {
+      "kind": "UNRESOLVED",
+      "name": "quantity-differences-on-established-movements",
+      "note": "Bill-of-lading identity of these truck movements is established. The kilogram differences are recorded and unexplained; they are not treated as a different movement.",
+      "relation": "mill_intake"
+    },
+    {
+      "kind": "REQUIRE",
+      "name": "preserve-unsupported-identity-as-unresolved",
+      "note": "",
+      "relation": null
+    }
+  ],
+  "text": "# Purpose\n\nTrace grain through Prairie Gate receiving, storage, and loadout, then through carrier shipment and Hearthland mill intake and processing. Record where material came from, what happened to it, and where it went only when the workspace evidence establishes those links. Keep unsupported identity, blend allocation, and missing receiving evidence unresolved.\n\n## User basis\n\n> Build a reusable World that lets us trace grain through receiving, storage, processing, and outbound shipment, including determining where material came from, what happened to it, and where it went when the available evidence establishes those links. Preserve uncertainty where material identity or event linkage cannot be established.\n"
+}

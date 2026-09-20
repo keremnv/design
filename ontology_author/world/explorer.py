@@ -96,6 +96,11 @@ def _adjudication_authority_path(db_path: Path) -> Path:
     return db_path.with_suffix(".adjudication-authority.json")
 
 
+def _construction_receipt_path(db_path: Path) -> Path:
+    """`world.sqlite` -> generated construction receipt."""
+    return db_path.with_suffix(".construction-receipt.json")
+
+
 def _read_json_sidecar(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
@@ -152,10 +157,9 @@ class WorldExplorerAdapter:
         purpose = _purpose_path(self.path)
         if purpose.exists():
             document = json.loads(purpose.read_text(encoding="utf-8"))
-            # Project.run keeps passing an empty Purpose object to the legacy
-            # constructor and therefore may persist an empty compatibility
-            # sidecar. It is not a loaded Purpose demand unless it has user
-            # text or declared requirements.
+            # A Purpose sidecar is a legacy demand document. Empty documents
+            # are still ignored for compatibility with older bundles, while a
+            # missing sidecar means no Purpose was supplied at all.
             if document.get("text", "").strip() or document.get("requirements"):
                 self._purpose_document = document
         self._governance_document = _read_json_sidecar(_governance_path(self.path))
@@ -166,6 +170,9 @@ class WorldExplorerAdapter:
         )
         self._adjudication_authority_document = _read_json_sidecar(
             _adjudication_authority_path(self.path)
+        )
+        self._construction_receipt_document = _read_json_sidecar(
+            _construction_receipt_path(self.path)
         )
 
     def close(self) -> None:
@@ -343,6 +350,16 @@ class WorldExplorerAdapter:
             payload["adjudication_authority"] = (
                 self._adjudication_authority_document.get("identity")
             )
+        if self._construction_receipt_document is not None:
+            payload["construction_receipt"] = {
+                "entrypoint": self._construction_receipt_document.get("entrypoint"),
+                "source_digest": self._construction_receipt_document.get(
+                    "source_digest"
+                ),
+                "runtime_world_id": self._construction_receipt_document.get(
+                    "runtime_world_id"
+                ),
+            }
         return payload
 
     def governance(self) -> dict[str, Any] | None:
@@ -356,6 +373,106 @@ class WorldExplorerAdapter:
     def adjudication_authority(self) -> dict[str, Any] | None:
         """The selected adjudication-authority artifact, when published."""
         return self._adjudication_authority_document
+
+    def construction_receipt(self) -> dict[str, Any] | None:
+        """Which construction.py produced this sealed World, when recorded."""
+        return self._construction_receipt_document
+
+    def claim_support(
+        self,
+        assertion_id: str,
+        *,
+        source_root: Path | str | None = None,
+    ) -> dict[str, Any]:
+        """Inspect recorded material support and, if possible, its currency.
+
+        Authority standing is read from the sealed evidence-authority artifact
+        plus Warrant SOURCE identities. Material support is the constructor-
+        declared region; reproducing it requires the current project source.
+        """
+
+        from ontology_author.world.runtime.material_support import (
+            material_support_for_warrant,
+            recorded_material_support,
+            workspace_source_root,
+        )
+        from ontology_author.world.runtime.source_helpers import Source
+
+        warrant = self._world.warrant_for_assertion(assertion_id)
+        recorded = recorded_material_support(warrant)
+        root = Path(source_root) if source_root is not None else workspace_source_root(
+            self.path
+        )
+        current = material_support_for_warrant(
+            warrant, Source(root) if root.exists() else None
+        )
+        authority = None
+        if self._evidence_authority_document is not None:
+            authority = {
+                "configuration": self._evidence_authority_document.get("identity"),
+                "bindings": self._evidence_authority_document.get("bindings"),
+                "warrant_source_identities": [
+                    {
+                        "provider": (base.get("detail") or {}).get("provider"),
+                        "native_handle": (base.get("detail") or {}).get("native_handle"),
+                        "native_location": (base.get("detail") or {}).get(
+                            "native_location"
+                        ),
+                        "source_revision": (base.get("detail") or {}).get(
+                            "source_revision"
+                        ),
+                    }
+                    for base in warrant.get("bases") or ()
+                    if isinstance(base, Mapping) and base.get("kind") == "SOURCE"
+                ],
+            }
+        return {
+            "commitment_id": assertion_id,
+            "recorded": recorded,
+            "current": current,
+            "authority": authority,
+        }
+
+    def current_resolution(
+        self,
+        obligation_id: str,
+        *,
+        source_root: Path | str | None = None,
+    ) -> dict[str, Any] | None:
+        """Recorded resolution overlayed with current material-support currency."""
+
+        from ontology_author.world.core.model import ObligationState, ResolutionStatus
+        from ontology_author.world.runtime.material_support import SUPPORT_PRESERVED
+
+        recorded = self.resolution(obligation_id)
+        if recorded is None:
+            return None
+        payload = dict(recorded)
+        assessments = []
+        invalidated = False
+        for item in recorded.get("candidate_assessments") or []:
+            assessment = dict(item)
+            commitment_id = str(assessment.get("commitment_id") or "")
+            if commitment_id:
+                support = self.claim_support(
+                    commitment_id, source_root=source_root
+                ).get("current")
+                if support is not None:
+                    assessment["material_support"] = support
+                    if support.get("status") != SUPPORT_PRESERVED:
+                        invalidated = True
+                        assessment["status"] = "INSUFFICIENT"
+            assessments.append(assessment)
+        payload["candidate_assessments"] = assessments
+        if invalidated and recorded.get("status") == ResolutionStatus.RESOLVED.value:
+            payload["status"] = ResolutionStatus.INSUFFICIENT_WARRANT.value
+            payload["selected_commitment_id"] = None
+            payload["state"] = ObligationState.UNRESOLVED.value
+            payload["reason"] = (
+                f"Obligation {obligation_id} has candidates with source standing, "
+                "but none currently has a reproducible material evidence basis."
+            )
+        return payload
 
     def adjudication(self, adjudication_id: str) -> dict[str, Any] | None:
         """One durable adjudicative input, addressed by its identity."""

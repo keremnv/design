@@ -1,0 +1,26 @@
+{
+  "id": "processor_receipt_provenance",
+  "family": "processor_receipt_provenance",
+  "title": "Processor receipt provenance",
+  "description": "For a mill receiving slip, summarize the established upstream dispatch/material path, any processing output, and unresolved links (missing allocation, missing mill receipt elsewhere, unexplained quantity differences).",
+  "parameters": [
+    {
+      "name": "processor_receipt",
+      "type": "string",
+      "required": true,
+      "description": "Processor/mill receipt token (e.g. HFM-IN-601)."
+    }
+  ],
+  "output": {
+    "type": "object",
+    "required": [
+      "computation",
+      "world_binding",
+      "query",
+      "receipt",
+      "upstream",
+      "processing",
+      "unresolved"
+    ]
+  }
+}

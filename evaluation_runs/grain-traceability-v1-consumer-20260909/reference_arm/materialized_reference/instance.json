@@ -1,0 +1,1815 @@
+{
+  "reference_instance_id": "grain-traceability-v1-reference-instance-1.0",
+  "model_id": "grain-traceability-v1-reference",
+  "status": "frozen_evaluator_materialization",
+  "epistemic_policy": {
+    "positive": "assert only consequences supported by at least one source record and a declared reconciliation rule",
+    "candidate": "retain plausible alternatives without treating them as co-referential",
+    "negative": "assert absence only under a scoped completeness claim",
+    "unknown": "use not_established for missing or conflicting links"
+  },
+  "places": [
+    {
+      "id": "PGE-01",
+      "label": "Prairie Gate Elevator",
+      "address": "17 County Route 8",
+      "aliases": [
+        "PG-ELEV",
+        "Prairie Gate"
+      ]
+    },
+    {
+      "id": "HFM-N",
+      "label": "Hearthland Feed Mill - North",
+      "address": "4420 Mill Road",
+      "aliases": [
+        "HFM-N"
+      ]
+    },
+    {
+      "id": "HFM-E",
+      "label": "Hearthland Feed Mill - East",
+      "address": "19 Grain Loop",
+      "aliases": [
+        "HFM-E"
+      ]
+    },
+    {
+      "id": "BIN-12",
+      "label": "North House 12",
+      "aliases": [
+        "B-12",
+        "BIN-12",
+        "North House 12"
+      ]
+    },
+    {
+      "id": "BIN-14",
+      "label": "South House 14",
+      "aliases": [
+        "B-14",
+        "BIN-14",
+        "South House 14"
+      ]
+    },
+    {
+      "id": "LO-3",
+      "label": "Spout 3 / load pit 2",
+      "aliases": [
+        "Spout 3",
+        "LOAD-PIT-2"
+      ]
+    },
+    {
+      "id": "LO-2",
+      "label": "Spout 2 / load pit 3",
+      "aliases": [
+        "Spout 2",
+        "LOAD-PIT-3"
+      ]
+    },
+    {
+      "id": "LO-1",
+      "label": "Spout 1 / load pit 1",
+      "aliases": [
+        "Spout 1",
+        "LOAD-PIT-1"
+      ]
+    }
+  ],
+  "parties": [
+    {
+      "id": "CEDAR-RIDGE",
+      "label": "Cedar Ridge Farm",
+      "aliases": []
+    },
+    {
+      "id": "WILLOW-BEND",
+      "label": "Willow Bend Farms",
+      "aliases": [
+        "Willow Bend Farm"
+      ]
+    },
+    {
+      "id": "EAST-FORK",
+      "label": "East Fork Co-op",
+      "aliases": [
+        "East Fork Cooperative"
+      ]
+    },
+    {
+      "id": "MEADOW-CREEK-FARMS",
+      "label": "Meadow Creek Farms",
+      "aliases": []
+    },
+    {
+      "id": "MEADOW-CREEK-GRAIN",
+      "label": "Meadow Creek Grain",
+      "aliases": []
+    },
+    {
+      "id": "SUNNYSIDE-ACRES",
+      "label": "Sunnyside Acres",
+      "aliases": []
+    },
+    {
+      "id": "PRAIRIE-GATE",
+      "label": "Prairie Gate Elevator",
+      "aliases": [
+        "Prairie Gate"
+      ]
+    },
+    {
+      "id": "GRAINLINK",
+      "label": "GrainLink Merchants",
+      "aliases": []
+    },
+    {
+      "id": "REDLINE",
+      "label": "Redline Haulage",
+      "aliases": []
+    },
+    {
+      "id": "NORTHSTAR",
+      "label": "Northstar Bulk Transport",
+      "aliases": []
+    },
+    {
+      "id": "HEARTHLAND",
+      "label": "Hearthland Feed Mill",
+      "aliases": [
+        "Hearthland Feed Mill - North",
+        "Hearthland Feed Mill - East"
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "id": "M-101",
+      "kind": "inbound_load",
+      "host_refs": [
+        "ER-7714",
+        "DR-44"
+      ],
+      "quantity_kg": 39900,
+      "source_party": "CEDAR-RIDGE",
+      "source_party_candidates": [],
+      "received_at": "2025-09-02T08:15:00-05:00",
+      "initial_place": "PGE-01",
+      "storage_place": "BIN-12",
+      "destination": null,
+      "source_place": null,
+      "composition": null,
+      "composition_candidates": [],
+      "missing_links": []
+    },
+    {
+      "id": "M-102",
+      "kind": "inbound_load",
+      "host_refs": [
+        "ER-7721",
+        "WB-390"
+      ],
+      "quantity_kg": 23850,
+      "source_party": "WILLOW-BEND",
+      "source_party_candidates": [],
+      "received_at": "2025-09-03T09:20:00-05:00",
+      "initial_place": "PGE-01",
+      "storage_place": "BIN-12",
+      "destination": null,
+      "source_place": null,
+      "composition": null,
+      "composition_candidates": [],
+      "missing_links": []
+    },
+    {
+      "id": "M-103",
+      "kind": "inbound_load",
+      "host_refs": [
+        "ER-7729",
+        "EF-18"
+      ],
+      "quantity_kg": 17900,
+      "source_party": "EAST-FORK",
+      "source_party_candidates": [],
+      "received_at": "2025-09-03T11:05:00-05:00",
+      "initial_place": "PGE-01",
+      "storage_place": "BIN-12",
+      "destination": null,
+      "source_place": null,
+      "composition": null,
+      "composition_candidates": [],
+      "missing_links": []
+    },
+    {
+      "id": "M-104",
+      "kind": "inbound_load",
+      "host_refs": [
+        "ER-7744",
+        "MCR-118"
+      ],
+      "quantity_kg": 20850,
+      "source_party": null,
+      "source_party_candidates": [
+        "MEADOW-CREEK-FARMS",
+        "MEADOW-CREEK-GRAIN"
+      ],
+      "received_at": "2025-09-07T07:40:00-05:00",
+      "initial_place": "PGE-01",
+      "storage_place": "BIN-14",
+      "destination": null,
+      "source_place": null,
+      "composition": null,
+      "composition_candidates": [],
+      "missing_links": []
+    },
+    {
+      "id": "M-105",
+      "kind": "inbound_load",
+      "host_refs": [
+        "ER-7750",
+        "S-52"
+      ],
+      "quantity_kg": 15900,
+      "source_party": "SUNNYSIDE-ACRES",
+      "source_party_candidates": [],
+      "received_at": "2025-09-07T08:10:00-05:00",
+      "initial_place": "PGE-01",
+      "storage_place": "BIN-14",
+      "destination": null,
+      "source_place": null,
+      "composition": null,
+      "composition_candidates": [],
+      "missing_links": []
+    },
+    {
+      "id": "M-201",
+      "kind": "outbound_load",
+      "host_refs": [
+        "PGE-OUT-5001",
+        "RL-5001-A",
+        "HFM-IN-601"
+      ],
+      "quantity_kg": 39000,
+      "source_party": null,
+      "source_party_candidates": [],
+      "received_at": null,
+      "initial_place": null,
+      "storage_place": null,
+      "destination": "HFM-N",
+      "source_place": null,
+      "composition": [
+        {
+          "material": "M-101",
+          "quantity_kg": 39000
+        }
+      ],
+      "composition_candidates": [],
+      "missing_links": []
+    },
+    {
+      "id": "M-202",
+      "kind": "outbound_load",
+      "host_refs": [
+        "PGE-OUT-5002",
+        "NS-5002-B",
+        "HFM-IN-602"
+      ],
+      "quantity_kg": 26000,
+      "source_party": null,
+      "source_party_candidates": [],
+      "received_at": null,
+      "initial_place": null,
+      "storage_place": null,
+      "destination": "HFM-N",
+      "source_place": null,
+      "composition": [
+        {
+          "material": "M-102",
+          "quantity_kg": 15000
+        },
+        {
+          "material": "M-103",
+          "quantity_kg": 11000
+        }
+      ],
+      "composition_candidates": [],
+      "missing_links": []
+    },
+    {
+      "id": "M-203",
+      "kind": "outbound_load",
+      "host_refs": [
+        "PGE-OUT-5003",
+        "NS-5003-C"
+      ],
+      "quantity_kg": 12000,
+      "source_party": null,
+      "source_party_candidates": [],
+      "received_at": null,
+      "initial_place": null,
+      "storage_place": null,
+      "destination": "HFM-E",
+      "source_place": "BIN-12",
+      "composition": null,
+      "composition_candidates": [],
+      "missing_links": [
+        "no_processor_receipt",
+        "no_source_allocation"
+      ]
+    },
+    {
+      "id": "M-204",
+      "kind": "outbound_load",
+      "host_refs": [
+        "PGE-OUT-5004",
+        "RL-5004-Q",
+        "HFM-IN-604"
+      ],
+      "quantity_kg": 19000,
+      "source_party": null,
+      "source_party_candidates": [],
+      "received_at": null,
+      "initial_place": null,
+      "storage_place": null,
+      "destination": "HFM-N",
+      "source_place": "BIN-14",
+      "composition": null,
+      "composition_candidates": [
+        "M-104",
+        "M-105"
+      ],
+      "missing_links": [
+        "no_individual_loadout_allocation"
+      ]
+    },
+    {
+      "id": "M-301",
+      "kind": "processed_product",
+      "host_refs": [
+        "FEED-2206"
+      ],
+      "quantity_kg": null,
+      "source_party": null,
+      "source_party_candidates": [],
+      "received_at": null,
+      "initial_place": null,
+      "storage_place": null,
+      "destination": null,
+      "source_place": null,
+      "composition": [
+        {
+          "material": "M-201",
+          "quantity_kg": 38700
+        }
+      ],
+      "composition_candidates": [],
+      "missing_links": []
+    },
+    {
+      "id": "M-302",
+      "kind": "processed_product",
+      "host_refs": [
+        "FEED-2207"
+      ],
+      "quantity_kg": null,
+      "source_party": null,
+      "source_party_candidates": [],
+      "received_at": null,
+      "initial_place": null,
+      "storage_place": null,
+      "destination": null,
+      "source_place": null,
+      "composition": [
+        {
+          "material": "M-202",
+          "quantity_kg": 25500
+        }
+      ],
+      "composition_candidates": [],
+      "missing_links": []
+    }
+  ],
+  "events": [
+    {
+      "id": "E-RECV-101",
+      "kind": "receiving",
+      "time": [
+        "2025-09-02T08:15:00-05:00",
+        "2025-09-02T08:35:00-05:00"
+      ],
+      "material": [
+        "M-101"
+      ],
+      "from_place": "CEDAR-RIDGE",
+      "to_place": "PGE-01",
+      "container": [
+        "INTAKE-2"
+      ],
+      "evidence": [
+        "elevator_receipts.csv:2"
+      ]
+    },
+    {
+      "id": "E-BIN-101",
+      "kind": "storage_move",
+      "time": [
+        "2025-09-02T08:43:00-05:00",
+        "2025-09-02T08:50:00-05:00"
+      ],
+      "material": [
+        "M-101"
+      ],
+      "from_place": "INTAKE-2",
+      "to_place": "BIN-12",
+      "evidence": [
+        "bin_movements.csv:2"
+      ]
+    },
+    {
+      "id": "E-SAMPLE-101",
+      "kind": "sampling",
+      "time": [
+        "2025-09-02T10:30:00-05:00",
+        "2025-09-02T10:30:00-05:00"
+      ],
+      "material": [
+        "M-101"
+      ],
+      "sample": "SMP-7714A",
+      "evidence": [
+        "inspection_results.csv:2"
+      ]
+    },
+    {
+      "id": "E-RECV-102",
+      "kind": "receiving",
+      "time": [
+        "2025-09-03T09:20:00-05:00",
+        "2025-09-03T09:40:00-05:00"
+      ],
+      "material": [
+        "M-102"
+      ],
+      "from_place": "WILLOW-BEND",
+      "to_place": "PGE-01",
+      "container": [
+        "INTAKE-1"
+      ],
+      "evidence": [
+        "elevator_receipts.csv:3"
+      ]
+    },
+    {
+      "id": "E-BIN-102",
+      "kind": "storage_move",
+      "time": [
+        "2025-09-03T09:47:00-05:00",
+        "2025-09-03T09:55:00-05:00"
+      ],
+      "material": [
+        "M-102"
+      ],
+      "from_place": "INTAKE-1",
+      "to_place": "BIN-12",
+      "evidence": [
+        "bin_movements.csv:3"
+      ]
+    },
+    {
+      "id": "E-RECV-103",
+      "kind": "receiving",
+      "time": [
+        "2025-09-03T11:05:00-05:00",
+        "2025-09-03T11:20:00-05:00"
+      ],
+      "material": [
+        "M-103"
+      ],
+      "from_place": "EAST-FORK",
+      "to_place": "PGE-01",
+      "container": [
+        "INTAKE-1"
+      ],
+      "evidence": [
+        "elevator_receipts.csv:4"
+      ]
+    },
+    {
+      "id": "E-BIN-103",
+      "kind": "storage_move",
+      "time": [
+        "2025-09-03T11:28:00-05:00",
+        "2025-09-03T11:35:00-05:00"
+      ],
+      "material": [
+        "M-103"
+      ],
+      "from_place": "INTAKE-1",
+      "to_place": "BIN-12",
+      "evidence": [
+        "bin_movements.csv:4"
+      ]
+    },
+    {
+      "id": "E-OWN-102",
+      "kind": "ownership_change",
+      "time": [
+        "2025-09-03T15:00:00-05:00",
+        "2025-09-03T15:00:00-05:00"
+      ],
+      "material": [
+        "M-102"
+      ],
+      "from_party": "WILLOW-BEND",
+      "to_party": "GRAINLINK",
+      "custody_party": "PRAIRIE-GATE",
+      "evidence": [
+        "ownership_records.csv:3"
+      ]
+    },
+    {
+      "id": "E-LOAD-201",
+      "kind": "loadout",
+      "time": [
+        "2025-09-04T09:40:00-05:00",
+        "2025-09-04T09:48:00-05:00"
+      ],
+      "material": [
+        "M-101"
+      ],
+      "from_place": "BIN-12",
+      "to_container": "RLT-088",
+      "outbound_material": "M-201",
+      "quantity_kg": 39000,
+      "evidence": [
+        "bin_movements.csv:5",
+        "loadout_log.csv:2"
+      ]
+    },
+    {
+      "id": "E-CUST-201A",
+      "kind": "custody_change",
+      "time": [
+        "2025-09-04T09:32:00-05:00",
+        "2025-09-04T09:32:00-05:00"
+      ],
+      "material": [
+        "M-201"
+      ],
+      "from_party": "PRAIRIE-GATE",
+      "to_party": "REDLINE",
+      "interval_after": [
+        "2025-09-04T09:32:00-05:00",
+        "2025-09-05T11:05:00-05:00"
+      ],
+      "evidence": [
+        "ownership_records.csv:4"
+      ]
+    },
+    {
+      "id": "E-TRANS-201",
+      "kind": "transport",
+      "time": [
+        "2025-09-04T09:52:00-05:00",
+        "2025-09-05T11:05:00-05:00"
+      ],
+      "material": [
+        "M-201"
+      ],
+      "from_place": "PGE-01",
+      "to_place": "HFM-N",
+      "carrier": "REDLINE",
+      "container": [
+        "RLT-088"
+      ],
+      "evidence": [
+        "carrier_manifests.json:1"
+      ]
+    },
+    {
+      "id": "E-RECV-201",
+      "kind": "processor_receipt",
+      "time": [
+        "2025-09-05T11:05:00-05:00",
+        "2025-09-05T11:15:00-05:00"
+      ],
+      "material": [
+        "M-201"
+      ],
+      "place": "HFM-N",
+      "container": [
+        "S-4"
+      ],
+      "evidence": [
+        "processor_receipts.json:receiving_log[0]"
+      ]
+    },
+    {
+      "id": "E-CUST-201B",
+      "kind": "custody_change",
+      "time": [
+        "2025-09-05T11:05:00-05:00",
+        "2025-09-05T11:05:00-05:00"
+      ],
+      "material": [
+        "M-201"
+      ],
+      "from_party": "REDLINE",
+      "to_party": "HEARTHLAND",
+      "interval_after": [
+        "2025-09-05T11:05:00-05:00",
+        null
+      ],
+      "evidence": [
+        "ownership_records.csv:7",
+        "processor_receipts.json:receiving_log[0]"
+      ]
+    },
+    {
+      "id": "E-OWN-201",
+      "kind": "ownership_change",
+      "time": [
+        "2025-09-05T11:05:00-05:00",
+        "2025-09-05T11:05:00-05:00"
+      ],
+      "material": [
+        "M-201"
+      ],
+      "from_party": "PRAIRIE-GATE",
+      "to_party": "HEARTHLAND",
+      "evidence": [
+        "ownership_records.csv:7"
+      ]
+    },
+    {
+      "id": "E-PROC-301",
+      "kind": "processing",
+      "time": [
+        "2025-09-05T14:20:00-05:00",
+        "2025-09-05T15:00:00-05:00"
+      ],
+      "material": [
+        "M-201"
+      ],
+      "output": "M-301",
+      "place": "HFM-N",
+      "evidence": [
+        "processor_receipts.json:mill_runs[0]"
+      ]
+    },
+    {
+      "id": "E-LOAD-202",
+      "kind": "loadout",
+      "time": [
+        "2025-09-04T13:15:00-05:00",
+        "2025-09-04T13:20:00-05:00"
+      ],
+      "material": [
+        "M-102",
+        "M-103"
+      ],
+      "from_place": "BIN-12",
+      "to_container": "NST-204",
+      "outbound_material": "M-202",
+      "quantity_kg": 26000,
+      "contribution": {
+        "M-102": 15000,
+        "M-103": 11000
+      },
+      "evidence": [
+        "bin_movements.csv:6",
+        "loadout_log.csv:3"
+      ]
+    },
+    {
+      "id": "E-CUST-202A",
+      "kind": "custody_change",
+      "time": [
+        "2025-09-04T13:05:00-05:00",
+        "2025-09-04T13:05:00-05:00"
+      ],
+      "material": [
+        "M-202"
+      ],
+      "from_party": "PRAIRIE-GATE",
+      "to_party": "NORTHSTAR",
+      "interval_after": [
+        "2025-09-04T13:05:00-05:00",
+        "2025-09-05T10:50:00-05:00"
+      ],
+      "evidence": [
+        "ownership_records.csv:5"
+      ]
+    },
+    {
+      "id": "E-TRANS-202",
+      "kind": "transport",
+      "time": [
+        "2025-09-04T13:23:00-05:00",
+        "2025-09-05T10:50:00-05:00"
+      ],
+      "material": [
+        "M-202"
+      ],
+      "from_place": "PGE-01",
+      "to_place": "HFM-N",
+      "carrier": "NORTHSTAR",
+      "container": [
+        "NST-204"
+      ],
+      "evidence": [
+        "carrier_manifests.json:2"
+      ]
+    },
+    {
+      "id": "E-RECV-202",
+      "kind": "processor_receipt",
+      "time": [
+        "2025-09-05T10:50:00-05:00",
+        "2025-09-05T11:00:00-05:00"
+      ],
+      "material": [
+        "M-202"
+      ],
+      "place": "HFM-N",
+      "container": [
+        "S-5"
+      ],
+      "evidence": [
+        "processor_receipts.json:receiving_log[1]"
+      ]
+    },
+    {
+      "id": "E-SAMPLE-202",
+      "kind": "sampling",
+      "time": [
+        "2025-09-05T13:10:00-05:00",
+        "2025-09-05T13:10:00-05:00"
+      ],
+      "material": [
+        "M-202"
+      ],
+      "sample": "SMP-602B",
+      "evidence": [
+        "inspection_results.csv:3"
+      ]
+    },
+    {
+      "id": "E-PROC-302",
+      "kind": "processing",
+      "time": [
+        "2025-09-05T15:10:00-05:00",
+        "2025-09-05T16:00:00-05:00"
+      ],
+      "material": [
+        "M-202"
+      ],
+      "output": "M-302",
+      "place": "HFM-N",
+      "evidence": [
+        "processor_receipts.json:mill_runs[1]"
+      ]
+    },
+    {
+      "id": "E-LOAD-203",
+      "kind": "loadout",
+      "time": [
+        "2025-09-05T07:10:00-05:00",
+        "2025-09-05T07:18:00-05:00"
+      ],
+      "material": [
+        "M-203"
+      ],
+      "from_place": "BIN-12",
+      "to_container": "NST-219",
+      "outbound_material": "M-203",
+      "quantity_kg": 12000,
+      "evidence": [
+        "bin_movements.csv:7",
+        "loadout_log.csv:4"
+      ]
+    },
+    {
+      "id": "E-TRANS-203",
+      "kind": "transport",
+      "time": [
+        "2025-09-05T07:24:00-05:00",
+        null
+      ],
+      "material": [
+        "M-203"
+      ],
+      "from_place": "PGE-01",
+      "to_place": "HFM-E",
+      "carrier": "NORTHSTAR",
+      "container": [
+        "NST-219"
+      ],
+      "evidence": [
+        "carrier_manifests.json:3"
+      ],
+      "status": "departure_record_only"
+    },
+    {
+      "id": "E-RECV-104",
+      "kind": "receiving",
+      "time": [
+        "2025-09-07T07:40:00-05:00",
+        "2025-09-07T08:00:00-05:00"
+      ],
+      "material": [
+        "M-104"
+      ],
+      "from_place": "unknown_meadow_creek_account",
+      "to_place": "PGE-01",
+      "container": [
+        "INTAKE-3"
+      ],
+      "evidence": [
+        "elevator_receipts.csv:5"
+      ],
+      "status": "source_party_undetermined"
+    },
+    {
+      "id": "E-BIN-104",
+      "kind": "storage_move",
+      "time": [
+        "2025-09-07T08:42:00-05:00",
+        "2025-09-07T08:50:00-05:00"
+      ],
+      "material": [
+        "M-104"
+      ],
+      "from_place": "INTAKE-3",
+      "to_place": "BIN-14",
+      "evidence": [
+        "bin_movements.csv:8"
+      ]
+    },
+    {
+      "id": "E-RECV-105",
+      "kind": "receiving",
+      "time": [
+        "2025-09-07T08:10:00-05:00",
+        "2025-09-07T08:30:00-05:00"
+      ],
+      "material": [
+        "M-105"
+      ],
+      "from_place": "SUNNYSIDE-ACRES",
+      "to_place": "PGE-01",
+      "container": [
+        "INTAKE-3"
+      ],
+      "evidence": [
+        "elevator_receipts.csv:6"
+      ]
+    },
+    {
+      "id": "E-BIN-105",
+      "kind": "storage_move",
+      "time": [
+        "2025-09-07T08:58:00-05:00",
+        "2025-09-07T09:05:00-05:00"
+      ],
+      "material": [
+        "M-105"
+      ],
+      "from_place": "INTAKE-3",
+      "to_place": "BIN-14",
+      "evidence": [
+        "bin_movements.csv:9"
+      ]
+    },
+    {
+      "id": "E-LOAD-204",
+      "kind": "loadout",
+      "time": [
+        "2025-09-07T10:30:00-05:00",
+        "2025-09-07T10:36:00-05:00"
+      ],
+      "material": [
+        "M-104",
+        "M-105"
+      ],
+      "from_place": "BIN-14",
+      "to_container": "RLT-091",
+      "outbound_material": "M-204",
+      "quantity_kg": 19000,
+      "evidence": [
+        "bin_movements.csv:10",
+        "loadout_log.csv:5"
+      ],
+      "status": "individual_contribution_undetermined"
+    },
+    {
+      "id": "E-TRANS-204",
+      "kind": "transport",
+      "time": [
+        "2025-09-07T10:41:00-05:00",
+        "2025-09-07T13:02:00-05:00"
+      ],
+      "material": [
+        "M-204"
+      ],
+      "from_place": "PGE-01",
+      "to_place": "HFM-N",
+      "carrier": "REDLINE",
+      "container": [
+        "RLT-091"
+      ],
+      "evidence": [
+        "carrier_manifests.json:4"
+      ]
+    },
+    {
+      "id": "E-RECV-204",
+      "kind": "processor_receipt",
+      "time": [
+        "2025-09-07T13:02:00-05:00",
+        "2025-09-07T13:12:00-05:00"
+      ],
+      "material": [
+        "M-204"
+      ],
+      "place": "HFM-N",
+      "container": [
+        "S-7"
+      ],
+      "evidence": [
+        "processor_receipts.json:receiving_log[2]"
+      ]
+    },
+    {
+      "id": "E-SAMPLE-204",
+      "kind": "sampling",
+      "time": [
+        "2025-09-07T14:10:00-05:00",
+        "2025-09-07T14:10:00-05:00"
+      ],
+      "material": [
+        "M-204"
+      ],
+      "sample": "SMP-604Q",
+      "evidence": [
+        "inspection_results.csv:4"
+      ],
+      "status": "shipment_link_established_source_contribution_unresolved"
+    }
+  ],
+  "identity_decisions": [
+    {
+      "source_values": [
+        "DR-44",
+        "DR44",
+        "ER-7714",
+        "RCV-7714"
+      ],
+      "result": "M-101",
+      "basis": [
+        "same receiving time",
+        "same quantity",
+        "bin movement work order",
+        "sample ticket"
+      ],
+      "status": "established"
+    },
+    {
+      "source_values": [
+        "WB-390",
+        "WB390",
+        "ER-7721",
+        "RCV-7721"
+      ],
+      "result": "M-102",
+      "basis": [
+        "same quantity and receiving interval",
+        "bin movement"
+      ],
+      "status": "established"
+    },
+    {
+      "source_values": [
+        "EF-18",
+        "EF18",
+        "ER-7729",
+        "RCV-7729"
+      ],
+      "result": "M-103",
+      "basis": [
+        "same quantity and receiving interval",
+        "bin movement"
+      ],
+      "status": "established"
+    },
+    {
+      "source_values": [
+        "PGE-OUT-5001",
+        "PG-OUT-5001",
+        "OUT-5001",
+        "RL-5001-A",
+        "HFM-IN-601"
+      ],
+      "result": "M-201",
+      "basis": [
+        "loadout, carrier bill, processor origin label, and receiving log"
+      ],
+      "status": "established"
+    },
+    {
+      "source_values": [
+        "PGE-OUT-5002",
+        "PG-OUT-5002",
+        "OUT-5002",
+        "NS-5002-B",
+        "HFM-IN-602"
+      ],
+      "result": "M-202",
+      "basis": [
+        "loadout, carrier bill, processor origin label, and receiving log"
+      ],
+      "status": "established"
+    },
+    {
+      "source_values": [
+        "PGE-OUT-5004",
+        "PG-OUT-5004",
+        "OUT-5004",
+        "RL-5004-Q",
+        "HFM-IN-604"
+      ],
+      "result": "M-204",
+      "basis": [
+        "loadout, carrier bill, processor origin label, and receiving log"
+      ],
+      "status": "established"
+    },
+    {
+      "source_values": [
+        "MC-118",
+        "MCR-118",
+        "South House 14 cargo",
+        "SMP-604Q"
+      ],
+      "result": "M-104 or shipment M-204",
+      "basis": [
+        "abbreviated lot mark",
+        "same bin",
+        "same shipment review"
+      ],
+      "status": "shipment established; source contribution not established"
+    },
+    {
+      "source_values": [
+        "N3 / EF-18?",
+        "EF-18",
+        "M-103"
+      ],
+      "result": null,
+      "basis": [
+        "question-marked handwritten note",
+        "N3 is a route code",
+        "no source allocation for M-203"
+      ],
+      "status": "unsupported_match"
+    }
+  ],
+  "custody_intervals": [
+    {
+      "subject": "M-201",
+      "party": "PRAIRIE-GATE",
+      "interval": [
+        "2025-09-02T08:15:00-05:00",
+        "2025-09-04T09:32:00-05:00"
+      ],
+      "basis": [
+        "TR-101"
+      ]
+    },
+    {
+      "subject": "M-201",
+      "party": "REDLINE",
+      "interval": [
+        "2025-09-04T09:32:00-05:00",
+        "2025-09-05T11:05:00-05:00"
+      ],
+      "basis": [
+        "TR-103",
+        "RL-8841"
+      ]
+    },
+    {
+      "subject": "M-201",
+      "party": "HEARTHLAND",
+      "interval": [
+        "2025-09-05T11:05:00-05:00",
+        null
+      ],
+      "basis": [
+        "TR-106",
+        "HFM-IN-601"
+      ]
+    },
+    {
+      "subject": "M-202",
+      "party": "PRAIRIE-GATE",
+      "interval": [
+        "2025-09-03T09:20:00-05:00",
+        "2025-09-04T13:05:00-05:00"
+      ],
+      "basis": [
+        "TR-102",
+        "TR-104"
+      ]
+    },
+    {
+      "subject": "M-202",
+      "party": "NORTHSTAR",
+      "interval": [
+        "2025-09-04T13:05:00-05:00",
+        "2025-09-05T10:50:00-05:00"
+      ],
+      "basis": [
+        "TR-104",
+        "NS-8848"
+      ]
+    },
+    {
+      "subject": "M-202",
+      "party": "HEARTHLAND",
+      "interval": [
+        "2025-09-05T10:50:00-05:00",
+        null
+      ],
+      "basis": [
+        "TR-105",
+        "HFM-IN-602"
+      ]
+    }
+  ],
+  "ownership_intervals": [
+    {
+      "subject": "M-101",
+      "party": "CEDAR-RIDGE",
+      "interval": [
+        "2025-09-02T08:15:00-05:00",
+        "2025-09-02T08:15:00-05:00"
+      ],
+      "role": "source_owner",
+      "basis": [
+        "ER-7714",
+        "TR-101"
+      ]
+    },
+    {
+      "subject": "M-201",
+      "party": "PRAIRIE-GATE",
+      "interval": [
+        "2025-09-02T08:15:00-05:00",
+        "2025-09-05T11:05:00-05:00"
+      ],
+      "role": "title_holder",
+      "basis": [
+        "TR-101",
+        "TR-106"
+      ]
+    },
+    {
+      "subject": "M-201",
+      "party": "HEARTHLAND",
+      "interval": [
+        "2025-09-05T11:05:00-05:00",
+        null
+      ],
+      "role": "title_holder",
+      "basis": [
+        "TR-106"
+      ]
+    },
+    {
+      "subject": "M-102",
+      "party": "WILLOW-BEND",
+      "interval": [
+        "2025-09-03T09:20:00-05:00",
+        "2025-09-03T15:00:00-05:00"
+      ],
+      "role": "source_owner",
+      "basis": [
+        "ER-7721"
+      ]
+    },
+    {
+      "subject": "M-102",
+      "party": "GRAINLINK",
+      "interval": [
+        "2025-09-03T15:00:00-05:00",
+        "2025-09-05T10:50:00-05:00"
+      ],
+      "role": "title_holder",
+      "basis": [
+        "TR-102"
+      ]
+    }
+  ],
+  "completeness_claims": [
+    {
+      "scope": "processor_receipts",
+      "place": "HFM-N",
+      "interval": [
+        "2025-09-05T00:00:00-05:00",
+        "2025-09-07T23:59:59-05:00"
+      ],
+      "claim": "complete",
+      "basis": "operating_notes.md"
+    },
+    {
+      "scope": "processor_receipts",
+      "place": "HFM-E",
+      "interval": [
+        "2025-09-05T00:00:00-05:00",
+        "2025-09-07T23:59:59-05:00"
+      ],
+      "claim": "unknown",
+      "basis": "operating_notes.md"
+    },
+    {
+      "scope": "elevator_receipts",
+      "place": "PGE-01",
+      "interval": [
+        "2025-09-02T00:00:00-05:00",
+        "2025-09-07T23:59:59-05:00"
+      ],
+      "claim": "complete_for_listed_tickets",
+      "basis": "operating_notes.md"
+    },
+    {
+      "scope": "ownership_changes",
+      "place": "PGE-01",
+      "interval": [
+        "2025-09-02T00:00:00-05:00",
+        "2025-09-07T23:59:59-05:00"
+      ],
+      "claim": "recorded_changes_only",
+      "basis": "operating_notes.md"
+    }
+  ],
+  "derived_views": {
+    "material_event_history": [
+      {
+        "material": [
+          "M-101"
+        ],
+        "event": "E-RECV-101",
+        "kind": "receiving",
+        "time": [
+          "2025-09-02T08:15:00-05:00",
+          "2025-09-02T08:35:00-05:00"
+        ],
+        "place": "PGE-01",
+        "container": [
+          "INTAKE-2"
+        ],
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-101"
+        ],
+        "event": "E-BIN-101",
+        "kind": "storage_move",
+        "time": [
+          "2025-09-02T08:43:00-05:00",
+          "2025-09-02T08:50:00-05:00"
+        ],
+        "place": "BIN-12",
+        "container": null,
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-101"
+        ],
+        "event": "E-SAMPLE-101",
+        "kind": "sampling",
+        "time": [
+          "2025-09-02T10:30:00-05:00",
+          "2025-09-02T10:30:00-05:00"
+        ],
+        "place": null,
+        "container": null,
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-102"
+        ],
+        "event": "E-RECV-102",
+        "kind": "receiving",
+        "time": [
+          "2025-09-03T09:20:00-05:00",
+          "2025-09-03T09:40:00-05:00"
+        ],
+        "place": "PGE-01",
+        "container": [
+          "INTAKE-1"
+        ],
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-102"
+        ],
+        "event": "E-BIN-102",
+        "kind": "storage_move",
+        "time": [
+          "2025-09-03T09:47:00-05:00",
+          "2025-09-03T09:55:00-05:00"
+        ],
+        "place": "BIN-12",
+        "container": null,
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-103"
+        ],
+        "event": "E-RECV-103",
+        "kind": "receiving",
+        "time": [
+          "2025-09-03T11:05:00-05:00",
+          "2025-09-03T11:20:00-05:00"
+        ],
+        "place": "PGE-01",
+        "container": [
+          "INTAKE-1"
+        ],
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-103"
+        ],
+        "event": "E-BIN-103",
+        "kind": "storage_move",
+        "time": [
+          "2025-09-03T11:28:00-05:00",
+          "2025-09-03T11:35:00-05:00"
+        ],
+        "place": "BIN-12",
+        "container": null,
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-102"
+        ],
+        "event": "E-OWN-102",
+        "kind": "ownership_change",
+        "time": [
+          "2025-09-03T15:00:00-05:00",
+          "2025-09-03T15:00:00-05:00"
+        ],
+        "place": null,
+        "container": null,
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-101"
+        ],
+        "event": "E-LOAD-201",
+        "kind": "loadout",
+        "time": [
+          "2025-09-04T09:40:00-05:00",
+          "2025-09-04T09:48:00-05:00"
+        ],
+        "place": null,
+        "container": "RLT-088",
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-201"
+        ],
+        "event": "E-CUST-201A",
+        "kind": "custody_change",
+        "time": [
+          "2025-09-04T09:32:00-05:00",
+          "2025-09-04T09:32:00-05:00"
+        ],
+        "place": null,
+        "container": null,
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-201"
+        ],
+        "event": "E-TRANS-201",
+        "kind": "transport",
+        "time": [
+          "2025-09-04T09:52:00-05:00",
+          "2025-09-05T11:05:00-05:00"
+        ],
+        "place": "HFM-N",
+        "container": [
+          "RLT-088"
+        ],
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-201"
+        ],
+        "event": "E-RECV-201",
+        "kind": "processor_receipt",
+        "time": [
+          "2025-09-05T11:05:00-05:00",
+          "2025-09-05T11:15:00-05:00"
+        ],
+        "place": "HFM-N",
+        "container": [
+          "S-4"
+        ],
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-201"
+        ],
+        "event": "E-CUST-201B",
+        "kind": "custody_change",
+        "time": [
+          "2025-09-05T11:05:00-05:00",
+          "2025-09-05T11:05:00-05:00"
+        ],
+        "place": null,
+        "container": null,
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-201"
+        ],
+        "event": "E-OWN-201",
+        "kind": "ownership_change",
+        "time": [
+          "2025-09-05T11:05:00-05:00",
+          "2025-09-05T11:05:00-05:00"
+        ],
+        "place": null,
+        "container": null,
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-201"
+        ],
+        "event": "E-PROC-301",
+        "kind": "processing",
+        "time": [
+          "2025-09-05T14:20:00-05:00",
+          "2025-09-05T15:00:00-05:00"
+        ],
+        "place": "HFM-N",
+        "container": null,
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-102",
+          "M-103"
+        ],
+        "event": "E-LOAD-202",
+        "kind": "loadout",
+        "time": [
+          "2025-09-04T13:15:00-05:00",
+          "2025-09-04T13:20:00-05:00"
+        ],
+        "place": null,
+        "container": "NST-204",
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-202"
+        ],
+        "event": "E-CUST-202A",
+        "kind": "custody_change",
+        "time": [
+          "2025-09-04T13:05:00-05:00",
+          "2025-09-04T13:05:00-05:00"
+        ],
+        "place": null,
+        "container": null,
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-202"
+        ],
+        "event": "E-TRANS-202",
+        "kind": "transport",
+        "time": [
+          "2025-09-04T13:23:00-05:00",
+          "2025-09-05T10:50:00-05:00"
+        ],
+        "place": "HFM-N",
+        "container": [
+          "NST-204"
+        ],
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-202"
+        ],
+        "event": "E-RECV-202",
+        "kind": "processor_receipt",
+        "time": [
+          "2025-09-05T10:50:00-05:00",
+          "2025-09-05T11:00:00-05:00"
+        ],
+        "place": "HFM-N",
+        "container": [
+          "S-5"
+        ],
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-202"
+        ],
+        "event": "E-SAMPLE-202",
+        "kind": "sampling",
+        "time": [
+          "2025-09-05T13:10:00-05:00",
+          "2025-09-05T13:10:00-05:00"
+        ],
+        "place": null,
+        "container": null,
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-202"
+        ],
+        "event": "E-PROC-302",
+        "kind": "processing",
+        "time": [
+          "2025-09-05T15:10:00-05:00",
+          "2025-09-05T16:00:00-05:00"
+        ],
+        "place": "HFM-N",
+        "container": null,
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-203"
+        ],
+        "event": "E-LOAD-203",
+        "kind": "loadout",
+        "time": [
+          "2025-09-05T07:10:00-05:00",
+          "2025-09-05T07:18:00-05:00"
+        ],
+        "place": null,
+        "container": "NST-219",
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-203"
+        ],
+        "event": "E-TRANS-203",
+        "kind": "transport",
+        "time": [
+          "2025-09-05T07:24:00-05:00",
+          null
+        ],
+        "place": "HFM-E",
+        "container": [
+          "NST-219"
+        ],
+        "status": "departure_record_only"
+      },
+      {
+        "material": [
+          "M-104"
+        ],
+        "event": "E-RECV-104",
+        "kind": "receiving",
+        "time": [
+          "2025-09-07T07:40:00-05:00",
+          "2025-09-07T08:00:00-05:00"
+        ],
+        "place": "PGE-01",
+        "container": [
+          "INTAKE-3"
+        ],
+        "status": "source_party_undetermined"
+      },
+      {
+        "material": [
+          "M-104"
+        ],
+        "event": "E-BIN-104",
+        "kind": "storage_move",
+        "time": [
+          "2025-09-07T08:42:00-05:00",
+          "2025-09-07T08:50:00-05:00"
+        ],
+        "place": "BIN-14",
+        "container": null,
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-105"
+        ],
+        "event": "E-RECV-105",
+        "kind": "receiving",
+        "time": [
+          "2025-09-07T08:10:00-05:00",
+          "2025-09-07T08:30:00-05:00"
+        ],
+        "place": "PGE-01",
+        "container": [
+          "INTAKE-3"
+        ],
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-105"
+        ],
+        "event": "E-BIN-105",
+        "kind": "storage_move",
+        "time": [
+          "2025-09-07T08:58:00-05:00",
+          "2025-09-07T09:05:00-05:00"
+        ],
+        "place": "BIN-14",
+        "container": null,
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-104",
+          "M-105"
+        ],
+        "event": "E-LOAD-204",
+        "kind": "loadout",
+        "time": [
+          "2025-09-07T10:30:00-05:00",
+          "2025-09-07T10:36:00-05:00"
+        ],
+        "place": null,
+        "container": "RLT-091",
+        "status": "individual_contribution_undetermined"
+      },
+      {
+        "material": [
+          "M-204"
+        ],
+        "event": "E-TRANS-204",
+        "kind": "transport",
+        "time": [
+          "2025-09-07T10:41:00-05:00",
+          "2025-09-07T13:02:00-05:00"
+        ],
+        "place": "HFM-N",
+        "container": [
+          "RLT-091"
+        ],
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-204"
+        ],
+        "event": "E-RECV-204",
+        "kind": "processor_receipt",
+        "time": [
+          "2025-09-07T13:02:00-05:00",
+          "2025-09-07T13:12:00-05:00"
+        ],
+        "place": "HFM-N",
+        "container": [
+          "S-7"
+        ],
+        "status": "established"
+      },
+      {
+        "material": [
+          "M-204"
+        ],
+        "event": "E-SAMPLE-204",
+        "kind": "sampling",
+        "time": [
+          "2025-09-07T14:10:00-05:00",
+          "2025-09-07T14:10:00-05:00"
+        ],
+        "place": null,
+        "container": null,
+        "status": "shipment_link_established_source_contribution_unresolved"
+      }
+    ],
+    "shipment_source_contributions": [
+      {
+        "shipment": "M-201",
+        "source": "M-101",
+        "quantity_kg": 39000,
+        "status": "established"
+      },
+      {
+        "shipment": "M-202",
+        "source": "M-102",
+        "quantity_kg": 15000,
+        "status": "established"
+      },
+      {
+        "shipment": "M-202",
+        "source": "M-103",
+        "quantity_kg": 11000,
+        "status": "established"
+      }
+    ],
+    "unresolved_identity_candidates": [
+      {
+        "source_values": [
+          "MC-118",
+          "MCR-118",
+          "South House 14 cargo",
+          "SMP-604Q"
+        ],
+        "result": "M-104 or shipment M-204",
+        "basis": [
+          "abbreviated lot mark",
+          "same bin",
+          "same shipment review"
+        ],
+        "status": "shipment established; source contribution not established"
+      },
+      {
+        "source_values": [
+          "N3 / EF-18?",
+          "EF-18",
+          "M-103"
+        ],
+        "result": null,
+        "basis": [
+          "question-marked handwritten note",
+          "N3 is a route code",
+          "no source allocation for M-203"
+        ],
+        "status": "unsupported_match"
+      }
+    ],
+    "completeness_scoped_absence": [
+      {
+        "scope": "processor_receipts",
+        "place": "HFM-N",
+        "interval": [
+          "2025-09-05T00:00:00-05:00",
+          "2025-09-07T23:59:59-05:00"
+        ],
+        "claim": "complete",
+        "basis": "operating_notes.md"
+      },
+      {
+        "scope": "processor_receipts",
+        "place": "HFM-E",
+        "interval": [
+          "2025-09-05T00:00:00-05:00",
+          "2025-09-07T23:59:59-05:00"
+        ],
+        "claim": "unknown",
+        "basis": "operating_notes.md"
+      },
+      {
+        "scope": "elevator_receipts",
+        "place": "PGE-01",
+        "interval": [
+          "2025-09-02T00:00:00-05:00",
+          "2025-09-07T23:59:59-05:00"
+        ],
+        "claim": "complete_for_listed_tickets",
+        "basis": "operating_notes.md"
+      },
+      {
+        "scope": "ownership_changes",
+        "place": "PGE-01",
+        "interval": [
+          "2025-09-02T00:00:00-05:00",
+          "2025-09-07T23:59:59-05:00"
+        ],
+        "claim": "recorded_changes_only",
+        "basis": "operating_notes.md"
+      }
+    ]
+  },
+  "provenance": "Canonical ledger evidence pointers are retained in each event/material record; this instance is not a native-source copy."
+}

@@ -1,0 +1,132 @@
+{
+  "experiment": "grain-traceability-v1-durable-computation-20260909",
+  "benchmark": "grain-traceability-v1",
+  "benchmark_commit": "17e1314f10d8b491b4462f821876a0a42642f1f8",
+  "product": {
+    "name": "Cursor CLI",
+    "version": "3.19.13",
+    "model": "cursor-grok-4.6-medium",
+    "reasoning": "medium",
+    "agent_package": "2026.09.02-c22c1a3"
+  },
+  "protocol": {
+    "replicates_per_world_condition": 3,
+    "conditions": [
+      "SYNOPSIS",
+      "DURABLE"
+    ],
+    "raw_secondary": false
+  },
+  "authoring_instruction": "authoring_instruction.txt",
+  "consumer_instruction": "consumer_instruction.txt",
+  "frozen_input_sha256": {
+    "workload_spec.md": "3d7dc308ec4fb2d4d35234f845eb32ad05b5392ff2f7117cb4742b89c1bf3e8a",
+    "development_tasks.json": "82bdb20d97f01a6ba1a71588a8200173fca5729b42ca0a1bc4b6e25931a443e0",
+    "evaluation_tasks.json": "259398efa1e5aba112b408d2ec212c5dddd884b27c01485bd11a86b091f83ed7",
+    "gold.json": "5f4d0f75df5bbd4238034abad9ff2ac9a7083d7d58c3a373e562b8062e9b381d",
+    "authoring_instruction.txt": "da4800cc9030269a3aa5e33479bd2660eae627fe4cc3c06ed5d628e2aa532900",
+    "consumer_instruction.txt": "99037f1dbd1d8c3457082052023a2eb071fb95abd0a829a2129c6fcd60194be4"
+  },
+  "contexts": {
+    "OA-G1": {
+      "world_hash": "dc2e7e45c1327fc997691b4fa4071c5fd44edb6aed2b57e2d1e4e4c70a471eb8",
+      "context_path": "/home/kerem/Desktop/Personal Projects/generalauthor/evaluation_runs/grain-traceability-v1-cursor-grok-medium-20260909/world_context/contexts/OA-G1-world-context.md",
+      "context_sha256": "6fb8764c0df1caa724b1345696a9cc7d6b6afb6a5299ba3e860c5a097b404527"
+    },
+    "OA-G2": {
+      "world_hash": "24f183176c742ec1326776de12cb73aae98250bb0e8bc89df0f8b37be6f1d220",
+      "context_path": "/home/kerem/Desktop/Personal Projects/generalauthor/evaluation_runs/grain-traceability-v1-cursor-grok-medium-20260909/world_context/contexts/OA-G2-world-context.md",
+      "context_sha256": "b7eb9dc1392a67ec0cd7169c274c09b166662b80d0ec90d5ae25633b86f1d99d"
+    }
+  },
+  "computation_bundles": {
+    "OA-G1": {
+      "application/catalog.json": "db6d578db5c4bca49ac68a870ec84ef02a9b4485daf474d506723a8e789e271d",
+      "application/lib/__init__.py": "ec875cf20ef8ab80662661a38a2ffc521f24f34e84421061bae2f73475618110",
+      "application/lib/compute.py": "d5d7c2aead0d1612e9ade896224dd7fd1cd88894ea9ddef369dcb7ded28ee936",
+      "application/lib/db.py": "e1354670d16f521ef276785c4aa5cb205564083e44708f4a442a9f1654b2104d",
+      "application/manifests/custody_owner_at.json": "5d73e09345dd4fe485e748dabd43092859b82fc7e616b556d5e4f8f3c2543fbf",
+      "application/manifests/inspection_downstream_scope.json": "fbab4dadf69b7bef4696bc4ea875fa598f7f3e6eafe0648c06447717167ad188",
+      "application/manifests/processor_receipt_provenance.json": "3ab91c6cd6d6968c4da577ff2257553ea63162d2a75375d3b9e5ee4ddc13877c",
+      "application/manifests/shipment_source_status.json": "d9c14036b9fffe645e32f611a34d91cd38a88e6ef971eac3127dec93b6cb5b72",
+      "application/run.py": "aedd075156dc88bf61c7fba28377d8d2421e55c3057378afe04219aa8a611032"
+    },
+    "OA-G2": {
+      "application/catalog.json": "0c8f1b12e410f7d354ad3aed4d76bfc8970c3adea904413227eeea0ac41cfc17",
+      "application/engine.py": "62ba0fe13e7e84ba9f6aca5b8fba2bc6c70bed883e2630f7becacaa4183b97fe",
+      "application/manifests/bin_tickets_before.json": "99955dc42946020771b1453e364f3eab5b0a13d00e8ec8d0c3e5fda63b36ba59",
+      "application/manifests/custody_owner_at.json": "df1951c29d857c3472e3b8034c1608827dbd105c5804855e24d9dfd3f59d4b66",
+      "application/manifests/identifier_canonical.json": "4a79fd4c29bb080bc82456b024fa5625077133bbf50114dfc7e41910f8370d0c",
+      "application/manifests/inspection_downstream_scope.json": "4c6b247e7de452108e391a80bf002184e1e5eab845403c7db2dbf175b7c3362e",
+      "application/manifests/processor_receipt_provenance.json": "0b400b4e4e690a4e523b8d21703db725ea26a20874818dca11ab11607fdfd758",
+      "application/manifests/shipment_source_status.json": "3168b7945b5cd6008de461cc3d1633aa26bf6b9d1d5f84b2a2b3642d969c577b",
+      "application/manifests/unresolved_failures.json": "55f6379dbee81c2a6b90a6ed38bc4508c9d040e150cf0f9c6fdb75716a8a0530",
+      "application/run": "87947b6a6519db96b6bee78b000b5b2951bae0d5b6f3f7d7f7b35bfdeaff8069"
+    }
+  },
+  "authoring_run_metadata": {
+    "OA-G1": {
+      "run_id": "OA-G1",
+      "world": "OA-G1",
+      "model": "cursor-grok-4.6-medium",
+      "reasoning": "medium",
+      "started": "2026-09-09T08:23:08.804688+00:00",
+      "ended": "2026-09-09T08:30:21.673981+00:00",
+      "duration_seconds": 432.869293,
+      "exit_code": 0,
+      "workspace": "/tmp/grain-traceability-v1-durable-computation-20260909-authoring/workspaces/OA-G1",
+      "output": "/home/kerem/Desktop/Personal Projects/generalauthor/evaluation_runs/grain-traceability-v1-durable-computation-20260909/application_authoring/OA-G1",
+      "stream_usage_events": [
+        {
+          "type": "result",
+          "subtype": "success",
+          "duration_ms": 425683,
+          "duration_api_ms": 425683,
+          "is_error": false,
+          "result": "I'll start by reading the instruction files and task spec so I can build and test the reusable application computation bundle.I'll inspect the World schema and data next so the computations can stay parameterized and bound to this sealed World.I have a clear World model. Next I\u2019ll add a small parameterized computation bundle and run the development tasks against it.Unresolved matching is too broad (it was picking up DR-44 from prose). I\u2019ll match identities in structured fields only, then re-run the tasks.The reusable bundle is in `application/`. It exposes four parameterized, read-only computations over the sealed World (`v0`, revision 242).\n\n**Call without reading source**\n\n```\npython3 application/run.py --list\npython3 application/run.py shipment_source_status --param dispatch=PGE-OUT-5001 --pretty\npython3 application/run.py processor_receipt_provenance --param processor_receipt=HFM-IN-601\npython3 application/run.py custody_owner_at --param material=DR-44 --param timestamp=2025-09-03T12:00:00-05:00\npython3 application/run.py inspection_downstream_scope --param sample=SMP-7714A\n```\n\nCatalog and per-computation manifests are under `application/catalog.json` and `application/manifests/`.\n\n**What the computations reuse**\n\n- Named hopper tickets vs bin occupants vs commercial ownership scopes (commercial scope is not bin allocation)\n- Explicit `purpose_requirement_failure` rows, matched on identities rather than prose\n- Covering ownership events at a timestamp for owner vs custodian\n- Lab-sample \u2192 ticket only when the World actually establishes it\n\n**Tests**\n\n`python3 application/tests/run_dev_tasks.py` ran all four development tasks twice; outputs were identical. Extra parameterized checks covered OUT-5002/5003, HFM-IN-604, and SMP-604Q (unresolved ticket preserved).\n\n`AUTHORING_REPORT.md` describes the interface and those runs.",
+          "session_id": "df326391-0353-4e2a-99de-b76e85c34834",
+          "request_id": "ad1d4db9-2f54-422d-a877-bd6a8a0d206b",
+          "usage": {
+            "inputTokens": 110409,
+            "outputTokens": 24952,
+            "cacheReadTokens": 582144,
+            "cacheWriteTokens": 0
+          }
+        }
+      ]
+    },
+    "OA-G2": {
+      "run_id": "OA-G2",
+      "world": "OA-G2",
+      "model": "cursor-grok-4.6-medium",
+      "reasoning": "medium",
+      "started": "2026-09-09T08:23:08.804775+00:00",
+      "ended": "2026-09-09T08:30:52.521314+00:00",
+      "duration_seconds": 463.716539,
+      "exit_code": 0,
+      "workspace": "/tmp/grain-traceability-v1-durable-computation-20260909-authoring/workspaces/OA-G2",
+      "output": "/home/kerem/Desktop/Personal Projects/generalauthor/evaluation_runs/grain-traceability-v1-durable-computation-20260909/application_authoring/OA-G2",
+      "stream_usage_events": [
+        {
+          "type": "result",
+          "subtype": "success",
+          "duration_ms": 457696,
+          "duration_api_ms": 457696,
+          "is_error": false,
+          "result": "I'll start by reading the instruction files and task list so I can build and test the reusable application computation bundle.I'll inspect the World schema and data next so the computations can be parameterized and bound to this sealed database.I have the World relations and the four development tasks. Next I\u2019ll add a small parameterized catalog and run those tasks against it.I'll tighten contributor and inspection logic so hopper-named tickets stay distinct from unresolved bin occupancy.The reusable bundle is in `application/`. It talks only to the sealed World (`world/world.sqlite`, read-only) plus call parameters.\n\n**How to call it** (catalog + manifests, no need to read Python):\n\n```\napplication/run COMPUTATION --param value\n```\n\n**Computations**\n\n- `shipment_source_status` \u2014 loadout bin/site, hopper-named tickets, bin candidates, unresolved allocation  \n- `processor_receipt_provenance` \u2014 dispatch/manifest/mill path, process output, upstream gaps  \n- `custody_owner_at` \u2014 covering `ownership_event` owner (`owner_after`) and custodian (`holder_after`)  \n- `inspection_downstream_scope` \u2014 established vs unresolved forward links from a lab sample  \n- helpers: `identifier_canonical`, `unresolved_failures`, `bin_tickets_before`\n\nHopper-named tickets count as contributing identities. Quantity splits and unnamed house occupants stay unresolved.\n\n**Development tasks** (`python3 application/tests/run_dev_tasks.py`: 4 tasks + 12 extra cases)\n\n| Task | Result |\n| --- | --- |\n| DEV-SRC-001 | PGE-OUT-5001 source **BIN-12**; no established contributing tickets; DR-44 / EF-18 / WB-390 candidates; allocation unresolved |\n| DEV-PROV-001 | HFM-IN-601 path PGE-OUT-5001 / RL-8841; output **FEED-2206**; upstream allocation unresolved |\n| DEV-CUST-001 | DR-44 at that timestamp: owner and custodian **Prairie Gate Elevator** (TR-101) |\n| DEV-INSP-001 | SMP-7714A is DR-44; no established downstream shipment/receipt/output; PGE-OUT-5001 (and mill path) and PGE-OUT-5003 remain unresolved |\n\nDetails are in `AUTHORING_REPORT.md`.",
+          "session_id": "9c58761f-2dbc-4847-811e-5ce15754b757",
+          "request_id": "2ad08ab4-894a-47de-a61f-84bad9ce3a56",
+          "usage": {
+            "inputTokens": 206880,
+            "outputTokens": 29114,
+            "cacheReadTokens": 614272,
+            "cacheWriteTokens": 0
+          }
+        }
+      ]
+    }
+  },
+  "held_out_tasks_hidden_from_authoring": true,
+  "gold_hidden_from_authoring_and_consumers": true,
+  "frozen_before_consumer_execution": true
+}

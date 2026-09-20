@@ -1,0 +1,56 @@
+{
+  "run_id": "OA-G1-SYNOPSIS-1",
+  "world": "OA-G1",
+  "condition": "SYNOPSIS",
+  "replicate": 1,
+  "model": "cursor-grok-4.6-medium",
+  "reasoning": "medium",
+  "started": "2026-09-09T08:37:33.677703+00:00",
+  "ended": "2026-09-09T08:43:43.570432+00:00",
+  "duration_seconds": 369.892729,
+  "exit_code": 0,
+  "workspace": "/tmp/grain-traceability-v1-durable-computation-20260909-consumers/workspaces/OA-G1-SYNOPSIS-1",
+  "output": "/home/kerem/Desktop/Personal Projects/generalauthor/evaluation_runs/grain-traceability-v1-durable-computation-20260909/consumer_runs/OA-G1-SYNOPSIS-1",
+  "native_sources_visible": false,
+  "telemetry": {
+    "usage": {
+      "inputTokens": 85942,
+      "outputTokens": 8812,
+      "cacheReadTokens": 102656,
+      "cacheWriteTokens": 0
+    },
+    "tool_actions": 26,
+    "read_paths": [
+      "/home/kerem",
+      "/home/kerem/.cursor",
+      "/home/kerem/.cursor/projects/workspace/agent-transcripts",
+      "/workspace",
+      "/workspace/INSTRUCTION.md",
+      "/workspace/PURPOSE.md",
+      "/workspace/evaluation_tasks.json",
+      "/workspace/final_answer.md",
+      "/workspace/world-context.md",
+      "/workspace/world/world.admission.json",
+      "/workspace/world/world.purpose.json",
+      "/workspace/world/world.sqlite.origins.json"
+    ],
+    "command_texts": [
+      "ls -la /workspace /workspace/world /workspace/application 2>/dev/null; find /workspace -type f 2>/dev/null",
+      "sqlite3 /workspace/world/world.sqlite \".tables\"; echo \"====\"; sqlite3 /workspace/world/world.sqlite \".schema\"",
+      "python3 - << 'PY'\nimport sqlite3\nconn = sqlite3.connect('/workspace/world/world.sqlite')\ncur = conn.cursor()\ncur.execute(\"SELECT name FROM sqlite_master WHERE type='table' ORDER BY name\")\nprint(\"TABLES:\")\nfor r in cur.fetchall():\n    print(r[0])\nprint(\"\\nSCHEMAS:\")\ncur.execute(\"SELECT sql FROM sqlite_master WHERE sql IS NOT NULL\")\nfor r in cur.fetchall():\n    print(r[0])\n    print(\"---\")\nPY",
+      "python3 - << 'PY'\nimport sqlite3, json\nconn = sqlite3.connect('/workspace/world/world.sqlite')\nconn.row_factory = sqlite3.Row\ncur = conn.cursor()\n\nprint(\"=== REFERENTS ===\")\nfor r in cur.execute(\"SELECT id, label FROM _world_referents ORDER BY label, id\"):\n    print(dict(r))\n\nprint(\"\\n=== known_as ===\")\nfor r in cur.execute(\"SELECT * FROM known_as\"):\n    d=dict(r); d.pop('_assertion_id', None); print(d)\n\nprint(\"\\n=== location ===\")\nfor r in cur.execute(\"SELECT * FROM location\"):\n    d=dict(r); d.pop('_assertion_id', None); print(d)\n\nprint(\"\\n=== elevator_intake ===\")\nfor r in cur.execute(\"SELECT * FROM elevator_intake\"):\n    d=dict(r); d.pop('_assertion_id', None); print(d)\n\nprint(\"\\n=== bin_transfer ===\")\nfor r in cur.execute(\"SELECT * FROM bin_transfer\"):\n    d=dict(r); d.pop('_assertion_id', None); print(d)\n\nprint(\"\\n=== ticket_named_on_move ===\")\nfor r in cur.execute(\"SELECT * FROM ticket_named_on_move\"):\n    d=dict(r); d.pop('_assertion_id', None); print(d)\n\nprint(\"\\n=== elevator_loadout ===\")\nfor r in cur.execute(\"SELECT * FROM elevator_loadout\"):\n    d=dict(r); d.pop('_assertion_id', None); print(d)\n\nprint(\"\\n=== carrier_departure ===\")\nfor r in cur.execute(\"SELECT * FROM carrier_departure\"):\n    d=dict(r); d.pop('_assertion_id', None); print(d)\n\nprint(\"\\n=== mill_intake ===\")\nfor r in cur.execute(\"SELECT * FROM mill_intake\"):\n    d=dict(r); d.pop('_assertion_id', None); print(d)\n\nprint(\"\\n=== mill_process ===\")\nfor r in cur.execute(\"SELECT * FROM mill_process\"):\n    d=dict(r); d.pop('_assertion_id', None); print(d)\n\nprint(\"\\n=== lab_result ===\")\nfor r in cur.execute(\"SELECT * FROM lab_result\"):\n    d=dict(r); d.pop('_assertion_id', None); print(d)\n\nprint(\"\\n=== ownership_event ===\")\nfor r in cur.execute(\"SELECT * FROM ownership_event\"):\n    d=dict(r); d.pop('_assertion_id', None); print(d)\n\nprint(\"\\n=== commercial_scope ===\")\nfor r in cur.execute(\"SELECT * FROM commercial_scope\"):\n    d=dict(r); d.pop('_assertion_id', None); print(d)\n\nprint(\"\\n=== extract_coverage ===\")\nfor r in cur.execute(\"SELECT * FROM extract_coverage\"):\n    d=dict(r); d.pop('_assertion_id', None); print(d)\n\nprint(\"\\n=== consignee_is_not_receipt ===\")\nfor r in cur.execute(\"SELECT * FROM consignee_is_not_receipt\"):\n    d=dict(r); d.pop('_assertion_id', None); print(d)\n\nprint(\"\\n=== purpose_requirement_failure ===\")\nfor r in cur.execute(\"SELECT * FROM purpose_requirement_failure\"):\n    d=dict(r); d.pop('_assertion_id', None); print(d)\nPY",
+      "ls -la /opt /usr/local /home/kerem 2>/dev/null | head -80; find /opt /usr/local /home/kerem -name 'catalog.json' 2>/dev/null | head; find / -name 'catalog.json' -not -path '*/proc/*' -not -path '*/node_modules/*' 2>/dev/null | head",
+      "python3 - << 'PY'\nimport sqlite3\nconn = sqlite3.connect('/workspace/world/world.sqlite')\nconn.row_factory = sqlite3.Row\ncur = conn.cursor()\n\ndef dump(name):\n    print(f\"\\n===== {name} =====\")\n    for r in cur.execute(f\"SELECT * FROM {name}\"):\n        d=dict(r); d.pop('_assertion_id', None); print(d)\n\nfor t in ['elevator_intake','bin_transfer','ticket_named_on_move','elevator_loadout','carrier_departure','mill_intake','mill_process','location']:\n    dump(t)\n\nprint(\"\\n===== groundings sample =====\")\nfor r in cur.execute(\"SELECT kind, reference, count(*) c FROM _world_groundings GROUP BY 1,2 ORDER BY 1,2\"):\n    print(dict(r))\nPY",
+      "ls -la /workspace/application 2>/dev/null; ls /tmp 2>/dev/null | head; find /workspace /tmp /opt /home/kerem/.cursor -name 'catalog.json' 2>/dev/null | head",
+      "python3 - << 'PY'\nimport sqlite3\nconn = sqlite3.connect('/workspace/world/world.sqlite')\nconn.row_factory = sqlite3.Row\ncur = conn.cursor()\nprint(\"=== known_as samples ===\")\nfor r in cur.execute(\"SELECT * FROM known_as WHERE entity_id LIKE '%sample%' OR token LIKE '%SMP%' OR token LIKE '%UNLISTED%'\"):\n    d=dict(r); d.pop('_assertion_id', None); print(d)\nprint(\"=== completeness ===\")\nfor r in cur.execute(\"SELECT * FROM _world_completeness\"):\n    print(dict(r))\nprint(\"=== derivations ===\")\nfor r in cur.execute(\"SELECT * FROM _world_derivations\"):\n    print(dict(r))\nprint(\"=== meta ===\")\nfor r in cur.execute(\"SELECT * FROM _world_meta\"):\n    print(dict(r))\nPY"
+    ],
+    "application_invocations": 0,
+    "sqlite_actions": 5,
+    "python_actions": 4,
+    "schema_inspection_actions": 2,
+    "ad_hoc_semantic_query_actions": 5,
+    "native_source_reads": false,
+    "catalog_reads": false,
+    "computation_source_reads": false
+  }
+}

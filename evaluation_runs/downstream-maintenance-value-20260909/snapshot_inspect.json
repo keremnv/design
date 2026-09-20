@@ -1,0 +1,36 @@
+{
+  "tables": [
+    "_world_assertions",
+    "_world_completeness",
+    "_world_derivation_inputs",
+    "_world_derivation_run_inputs",
+    "_world_derivations",
+    "_world_groundings",
+    "_world_meta",
+    "_world_referents",
+    "_world_relations",
+    "_world_roles",
+    "dispatch_to_mill",
+    "intake",
+    "loadout",
+    "manifest",
+    "mill_receipt",
+    "mill_run",
+    "place_alias",
+    "purpose_requirement_failure"
+  ],
+  "purpose_requirement_failure": [
+    {
+      "_assertion_id": "assertion:2eb0ac7799684bb555f69861",
+      "requirement_id": "out_5003_no_mill_slip",
+      "affected_identity": "out_5003_no_mill_slip",
+      "failure_kind": "EXPLICIT_UNRESOLVED",
+      "relation_name": "manifest",
+      "subject_json": "{\"dispatch_ref\": \"PGE-OUT-5003\", \"manifest_no\": \"NS-8910\", \"reason\": \"PGE-OUT-5003 has a carrier manifest but no HFM receiving slip in the supplied extracts\"}",
+      "grounding_ref": ""
+    }
+  ],
+  "hopper_named_out5002": true,
+  "unresolved_out5004": false,
+  "control_out5001": true
+}

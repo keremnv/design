@@ -1,0 +1,9 @@
+{
+  "law_id": "design-account-settings-law",
+  "sources": [
+    {
+      "source_id": "account-settings-design-governance",
+      "path": "design-governance.md"
+    }
+  ]
+}

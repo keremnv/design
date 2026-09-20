@@ -73,7 +73,7 @@ class WorldStore:
         path: Path | str,
         *,
         world_id: str,
-        purpose_ref: str = "",
+        purpose_ref: str | None = None,
     ) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -84,18 +84,21 @@ class WorldStore:
         existing = self._db.execute(
             "SELECT world_id, purpose_ref FROM _world_meta WHERE singleton = 1"
         ).fetchone()
+        normalized_purpose_ref = (
+            str(purpose_ref) if purpose_ref is not None and str(purpose_ref) else None
+        )
         if existing is None:
             with self._db:
                 self._db.execute(
                     "INSERT INTO _world_meta(singleton, world_id, purpose_ref, revision) "
                     "VALUES (1, ?, ?, 0)",
-                    (str(world_id), str(purpose_ref)),
+                    (str(world_id), normalized_purpose_ref),
                 )
         elif existing["world_id"] != str(world_id):
             raise WorldStoreError(
                 f"database belongs to World {existing['world_id']!r}, not {world_id!r}"
             )
-        elif purpose_ref and existing["purpose_ref"] != str(purpose_ref):
+        elif normalized_purpose_ref and existing["purpose_ref"] != normalized_purpose_ref:
             raise WorldStoreError(
                 "purpose reference differs from the stored World"
             )
@@ -115,7 +118,7 @@ class WorldStore:
             CREATE TABLE IF NOT EXISTS _world_meta (
                 singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
                 world_id TEXT NOT NULL UNIQUE,
-                purpose_ref TEXT NOT NULL,
+                purpose_ref TEXT,
                 revision INTEGER NOT NULL
             );
             CREATE TABLE IF NOT EXISTS _world_referents (

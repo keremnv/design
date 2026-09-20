@@ -1,0 +1,8 @@
+record_no,recorded_at,record_type,scope_ref,effective_start,effective_end,from_party,to_party,owner_after,holder_after,basis
+TR-101,2025-09-02T08:20:00-05:00,title_change,DR-44,2025-09-02T08:15:00-05:00,2025-09-04T09:32:00-05:00,Cedar Ridge Farm,Prairie Gate Elevator,Prairie Gate Elevator,Prairie Gate Elevator,scale settlement 7714
+TR-102,2025-09-03T15:00:00-05:00,title_change,WB-390,2025-09-03T15:00:00-05:00,2025-09-05T10:50:00-05:00,Willow Bend Farms,GrainLink Merchants,GrainLink Merchants,Prairie Gate Elevator,broker release GL-88
+TR-103,2025-09-04T09:32:00-05:00,custody_change,DR-44,2025-09-04T09:32:00-05:00,2025-09-05T11:05:00-05:00,Prairie Gate Elevator,Redline Haulage,Prairie Gate Elevator,Redline Haulage,dispatch handoff RL-8841
+TR-104,2025-09-04T13:05:00-05:00,custody_change,OUT-5002,2025-09-04T13:05:00-05:00,2025-09-05T10:50:00-05:00,Prairie Gate Elevator,Northstar Bulk Transport,GrainLink Merchants,Northstar Bulk Transport,dispatch handoff NS-8848
+TR-105,2025-09-05T10:50:00-05:00,custody_change,OUT-5002,2025-09-05T10:50:00-05:00,,Northstar Bulk Transport,Hearthland Feed Mill,GrainLink Merchants,Hearthland Feed Mill,processor dock scan HFM-IN-602
+TR-106,2025-09-05T11:05:00-05:00,title_change,DR-44,2025-09-05T11:05:00-05:00,,Prairie Gate Elevator,Hearthland Feed Mill,Hearthland Feed Mill,Hearthland Feed Mill,processor acceptance HFM-IN-601
+TR-107,2025-09-07T07:45:00-05:00,party_claim,MCR-118,2025-09-07T07:40:00-05:00,,Meadow Creek Farms,Meadow Creek Grain,,Prairie Gate Elevator,duplicate account claims; no account key

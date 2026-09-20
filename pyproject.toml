@@ -21,13 +21,14 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-dependencies = ["starlette>=0.37,<1", "uvicorn>=0.29"]
+dependencies = ["starlette>=0.37,<1", "uvicorn>=0.29", "requests>=2.31.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0.0", "httpx>=0.27.0"]
 
 [project.scripts]
 author = "ontology_author.world.cli:main"
+governance = "ontology_author.governance.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/keremnv/ontology-author"

@@ -1,0 +1,15 @@
+{
+  "id": "shipment_source_status",
+  "description": "For an elevator dispatch: established loadout bin/site, hopper-named contributing tickets, candidate tickets already in that bin, and whether ticket-to-truck allocation remains unresolved. Does not infer a quantity split.",
+  "parameters": {
+    "dispatch": {"type": "string", "required": true}
+  },
+  "result": {
+    "source_location": "{established, bin, bin_label, site, loadout_id, loaded_at, quantity_kg}",
+    "established_contributing_identities": "hopper-named tickets (empty if none named)",
+    "candidate_identities_in_source_bin": "tickets moved into the loadout bin before loaded_at",
+    "source_allocation_unresolved": "boolean",
+    "unresolved": "matching purpose_requirement_failure rows"
+  },
+  "invoke": "application/run shipment_source_status --dispatch PGE-OUT-5001"
+}

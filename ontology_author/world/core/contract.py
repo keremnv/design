@@ -31,6 +31,7 @@ class CandidateAssessment:
     reason: str
     warrant_authorities: tuple[str, ...] = ()
     authority_basis: tuple[Mapping[str, Any], ...] = ()
+    material_support: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         value = str(self.status).strip().upper()
@@ -56,15 +57,24 @@ class CandidateAssessment:
                 basis.append({str(key): value for key, value in item.items()})
         basis.sort(key=lambda item: repr(sorted(item.items())))
         object.__setattr__(self, "authority_basis", tuple(basis))
+        if self.material_support is None:
+            object.__setattr__(self, "material_support", None)
+        elif isinstance(self.material_support, Mapping):
+            object.__setattr__(self, "material_support", dict(self.material_support))
+        else:
+            raise ValueError("material_support must be a mapping or None")
 
     def as_payload(self) -> dict[str, object]:
-        return {
+        payload = {
             "commitment_id": self.commitment_id,
             "status": self.status,
             "reason": self.reason,
             "warrant_authorities": list(self.warrant_authorities),
             "authority_basis": [dict(item) for item in self.authority_basis],
         }
+        if self.material_support is not None:
+            payload["material_support"] = dict(self.material_support)
+        return payload
 
 
 @dataclass(frozen=True)
@@ -343,16 +353,9 @@ class Contract:
         has_provenance: bool,
         has_construction_method: bool,
         semantic_reference_kinds: Iterable[str] = (),
-        authority: Any | None = None,
     ) -> None:
-        """Admit one asserted tuple or raise ``ContractAdmissionError``.
+        """Admit one asserted tuple or raise ``ContractAdmissionError``."""
 
-        ``authority`` is intentionally an unused extension point. No authority
-        model is introduced in this slice, but admission has a stable place to
-        receive one later.
-        """
-
-        del authority
         relation_name = str(relation)
         scope_name = str(scope)
         mode_name = str(mode)

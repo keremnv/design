@@ -1,0 +1,63 @@
+{
+  "run_id": "OA-G1-DURABLE-3",
+  "world": "OA-G1",
+  "condition": "DURABLE",
+  "replicate": 3,
+  "model": "cursor-grok-4.6-medium",
+  "reasoning": "medium",
+  "started": "2026-09-09T08:40:39.036577+00:00",
+  "ended": "2026-09-09T08:43:28.332404+00:00",
+  "duration_seconds": 169.295827,
+  "exit_code": 0,
+  "workspace": "/tmp/grain-traceability-v1-durable-computation-20260909-consumers/workspaces/OA-G1-DURABLE-3",
+  "output": "/home/kerem/Desktop/Personal Projects/generalauthor/evaluation_runs/grain-traceability-v1-durable-computation-20260909/consumer_runs/OA-G1-DURABLE-3",
+  "native_sources_visible": false,
+  "telemetry": {
+    "usage": {
+      "inputTokens": 174608,
+      "outputTokens": 8523,
+      "cacheReadTokens": 166144,
+      "cacheWriteTokens": 0
+    },
+    "tool_actions": 30,
+    "read_paths": [
+      "/workspace/INSTRUCTION.md",
+      "/workspace/PURPOSE.md",
+      "/workspace/application/catalog.json",
+      "/workspace/application/lib/compute.py",
+      "/workspace/application/manifests/custody_owner_at.json",
+      "/workspace/application/manifests/inspection_downstream_scope.json",
+      "/workspace/application/manifests/processor_receipt_provenance.json",
+      "/workspace/application/manifests/shipment_source_status.json",
+      "/workspace/application/run.py",
+      "/workspace/evaluation_tasks.json",
+      "/workspace/final_answer.md",
+      "/workspace/world-context.md",
+      "/workspace/world/world.admission.json",
+      "/workspace/world/world.purpose.json"
+    ],
+    "command_texts": [
+      "ls -la /workspace/world/ && python3 application/run.py --list",
+      "python3 application/run.py shipment_source_status --param dispatch=PGE-OUT-5002 --pretty",
+      "python3 application/run.py shipment_source_status --param dispatch=PGE-OUT-5003 --pretty",
+      "python3 application/run.py shipment_source_status --param dispatch=PGE-OUT-5004 --pretty",
+      "python3 application/run.py processor_receipt_provenance --param processor_receipt=HFM-IN-602 --pretty",
+      "python3 application/run.py processor_receipt_provenance --param processor_receipt=HFM-IN-604 --pretty",
+      "python3 application/run.py custody_owner_at --param material=WB-390 --param timestamp=2025-09-04T13:10:00-05:00 --pretty",
+      "python3 application/run.py custody_owner_at --param material=EF-18 --param timestamp=2025-09-03T12:00:00-05:00 --pretty",
+      "python3 application/run.py inspection_downstream_scope --param sample=SMP-602B --pretty",
+      "python3 application/run.py inspection_downstream_scope --param sample=SMP-604Q --pretty",
+      "python3 application/run.py inspection_downstream_scope --param sample=SMP-UNLISTED --pretty",
+      "python3 << 'PY'\nimport sqlite3\nconn = sqlite3.connect('/workspace/world/world.sqlite')\nconn.row_factory = sqlite3.Row\n\ndef show(sql, params=()):\n    print('SQL:', sql, params)\n    for r in conn.execute(sql, params):\n        print(dict(r))\n    print()\n\nprint('=== TABLES ===')\nfor r in conn.execute(\"SELECT name FROM sqlite_master WHERE type='table' ORDER BY name\"):\n    print(r[0])\n\nprint('\\n=== lab_result ===')\nshow('SELECT * FROM lab_result')\n\nprint('=== mill_intake ===')\nshow('SELECT * FROM mill_intake')\n\nprint('=== mill_process ===')\nshow('SELECT * FROM mill_process')\n\nprint('=== elevator_loadout ===')\nshow('SELECT * FROM elevator_loadout')\n\nprint('=== ticket_named_on_move ===')\nshow('SELECT * FROM ticket_named_on_move')\n\nprint('=== bin_transfer ===')\nshow('SELECT * FROM bin_transfer')\n\nprint('=== ownership_event ===')\nshow('SELECT * FROM ownership_event')\n\nprint('=== commercial_scope ===')\nshow('SELECT * FROM commercial_scope')\n\nprint('=== elevator_intake ===')\nshow('SELECT * FROM elevator_intake')\n\nprint('=== purpose_requirement_failure ===')\nshow('SELECT requirement_id, affected_identity, failure_kind, relation_name, subject_json FROM purpose_requirement_failure')\n\nprint('=== carrier_departure ===')\nshow('SELECT * FROM carrier_departure')\nPY",
+      "python3 << 'PY'\nimport sqlite3\nconn = sqlite3.connect('/workspace/world/world.sqlite')\nconn.row_factory = sqlite3.Row\nprint('=== remaining ownership ===')\nfor r in conn.execute('SELECT record_id, record_type, scope_ref, effective_start, effective_end, from_party, to_party, owner_after, holder_after, basis FROM ownership_event'):\n    print(dict(r))\nprint('\\n=== consignee_is_not_receipt ===')\nfor r in conn.execute('SELECT * FROM consignee_is_not_receipt'):\n    print(dict(r))\nprint('\\n=== extract_coverage ===')\nfor r in conn.execute('SELECT * FROM extract_coverage'):\n    print(dict(r))\nPY"
+    ],
+    "application_invocations": 11,
+    "sqlite_actions": 2,
+    "python_actions": 13,
+    "schema_inspection_actions": 1,
+    "ad_hoc_semantic_query_actions": 2,
+    "native_source_reads": false,
+    "catalog_reads": true,
+    "computation_source_reads": true
+  }
+}

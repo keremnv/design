@@ -1,0 +1,53 @@
+{
+  "model_id": "grain-traceability-v1-reference",
+  "status": "frozen_comparator",
+  "design_intent": "Represent the material/event history needed by the hidden questions while retaining provenance and epistemic status.",
+  "concepts": [
+    {"id": "MaterialPortion", "notes": "A physically tracked portion of grain; may bear a load or shipment role."},
+    {"id": "Load", "notes": "A portion moved or transported together."},
+    {"id": "Shipment", "notes": "An outbound load with a dispatch and carrier context."},
+    {"id": "OperationalEvent", "notes": "A recorded receiving, movement, loadout, transport, receipt, sampling, inspection, title, custody, or processing occurrence."},
+    {"id": "Place", "notes": "Facility, bin, loading point, dock, silo, or route endpoint."},
+    {"id": "Container", "notes": "A bin, load pit, truck, or silo in which the material is recorded."},
+    {"id": "Organization", "notes": "Farm, elevator, carrier, broker, or processor."},
+    {"id": "Sample", "notes": "A separated or designated portion used for analysis."},
+    {"id": "Observation", "notes": "A recorded test or inspection result about material or sample."},
+    {"id": "ProcessedProduct", "notes": "A material output of a processor run."},
+    {"id": "IdentityCandidate", "notes": "A possible but not committed cross-source identity mapping."}
+  ],
+  "relations": [
+    {"id": "participates_in", "arity": 2, "arguments": ["MaterialPortion", "OperationalEvent"]},
+    {"id": "input_to", "arity": 2, "arguments": ["MaterialPortion", "OperationalEvent"]},
+    {"id": "output_of", "arity": 2, "arguments": ["MaterialPortion", "OperationalEvent"]},
+    {"id": "occurs_at", "arity": 2, "arguments": ["OperationalEvent", "Place"]},
+    {"id": "held_in", "arity": 3, "arguments": ["MaterialPortion", "Container", "TemporalInterval"]},
+    {"id": "moves_from_to", "arity": 4, "arguments": ["OperationalEvent", "Place", "Place", "MaterialPortion"]},
+    {"id": "uses_container", "arity": 3, "arguments": ["OperationalEvent", "Container", "ParticipantRole"]},
+    {"id": "transported_by", "arity": 3, "arguments": ["MaterialPortion", "Organization", "OperationalEvent"]},
+    {"id": "identified_as", "arity": 4, "arguments": ["Entity", "SourceSystem", "SourceIdentifier", "IdentityStatus"]},
+    {"id": "composed_of", "arity": 3, "arguments": ["MaterialPortion", "MaterialPortion", "Quantity"]},
+    {"id": "sampled_from", "arity": 2, "arguments": ["Sample", "MaterialPortion"]},
+    {"id": "observes", "arity": 3, "arguments": ["Observation", "Sample", "Result"]},
+    {"id": "owned_by_during", "arity": 3, "arguments": ["MaterialPortion", "Organization", "TemporalInterval"]},
+    {"id": "in_custody_of_during", "arity": 3, "arguments": ["MaterialPortion", "Organization", "TemporalInterval"]},
+    {"id": "derived_from", "arity": 3, "arguments": ["ProcessedProduct", "MaterialPortion", "OperationalEvent"]},
+    {"id": "has_status", "arity": 2, "arguments": ["Assertion", "EpistemicStatus"]}
+  ],
+  "assertion_policy": {
+    "positive": "assert only consequences supported by at least one source record and a declared reconciliation rule",
+    "candidate": "retain plausible alternatives without treating them as co-referential",
+    "negative": "assert absence only under a scoped completeness claim",
+    "unknown": "use not_established for missing or conflicting links"
+  },
+  "derived_views": [
+    "material_event_history",
+    "location_at_time",
+    "shipment_source_contributions",
+    "sample_source_owner",
+    "custody_intervals",
+    "ownership_intervals",
+    "processor_upstream_completeness",
+    "unresolved_identity_candidates",
+    "completeness_scoped_absence"
+  ]
+}

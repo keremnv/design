@@ -1,0 +1,13 @@
+{
+  "id": "T4",
+  "relevant_world": "grain-flow",
+  "probe": "raw-evidence fallback / unresolved cargo note",
+  "prompt": "What does the handwritten note N3 / EF-18? on the PGE-OUT-5003 packet mean, and can we treat EF-18 as the source ticket for that truck? Write the answer to answer.md.",
+  "started": "2026-09-09T14:38:10.400394+00:00",
+  "ended": "2026-09-09T14:39:44.716600+00:00",
+  "exit_code": 0,
+  "workspace": "/tmp/oa-multi-world-discovery-20260909/tasks/T4",
+  "model_requested": "composer-2.5",
+  "model_reported": "Composer 2.5",
+  "model_ok": true
+}

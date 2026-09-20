@@ -1,0 +1,59 @@
+{
+  "id": "P3",
+  "case": "already-sufficient-control",
+  "prompt": "A mill desk asked: which mill receiving slip accepted the truck dispatched as PGE-OUT-5001, and what mill run used that receipt? Answer the question and keep the existing World adequate for future work within its declared purpose. Write the answer to answer.md.",
+  "started": "2026-09-09T19:14:04.662885+00:00",
+  "ended": "2026-09-09T19:14:34.867368+00:00",
+  "exit_code": 0,
+  "timed_out": false,
+  "workspace": "/tmp/oa-spr-persist-isolated-P3",
+  "isolated": true,
+  "model_requested": "composer-2.5",
+  "model_reported": "Composer 2.5",
+  "model_ok": true,
+  "author_commands": [
+    "author list 2>/dev/null;",
+    "author list"
+  ],
+  "construction_changed": false,
+  "purpose_changed": false,
+  "sqlite_changed": false,
+  "created_other_worlds": false,
+  "sqlite_patched_without_construction": false,
+  "world_names": [
+    "yard-trace"
+  ],
+  "sqlite_inspect": {
+    "tables": [
+      "_world_assertions",
+      "_world_completeness",
+      "_world_derivation_inputs",
+      "_world_derivation_run_inputs",
+      "_world_derivations",
+      "_world_groundings",
+      "_world_meta",
+      "_world_referents",
+      "_world_relations",
+      "_world_roles",
+      "dispatch_to_mill",
+      "intake",
+      "loadout",
+      "manifest",
+      "mill_receipt",
+      "mill_run",
+      "place_alias",
+      "purpose_requirement_failure"
+    ],
+    "purpose_requirement_failure": [
+      {
+        "_assertion_id": "assertion:2eb0ac7799684bb555f69861",
+        "requirement_id": "out_5003_no_mill_slip",
+        "affected_identity": "out_5003_no_mill_slip",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "manifest",
+        "subject_json": "{\"dispatch_ref\": \"PGE-OUT-5003\", \"manifest_no\": \"NS-8910\", \"reason\": \"PGE-OUT-5003 has a carrier manifest but no HFM receiving slip in the supplied extracts\"}",
+        "grounding_ref": ""
+      }
+    ]
+  }
+}

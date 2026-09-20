@@ -13,6 +13,13 @@ from ontology_author.world.core.contract import (
 )
 from ontology_author.world.core.model import ResolutionStatus
 from ontology_author.world.core.resolution import Resolution
+from ontology_author.world.runtime.material_support import (
+    SUPPORT_CHANGED,
+    SUPPORT_MISSING,
+    SUPPORT_PRESERVED,
+    SUPPORT_UNKNOWN,
+    material_support_for_warrant,
+)
 
 
 class ResolutionEvaluationError(ValueError):
@@ -31,14 +38,17 @@ def resolve_world(
     conflict_checker: CommitmentConflictChecker | None = None,
     evidence_authority: Any | None = None,
     adjudication_authority: Any | None = None,
+    source: Any | None = None,
 ) -> tuple[Resolution, ...]:
     """Evaluate every durable Contract Obligation in deterministic order.
 
-    The resolver reads only the candidate World: obligations, candidate
+    The resolver reads the candidate World: obligations, candidate
     relationships, assertion tuples, and recorded Warrant façade data. It
     joins the Warrant's source identities to the explicitly supplied evidence
-    authority configuration; it never reads project files and never constructs
-    a Commitment.
+    authority configuration. When ``source`` is supplied, it also
+    deterministically reproduces any constructor-declared material evidence
+    region. It never searches a file for supporting sentences and never
+    constructs a Commitment.
     """
 
     bound = world.contract_identity()
@@ -58,14 +68,15 @@ def resolve_world(
             commitments[commitment_id] = commitment
             warrant = world.warrant_for_assertion(commitment_id)
             authority = _derive_evidence_authority(evidence_authority, warrant)
+            assessment = contract.assess_candidate(
+                obligation=obligation,
+                commitment=commitment,
+                warrant=warrant,
+                warrant_authorities=authority["authority_kinds"],
+                authority_basis=authority["authority_basis"],
+            )
             assessments.append(
-                contract.assess_candidate(
-                    obligation=obligation,
-                    commitment=commitment,
-                    warrant=warrant,
-                    warrant_authorities=authority["authority_kinds"],
-                    authority_basis=authority["authority_basis"],
-                )
+                _apply_material_support(assessment, warrant, source)
             )
         assessments.sort(key=lambda item: item.commitment_id)
         adjudication_assessments: list[AdjudicationAssessment] = []
@@ -81,10 +92,22 @@ def resolve_world(
         elif not sufficient_ids:
             status = ResolutionStatus.INSUFFICIENT_WARRANT
             selected = None
-            reason = (
-                f"Obligation {obligation_id} has candidates, but none meets the "
-                "Contract resolution warrant standard."
-            )
+            if any(
+                (item.material_support or {}).get("status")
+                in {SUPPORT_CHANGED, SUPPORT_MISSING, SUPPORT_UNKNOWN}
+                and item.warrant_authorities
+                for item in assessments
+            ):
+                reason = (
+                    f"Obligation {obligation_id} has candidates with source "
+                    "standing, but none currently has a reproducible material "
+                    "evidence basis."
+                )
+            else:
+                reason = (
+                    f"Obligation {obligation_id} has candidates, but none meets the "
+                    "Contract resolution warrant standard."
+                )
         else:
             conflicts: list[tuple[str, str]] = []
             if conflict_checker is not None:
@@ -185,7 +208,7 @@ def resolve_world(
             adjudication_assessments=tuple(adjudication_assessments),
             resolution_basis=tuple(resolution_basis),
         )
-        world.record_resolution(
+        world._materialize_resolution(
             obligation_id=obligation_id,
             status=result.status.value,
             selected_commitment_id=result.selected_commitment_id,
@@ -198,6 +221,43 @@ def resolve_world(
         )
         results.append(result)
     return tuple(results)
+
+
+def _apply_material_support(
+    assessment: CandidateAssessment,
+    warrant: Mapping[str, Any],
+    source: Any | None,
+) -> CandidateAssessment:
+    """Separate material-region currency from source-authority standing."""
+
+    support = material_support_for_warrant(warrant, source)
+    if support is None:
+        return assessment
+    support_status = str(support.get("status") or "")
+    invalidate = support_status in {SUPPORT_CHANGED, SUPPORT_MISSING} or (
+        support_status == SUPPORT_UNKNOWN and source is not None
+    )
+    if assessment.status == "SUFFICIENT" and invalidate:
+        return CandidateAssessment(
+            commitment_id=assessment.commitment_id,
+            status="INSUFFICIENT",
+            reason=(
+                f"Commitment {assessment.commitment_id} has acceptable source "
+                f"standing, but its material evidence basis is {support_status}: "
+                f"{support.get('reason') or 'not current'}"
+            ),
+            warrant_authorities=assessment.warrant_authorities,
+            authority_basis=assessment.authority_basis,
+            material_support=support,
+        )
+    return CandidateAssessment(
+        commitment_id=assessment.commitment_id,
+        status=assessment.status,
+        reason=assessment.reason,
+        warrant_authorities=assessment.warrant_authorities,
+        authority_basis=assessment.authority_basis,
+        material_support=support,
+    )
 
 
 def _evaluate_adjudications(

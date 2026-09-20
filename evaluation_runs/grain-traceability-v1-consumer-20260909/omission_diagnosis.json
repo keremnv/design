@@ -1,0 +1,23 @@
+{
+  "frozen_evaluator_verdict": "PARTIALLY_SUPPORTED",
+  "purpose_only_interpretation": "SUPPORTED",
+  "cases": {
+    "LO-3_Spout-3": {
+      "host_established": true,
+      "purpose_required": false,
+      "obligation_source": "STANDARD_CQ_ONLY",
+      "OA-1": ["MODELED_AT_COARSER_GRAIN", "PURPOSE_SALIENCE_OMISSION", "SELF_TEST_COVERAGE_GAP"],
+      "OA-2": ["MODELED_AT_COARSER_GRAIN", "PURPOSE_SALIENCE_OMISSION", "SELF_TEST_COVERAGE_GAP"],
+      "root_cause": "shared abstraction boundary; benchmark asks finer loadout-point grain than purpose makes salient"
+    },
+    "OUT-5002_source_quantities": {
+      "host_established": false,
+      "purpose_required": false,
+      "obligation_source": "NOVEL_BENCHMARK_EXTENSION",
+      "OA-1": ["CONSIDERED_AND_LEFT_UNRESOLVED", "SOURCE_AMBIGUITY"],
+      "OA-2": ["CONSIDERED_AND_LEFT_UNRESOLVED", "SOURCE_AMBIGUITY"],
+      "root_cause": "gold/canonical ledger over-specifies a quantity split not present in host evidence"
+    }
+  },
+  "kernel_pressure": "NONE"
+}

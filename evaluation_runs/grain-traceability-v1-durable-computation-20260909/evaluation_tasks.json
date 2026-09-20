@@ -1,0 +1,65 @@
+{
+  "experiment": "grain-traceability-v1-durable-computation-20260909",
+  "tasks": [
+    {
+      "task_id": "EVAL-SRC-001",
+      "family": "shipment_source_status",
+      "request": "For outbound dispatch PGE-OUT-5002, determine which inbound material identities are established as contributing, what source location is established, and whether individual source allocation remains unresolved.",
+      "parameters": {"dispatch": "PGE-OUT-5002"}
+    },
+    {
+      "task_id": "EVAL-SRC-002",
+      "family": "shipment_source_status",
+      "request": "For outbound dispatch PGE-OUT-5003, determine the established source location, any established inbound material identity, and the missing or unresolved source linkage.",
+      "parameters": {"dispatch": "PGE-OUT-5003"}
+    },
+    {
+      "task_id": "EVAL-SRC-003",
+      "family": "shipment_source_status",
+      "request": "For outbound dispatch PGE-OUT-5004, determine which inbound material identities are established as contributing and whether the individual allocation is resolved.",
+      "parameters": {"dispatch": "PGE-OUT-5004"}
+    },
+    {
+      "task_id": "EVAL-PROV-001",
+      "family": "processor_receipt_provenance",
+      "request": "For processor receipt HFM-IN-602, summarize its upstream dispatch and inbound material identities, downstream processing output, and any unresolved allocation detail.",
+      "parameters": {"processor_receipt": "HFM-IN-602"}
+    },
+    {
+      "task_id": "EVAL-PROV-002",
+      "family": "processor_receipt_provenance",
+      "request": "For processor receipt HFM-IN-604, state the upstream dispatch and source status, whether an identified inbound load is established, and whether a processing output is recorded.",
+      "parameters": {"processor_receipt": "HFM-IN-604"}
+    },
+    {
+      "task_id": "EVAL-CUST-001",
+      "family": "custody_owner_at",
+      "request": "At 2025-09-04T13:10:00-05:00, determine the recorded owner and custodian of material WB-390.",
+      "parameters": {"material": "WB-390", "timestamp": "2025-09-04T13:10:00-05:00"}
+    },
+    {
+      "task_id": "EVAL-CUST-002",
+      "family": "custody_owner_at",
+      "request": "At 2025-09-03T12:00:00-05:00, determine the recorded owner and custodian of material EF-18.",
+      "parameters": {"material": "EF-18", "timestamp": "2025-09-03T12:00:00-05:00"}
+    },
+    {
+      "task_id": "EVAL-INSP-001",
+      "family": "inspection_downstream_scope",
+      "request": "Determine what downstream shipment, processor receipt, and processed output are established as affected by inspection sample SMP-602B, and whether attribution to individual inbound material is resolved.",
+      "parameters": {"sample": "SMP-602B"}
+    },
+    {
+      "task_id": "EVAL-INSP-002",
+      "family": "inspection_downstream_scope",
+      "request": "Determine what downstream shipment and processor receipt are established as affected by inspection sample SMP-604Q, whether a processed output is recorded, and what source attribution remains unresolved.",
+      "parameters": {"sample": "SMP-604Q"}
+    },
+    {
+      "task_id": "EVAL-INSP-003",
+      "family": "inspection_downstream_scope",
+      "request": "For inspection sample SMP-UNLISTED, report whether a validated downstream shipment, processor receipt, or inbound source identity is established, and preserve any unresolved linkage.",
+      "parameters": {"sample": "SMP-UNLISTED"}
+    }
+  ]
+}

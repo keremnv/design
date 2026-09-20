@@ -1,6 +1,11 @@
 # Ontology Author research direction
 
-**Status:** working research note, not product specification.
+**Status:** historical research note, not product specification. It records
+the older purpose-relative programme (Worlds as purpose-relative
+abstractions). For the current architecture see [`ARCHITECTURE.md`](ARCHITECTURE.md);
+for the newer construction/epistemic-guarantee synthesis see
+[`CONSTRUCTION_AND_APPLICATION_RESEARCH.md`](CONSTRUCTION_AND_APPLICATION_RESEARCH.md).
+Open questions below remain questions, not requirements.
 
 Current product constraints are in [`FOUNDATIONS.md`](FOUNDATIONS.md). This
 document records the hypotheses, decompositions, open questions, and
@@ -640,6 +645,14 @@ Measure whether the agent:
 - understands the purpose boundary;
 - knows when raw fallback is appropriate;
 - avoids treating the World as authoritative reality outside its scope.
+
+Parked consumer-SQL note (not a result): sealed Worlds are ordinary SQLite with
+a catalog (`_world_relations`) plus one table per relation. On a tiny
+authority World, a coding agent can navigate that catalog and consume
+construction’s compiled facts. That is not the same as recovering original
+source text (grounding is a pointer, by contract) and is easy to overstate if
+the program spine was snapshotted from already-wired code. Working notes:
+[`evaluation_runs/authority-context-probe-20260914/NOTES.md`](../evaluation_runs/authority-context-probe-20260914/NOTES.md).
 
 ### Phase 3 — bottom-up refinement
 

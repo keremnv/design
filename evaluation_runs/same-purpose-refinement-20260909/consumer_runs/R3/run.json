@@ -1,0 +1,21 @@
+{
+  "id": "R3",
+  "case": "control-world-already-sufficient",
+  "prompt": "A mill desk asked: which mill receiving slip accepted the truck dispatched as PGE-OUT-5001, and what mill run used that receipt? Write the answer to answer.md.",
+  "started": "2026-09-09T18:32:09.886572+00:00",
+  "ended": "2026-09-09T18:57:09.989237+00:00",
+  "exit_code": 124,
+  "timed_out": true,
+  "workspace": "/tmp/oa-spr-isolated-R3",
+  "isolated": true,
+  "model_requested": "composer-2.5",
+  "model_reported": "Composer 2.5",
+  "model_ok": true,
+  "construction_changed": false,
+  "purpose_changed": false,
+  "sqlite_changed": false,
+  "created_other_worlds": false,
+  "world_names": [
+    "yard-trace"
+  ]
+}

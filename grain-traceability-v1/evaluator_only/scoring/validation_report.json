@@ -1,0 +1,44 @@
+{
+  "benchmark_id": "grain-traceability-v1",
+  "errors": [],
+  "ready": true,
+  "host_visible_file_count": 10,
+  "record_counts": {
+    "elevator_receipts": 5,
+    "bin_movements": 10,
+    "loadout_log": 4,
+    "carrier_manifests": 4,
+    "processor_receipts": 3,
+    "mill_runs": 2,
+    "inspection_results": 4,
+    "ownership_records": 7,
+    "canonical_events": 31
+  },
+  "question_counts": {"standard": 10, "novel": 10},
+  "checks": {
+    "canonical_ledger_authored_before_projection": true,
+    "every_hidden_question_checked_against_ledger": true,
+    "gold_evidence_basis_present": true,
+    "unresolved_cases_have_host_visible_basis": true,
+    "host_visibility_terms": true,
+    "no_evaluator_or_reference_files_in_host_visible": true,
+    "no_universal_join_key": true,
+    "reference_model_covers_all_standard_questions": true,
+    "external_artifacts_redistribution_required": false,
+    "ontology_author_invoked": false,
+    "world_constructed": false,
+    "raw_or_world_consumers_run": false
+  },
+  "host_visible_hashes": {
+    "host_visible/PURPOSE.md": "06ff902ff04add77e6e95002da0a0cc3a331e9cb32e6273d4f67e305627b5743",
+    "host_visible/README.md": "d6f94d7c34bf4243568b7614143f5a60ccfbda28c1431e49765e08ef5b558850",
+    "host_visible/evidence/bin_movements.csv": "d57fda58431cb10feebc035b445e4707f5e0d0198a20ff3849176f90319941ab",
+    "host_visible/evidence/carrier_manifests.json": "a23045858ac1cf8f6201800d23371ca4c25bb5c12e0651c8c5416c96fa9a7c90",
+    "host_visible/evidence/elevator_receipts.csv": "59b06ece558300d43910c22d6ebba571db63ca0fff8e1a461428f2098bb2a524",
+    "host_visible/evidence/inspection_results.csv": "61cfc6c5a0b8fb1e041bedba78b2748be25e33c087d7cd962d716dbb7514bdf8",
+    "host_visible/evidence/loadout_log.csv": "86133830e2c2aa3de92c12179e64854451316867f17e42051c6b36e3f91794ef",
+    "host_visible/evidence/operating_notes.md": "dd3620dd0747806d63d96790ee02d82afcfdd9e6b5ddee4021e7dba5f2578e0e",
+    "host_visible/evidence/ownership_records.csv": "6999704b14b702497ab846ec1ef0941207ece03c0e7946146c3213c5f16cd32d",
+    "host_visible/evidence/processor_receipts.json": "5a04c8491e3abce6facba05abf39a54d2b993b5aced1bfe28a3c15dd62baa20a"
+  }
+}

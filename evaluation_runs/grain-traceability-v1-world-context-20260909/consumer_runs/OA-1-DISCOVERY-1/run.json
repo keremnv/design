@@ -1,0 +1,15 @@
+{
+  "run_id": "OA-1-DISCOVERY-1",
+  "world": "OA-1",
+  "condition": "DISCOVERY",
+  "replicate": 1,
+  "world_hash": "d39faa9ed9e40b03fea7cd329033ae7756664f4dae533ff83a6c7c725006b116",
+  "started": "2026-09-09T07:19:50.210229+00:00",
+  "ended": "2026-09-09T07:21:45.183993+00:00",
+  "exit_code": 0,
+  "workspace": "/tmp/grain-traceability-v1-world-context-20260909/attempt1/workspaces/OA-1-DISCOVERY-1",
+  "codex_home": "/tmp/grain-traceability-v1-world-context-20260909/attempt1/codex-home/OA-1-DISCOVERY-1",
+  "run_output": "/tmp/grain-traceability-v1-world-context-20260909/attempt1/runs/OA-1-DISCOVERY-1",
+  "native_sources_visible": false,
+  "context_visible": false
+}

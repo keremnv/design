@@ -1,0 +1,12 @@
+{
+  "relations": {
+    "dispatch_to_mill": "WORLD",
+    "intake": "WORLD",
+    "loadout": "WORLD",
+    "manifest": "WORLD",
+    "mill_receipt": "WORLD",
+    "mill_run": "WORLD",
+    "place_alias": "WORLD",
+    "purpose_requirement_failure": "PURPOSE"
+  }
+}

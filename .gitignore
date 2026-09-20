@@ -50,3 +50,12 @@ benchmarks/
 examples/
 archive/
 results/
+
+# External RepoProbe release/cache/export material is benchmark input, not product code.
+research/repoprobe_prep/external/
+research/repoprobe_prep/snapshots/
+research/repoprobe_prep/exports/
+research/repoprobe_prep/export_manifests/
+
+# Re-exclude binaries under the un-ignored .worlds/ tree (text fixtures stay tracked).
+*.sqlite

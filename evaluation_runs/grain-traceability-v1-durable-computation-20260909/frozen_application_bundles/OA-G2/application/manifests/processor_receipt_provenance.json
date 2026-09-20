@@ -1,0 +1,14 @@
+{
+  "id": "processor_receipt_provenance",
+  "description": "Join mill_receipt to inbound_same_movement, outbound_same_movement / established_shipment, mill_process, and upstream shipment_source_status. Processing is present only when mill_process names the slip.",
+  "parameters": {
+    "processor_receipt": {"type": "string", "required": true}
+  },
+  "result": {
+    "established_path": "{dispatch_ref, manifest_no, mill_receipt, outbound_link_basis, inbound_link_basis} or null",
+    "processing": "mill run and output_batch or null",
+    "upstream_source": "source bin and ticket allocation status of the linked dispatch",
+    "unresolved_links": "{mill_receipt_missing, processing_run_missing, upstream_ticket_allocation}"
+  },
+  "invoke": "application/run processor_receipt_provenance --processor_receipt HFM-IN-601"
+}

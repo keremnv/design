@@ -168,6 +168,9 @@ def build_app(world: Path | str, *, token: str | None = None):
             lambda adapter: adapter.obligation(required(request, "obligation_id"))
         )
 
+    async def construction_receipt(_request):
+        return await session.call(lambda adapter: adapter.construction_receipt())
+
     async def query(request):
         body = await request.json()
         sql = str(body.get("sql") or "").strip()
@@ -216,6 +219,7 @@ def build_app(world: Path | str, *, token: str | None = None):
         Route("/world/obligations", guard(obligations)),
         Route("/world/resolution", guard(resolution)),
         Route("/world/obligation", guard(obligation)),
+        Route("/world/construction-receipt", guard(construction_receipt)),
         Route("/world/query", query, methods=["POST"]),
     ]
     return Starlette(lifespan=lifespan, routes=routes)

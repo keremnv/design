@@ -1,0 +1,62 @@
+{
+  "run_id": "OA-G1-DURABLE-2",
+  "world": "OA-G1",
+  "condition": "DURABLE",
+  "replicate": 2,
+  "model": "cursor-grok-4.6-medium",
+  "reasoning": "medium",
+  "started": "2026-09-09T08:40:38.592327+00:00",
+  "ended": "2026-09-09T08:43:45.430166+00:00",
+  "duration_seconds": 186.837839,
+  "exit_code": 0,
+  "workspace": "/tmp/grain-traceability-v1-durable-computation-20260909-consumers/workspaces/OA-G1-DURABLE-2",
+  "output": "/home/kerem/Desktop/Personal Projects/generalauthor/evaluation_runs/grain-traceability-v1-durable-computation-20260909/consumer_runs/OA-G1-DURABLE-2",
+  "native_sources_visible": false,
+  "telemetry": {
+    "usage": {
+      "inputTokens": 76356,
+      "outputTokens": 9189,
+      "cacheReadTokens": 201984,
+      "cacheWriteTokens": 0
+    },
+    "tool_actions": 29,
+    "read_paths": [
+      "/workspace/INSTRUCTION.md",
+      "/workspace/PURPOSE.md",
+      "/workspace/application/catalog.json",
+      "/workspace/application/lib/compute.py",
+      "/workspace/application/lib/db.py",
+      "/workspace/application/manifests/custody_owner_at.json",
+      "/workspace/application/manifests/inspection_downstream_scope.json",
+      "/workspace/application/manifests/processor_receipt_provenance.json",
+      "/workspace/application/manifests/shipment_source_status.json",
+      "/workspace/application/run.py",
+      "/workspace/evaluation_tasks.json",
+      "/workspace/final_answer.md",
+      "/workspace/world-context.md",
+      "/workspace/world/world.purpose.json"
+    ],
+    "command_texts": [
+      "python3 application/run.py shipment_source_status --param dispatch=PGE-OUT-5002 --pretty",
+      "python3 application/run.py shipment_source_status --param dispatch=PGE-OUT-5003 --pretty",
+      "python3 application/run.py shipment_source_status --param dispatch=PGE-OUT-5004 --pretty",
+      "python3 application/run.py processor_receipt_provenance --param processor_receipt=HFM-IN-602 --pretty",
+      "python3 application/run.py processor_receipt_provenance --param processor_receipt=HFM-IN-604 --pretty",
+      "python3 application/run.py custody_owner_at --param material=WB-390 --param timestamp=2025-09-04T13:10:00-05:00 --pretty",
+      "python3 application/run.py custody_owner_at --param material=EF-18 --param timestamp=2025-09-03T12:00:00-05:00 --pretty",
+      "python3 application/run.py inspection_downstream_scope --param sample=SMP-602B --pretty",
+      "python3 application/run.py inspection_downstream_scope --param sample=SMP-604Q --pretty",
+      "python3 application/run.py inspection_downstream_scope --param sample=SMP-UNLISTED --pretty",
+      "python3 - <<'PY'\nimport sqlite3\nconn = sqlite3.connect('/workspace/world/world.sqlite')\nconn.row_factory = sqlite3.Row\nprint('TABLES:')\nfor r in conn.execute(\"SELECT name FROM sqlite_master WHERE type='table' ORDER BY name\"):\n    print(' ', r[0])\nprint('\\n-- lab_result --')\nfor r in conn.execute('SELECT * FROM lab_result'):\n    print(dict(r))\nprint('\\n-- mill_intake --')\nfor r in conn.execute('SELECT * FROM mill_intake'):\n    print(dict(r))\nprint('\\n-- mill_process --')\nfor r in conn.execute('SELECT * FROM mill_process'):\n    print(dict(r))\nprint('\\n-- ticket_named_on_move --')\nfor r in conn.execute('SELECT * FROM ticket_named_on_move'):\n    print(dict(r))\nprint('\\n-- bin_transfer --')\nfor r in conn.execute('SELECT * FROM bin_transfer'):\n    print(dict(r))\nprint('\\n-- purpose_requirement_failure --')\nfor r in conn.execute('SELECT * FROM purpose_requirement_failure'):\n    print(dict(r))\nprint('\\n-- ownership_event --')\nfor r in conn.execute('SELECT * FROM ownership_event'):\n    print(dict(r))\nprint('\\n-- commercial_scope --')\nfor r in conn.execute('SELECT * FROM commercial_scope'):\n    print(dict(r))\nprint('\\n-- elevator_intake --')\nfor r in conn.execute('SELECT * FROM elevator_intake'):\n    print(dict(r))\nprint('\\n-- elevator_loadout --')\nfor r in conn.execute('SELECT * FROM elevator_loadout'):\n    print(dict(r))\nprint('\\n-- carrier_departure --')\nfor r in conn.execute('SELECT * FROM carrier_departure'):\n    print(dict(r))\nprint('\\n-- known_as for samples --')\nfor r in conn.execute(\"SELECT * FROM known_as WHERE token LIKE '%SMP%' OR entity_id LIKE '%sample%'\"):\n    print(dict(r))\nPY",
+      "python3 - <<'PY'\nimport sqlite3\nconn = sqlite3.connect('/workspace/world/world.sqlite')\nconn.row_factory = sqlite3.Row\nprint('-- extract_coverage --')\nfor r in conn.execute('SELECT * FROM extract_coverage'):\n    print(dict(r))\nprint('-- consignee_is_not_receipt --')\nfor r in conn.execute('SELECT * FROM consignee_is_not_receipt'):\n    print(dict(r))\nprint('-- known_as tickets --')\nfor r in conn.execute(\"SELECT * FROM known_as WHERE entity_id LIKE 'ticket:%' OR entity_id LIKE 'mill-receipt:%' OR entity_id LIKE 'movement:%' ORDER BY entity_id, system\"):\n    print(dict(r))\nPY"
+    ],
+    "application_invocations": 10,
+    "sqlite_actions": 2,
+    "python_actions": 12,
+    "schema_inspection_actions": 1,
+    "ad_hoc_semantic_query_actions": 2,
+    "native_source_reads": false,
+    "catalog_reads": true,
+    "computation_source_reads": true
+  }
+}

@@ -193,11 +193,12 @@ governed World. An in-scope program identity remains represented even when no
 semantic or governance claim attaches to it. Program-universe completeness
 does not imply semantic or governance completeness.
 
-OMG KDM 1.4 is the normative semantic basis for the v0 mechanically derived
-program spine. Snapshot program identities are manifestations in one
-mechanical snapshot; cross-version lineage is a later explicit mapping between
-those manifestations. The detailed KDM profile belongs in
-`docs/KDM_PROFILE.md`, not in these foundations.
+The native spine core and its versioned standard capabilities are the
+normative basis for the mechanically derived program spine. Snapshot program
+identities are manifestations in one mechanical snapshot; cross-version
+lineage is a later explicit mapping between those manifestations. Extractors
+may use any implementation technology, but their durable output must satisfy
+the declared native core and capability contracts.
 
 This task does not select the program-spine technology.
 
@@ -237,7 +238,9 @@ complete. A README, generated artifact, source file, authoritative policy, and
 test fixture may all ground claims while having different governance standing.
 
 Authority is an application-level boundary separate from generic World
-grounding.
+grounding. The authorized source universe, standing, and construction receipt
+are specified by
+[`AUTHORITY_CONSTRUCTION_CONTRACT.md`](AUTHORITY_CONSTRUCTION_CONTRACT.md).
 
 ### 6. Epistemic origin and referent resolution must survive
 
@@ -275,9 +278,11 @@ ambiguous
 ```
 
 For example, a document may explicitly assert a relationship while both
-participating referents require agent resolution. The permanent schema for
-these dimensions is not fixed here, but future code must retain enough
-provenance to avoid silently collapsing them.
+participating referents require agent resolution. The permanent kernel schema
+for these dimensions is not fixed here, but future code must retain enough
+provenance to avoid silently collapsing them. The application-level taxonomies
+and grounding envelope are specified by
+[`AUTHORITY_CONSTRUCTION_CONTRACT.md`](AUTHORITY_CONSTRUCTION_CONTRACT.md).
 
 `ConstructionOrigin.SEMANTIC` is therefore only a coarse construction/support
 classification. It is not the full governance epistemic model.
@@ -365,7 +370,11 @@ Case assembly selects the persisted referents, program facts, semantic claims,
 provenance, and exact original authoritative material that accompany a concrete
 change. Adjudication interprets that bounded material against the change.
 
-Neither operation should be hidden inside the other.
+Neither operation should be hidden inside the other. Program-side assembly
+is specified by
+[`GOVERNANCE_CASE_CONTRACT.md`](GOVERNANCE_CASE_CONTRACT.md).
+Adjudication of an assembled case is specified by
+[`GOVERNANCE_ADJUDICATION_CONTRACT.md`](GOVERNANCE_ADJUDICATION_CONTRACT.md).
 
 ### 14. Construction is free; durable output is rigid
 
@@ -401,27 +410,36 @@ These require experiments before they become product rules.
 
 ## Deferred questions
 
-Leave these unresolved until the program-spine milestone and its evidence make
-the choices concrete:
+Program-spine durable output is specified by
+[`PROGRAM_SPINE_CONTRACT.md`](PROGRAM_SPINE_CONTRACT.md) and related spine
+documents. Authoritative-source construction into durable semantic/program
+relationships is specified by
+[`AUTHORITY_CONSTRUCTION_CONTRACT.md`](AUTHORITY_CONSTRUCTION_CONTRACT.md).
+Those documents freeze application-level contracts. Program-side attachment
+maintenance and deterministic case assembly are specified by
+[`AUTHORITY_MAINTENANCE_CONTRACT.md`](AUTHORITY_MAINTENANCE_CONTRACT.md) and
+[`GOVERNANCE_CASE_CONTRACT.md`](GOVERNANCE_CASE_CONTRACT.md). Adjudication
+of an assembled case is specified by
+[`GOVERNANCE_ADJUDICATION_CONTRACT.md`](GOVERNANCE_ADJUDICATION_CONTRACT.md).
+Those documents freeze application-level contracts. They do not implement
+an adjudicator runtime, agent execution, or source-authority lineage.
 
-- Which program-spine technology and exact fact contract will be used?
-- What permanent schema combines support mode, referent resolution,
-  confidence, warrant dependencies, and exact grounding?
-- How should source, semantic, and program identity namespaces be represented
-  across World revisions and projects?
-- What authority registry and policy binds source observations to governance
-  standing?
-- How are source, program, adapter, resolver, and semantic dependency changes
-  detected and invalidated?
+Leave these unresolved until later evidence makes the choices concrete:
+
+- How are source, adapter, resolver, and semantic dependency changes
+  detected and invalidated? (Program-side attachment-grounds maintenance
+  against ProgramDelta is specified; source `AuthorityDelta` is not.)
 - How are semantic referents carried across World revisions without making a
   sealed World mutable?
 - Which relations belong in durable semantic structure and which belong in
   case-local or procedural state?
-- What source and program adapter contracts are needed, and how should their
-  lifecycle be managed?
 - How are unresolved cases repaired, escalated, or left unresolved?
-- What adjudication input and output format is appropriate, including human
-  review and policy decisions?
+- How should a future orchestrator act on `GovernanceAdjudication`
+  (continue, revise, request approval, seek more context) without
+  collapsing those actions into conformance?
+- Which additional source drivers beyond Markdown v0 are needed, and how
+  their lifecycles should be managed?
 
-No program spine, source adapter, diff analysis, traversal, adjudication
-policy, or search infrastructure is implied by this document.
+No source-driver implementation, diff analysis, traversal, adjudicator
+runtime, execution policy, or search infrastructure is implied by this
+document.

@@ -39,12 +39,18 @@ def rebuild(
     workspace: Path | str,
     *,
     construction: Path | str | None = None,
+    purpose: str | Path | None = None,
     contract: Contract | None = None,
     governance: Any | None = None,
     evidence_authority: Any | None = None,
     adjudication_authority: Any | None = None,
 ) -> RunResult:
-    """Construct, validate, and replace this World's sealed bundle."""
+    """Construct, validate, and replace this World's sealed bundle.
+
+    ``purpose=None`` is the governed Purpose-free path; ``PURPOSE.md`` is
+    never read implicitly.  An explicit text-or-path request builds the
+    legacy Purpose context for old three-argument constructors.
+    """
 
     project = Project(
         workspace,
@@ -53,7 +59,7 @@ def rebuild(
         evidence_authority=evidence_authority,
         adjudication_authority=adjudication_authority,
     )
-    result = project.run(construction)
+    result = project.run(construction, purpose=purpose)
     payload = {
         "succeeded": bool(result.succeeded),
         "reason": result.reason,

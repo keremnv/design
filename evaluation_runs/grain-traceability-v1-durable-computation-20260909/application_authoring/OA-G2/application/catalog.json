@@ -1,0 +1,53 @@
+{
+  "application": "grain-trace-computations",
+  "version": "1",
+  "world": {
+    "path": "../world/world.sqlite",
+    "id": "v0",
+    "revision": 95,
+    "hash": "24f183176c742ec1326776de12cb73aae98250bb0e8bc89df0f8b37be6f1d220",
+    "sqlite_sha256": "fdd4f332b7b5372bdfc1da6f0e9e1a33b96aa6c12c129768bec30e11f80f4586"
+  },
+  "invoke": {
+    "entrypoint": "application/run",
+    "usage": "application/run COMPUTATION --param value",
+    "stdout": "JSON object with computation, parameters, world, result"
+  },
+  "computations": [
+    {
+      "id": "identifier_canonical",
+      "manifest": "manifests/identifier_canonical.json",
+      "summary": "Map a recorded spelling to its World canonical identifier."
+    },
+    {
+      "id": "unresolved_failures",
+      "manifest": "manifests/unresolved_failures.json",
+      "summary": "List purpose_requirement_failure rows, optionally for one identity."
+    },
+    {
+      "id": "bin_tickets_before",
+      "manifest": "manifests/bin_tickets_before.json",
+      "summary": "Tickets established as moved into a bin at or before a timestamp."
+    },
+    {
+      "id": "shipment_source_status",
+      "manifest": "manifests/shipment_source_status.json",
+      "summary": "Established source bin, named or candidate inbound tickets, and allocation unresolvedness for an outbound dispatch."
+    },
+    {
+      "id": "processor_receipt_provenance",
+      "manifest": "manifests/processor_receipt_provenance.json",
+      "summary": "Upstream dispatch/manifest path, mill process output, and unresolved links for a processor receipt."
+    },
+    {
+      "id": "custody_owner_at",
+      "manifest": "manifests/custody_owner_at.json",
+      "summary": "Recorded owner and custodian of a material at a timestamp from covering ownership_event rows."
+    },
+    {
+      "id": "inspection_downstream_scope",
+      "manifest": "manifests/inspection_downstream_scope.json",
+      "summary": "Established and unresolved downstream shipments, mill receipts, and process outputs for a lab sample."
+    }
+  ]
+}

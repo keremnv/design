@@ -70,8 +70,6 @@ class ConstructionWorld:
         self,
         inner: SemanticWorld,
         contract: Contract | None = None,
-        *,
-        constructor_authority: Any | None = None,
     ) -> None:
         self._inner = inner
         stored = inner.contract_identity()
@@ -81,7 +79,6 @@ class ConstructionWorld:
                 "Construction Contract identity differs from the World binding"
             )
         self.contract = selected
-        self.constructor_authority = constructor_authority
         self.admission: dict[str, Scope] = {}
 
     @classmethod
@@ -91,7 +88,6 @@ class ConstructionWorld:
         *,
         world_id: str,
         contract: Contract | None = None,
-        constructor_authority: Any | None = None,
     ) -> "ConstructionWorld":
         selected = contract or Contract.default()
         return cls(
@@ -102,7 +98,6 @@ class ConstructionWorld:
                 contract_revision=selected.contract_revision,
             ),
             selected,
-            constructor_authority=constructor_authority,
         )
 
     @classmethod
@@ -111,13 +106,15 @@ class ConstructionWorld:
         path: Path | str,
         *,
         world_id: str | None = None,
-        constructor_authority: Any | None = None,
+        read_only: bool = True,
     ) -> "ConstructionWorld":
         db_path = Path(path)
         inner = SemanticWorld(
-            db_path, world_id=world_id or world_id_of(db_path), read_only=True
+            db_path,
+            world_id=world_id or world_id_of(db_path),
+            read_only=read_only,
         )
-        world = cls(inner, constructor_authority=constructor_authority)
+        world = cls(inner)
         admission_path = db_path.parent / "world.admission.json"
         if admission_path.exists():
             world.load_admission(admission_path)
@@ -215,7 +212,7 @@ class ConstructionWorld:
     def adjudications_for_obligation(self, obligation_id: str) -> list[dict[str, Any]]:
         return self._inner.adjudications_for_obligation(obligation_id)
 
-    def record_resolution(
+    def _materialize_resolution(
         self,
         *,
         obligation_id: str,
@@ -226,9 +223,10 @@ class ConstructionWorld:
         adjudication_assessments: Sequence[Mapping[str, Any]] = (),
         resolution_basis: Sequence[Mapping[str, Any]] = (),
     ) -> str:
+        """Internal resolver-only bridge to persisted derived state."""
         if self._inner.read_only:
             raise ConstructionError("World is read-only")
-        return self._inner._store.record_resolution(
+        return self._inner._materialize_resolution(
             obligation_id=obligation_id,
             status=status,
             selected_commitment_id=selected_commitment_id,
@@ -292,7 +290,6 @@ class ConstructionWorld:
                 has_provenance=True,
                 has_construction_method=has_construction_method(grounding),
                 semantic_reference_kinds=reference_kinds,
-                authority=self.constructor_authority,
             )
         except ContractAdmissionError as error:
             if error.reason == "ungrounded_world_base":
@@ -384,7 +381,6 @@ class ConstructionWorld:
                                 support["has_construction_method"]
                             ),
                             semantic_reference_kinds=reference_kinds,
-                            authority=self.constructor_authority,
                         )
                     except ContractAdmissionError as error:
                         errors.append(
@@ -422,6 +418,9 @@ class ConstructionWorld:
 
     def query(self, sql: str, parameters: Sequence[Any] = ()) -> list[dict[str, Any]]:
         return self._inner.query(sql, parameters)
+
+    def latest_completeness(self, relation: str) -> dict[str, Any] | None:
+        return self._inner.latest_completeness(relation)
 
     def relation_schema(self, relation: str) -> dict[str, Any]:
         return self._inner._store.relation_schema(relation)

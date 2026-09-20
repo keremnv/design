@@ -1,0 +1,105 @@
+{
+  "benchmark_id": "grain-traceability-v1",
+  "answers": [
+    {
+      "id": "CQ-01",
+      "expected": [{"event": "E-LOAD-201", "associated_points": ["BIN-12", "LO-3", "RLT-088"]}],
+      "establishable": true,
+      "expected_unresolvedness": [],
+      "evidence_basis": ["bin_movements.csv:5", "loadout_log.csv:2", "operating_notes.md:local names"],
+      "completeness_assumptions": ["the question asks for points recorded for this movement, not every physical contact"],
+      "acceptable_variants": ["B-12 for BIN-12", "Spout 3 or LOAD-PIT-2 for LO-3", "truck RLT-088 for the road container"],
+      "unsupported_closure": ["claiming a different storage bin", "claiming the truck was the only container involved"]
+    },
+    {
+      "id": "CQ-02",
+      "expected": ["E-RECV-101", "E-BIN-101", "E-SAMPLE-101", "E-LOAD-201", "E-CUST-201A", "E-TRANS-201", "E-RECV-201", "E-CUST-201B", "E-OWN-201", "E-PROC-301"],
+      "establishable": true,
+      "expected_unresolvedness": [],
+      "evidence_basis": ["elevator_receipts.csv:2", "bin_movements.csv:2,5", "inspection_results.csv:2", "carrier_manifests.json:1", "processor_receipts.json:receiving_log[0],mill_runs[0]", "ownership_records.csv:2,4,7"],
+      "completeness_assumptions": ["the listed source extracts are sufficient for the recorded path of DR-44"],
+      "acceptable_variants": ["returning the event records by their host identifiers rather than hidden event IDs", "grouping custody and title changes with their source records"],
+      "unsupported_closure": ["omitting the processor receipt while claiming a complete path", "inventing an unrecorded farm-side event"]
+    },
+    {
+      "id": "CQ-03",
+      "expected": ["INTAKE-2", "BIN-12", "RLT-088", "S-4"],
+      "establishable": true,
+      "expected_unresolvedness": [],
+      "evidence_basis": ["elevator_receipts.csv:2", "bin_movements.csv:2,5", "carrier_manifests.json:1", "processor_receipts.json:receiving_log[0]"],
+      "completeness_assumptions": ["contact means a recorded operational holding/transport point"],
+      "acceptable_variants": ["PGE-01 as the facility containing INTAKE-2 and BIN-12", "HFM-N as the site containing S-4"],
+      "unsupported_closure": ["treating an unrecorded conveyor or road segment as observed evidence"]
+    },
+    {
+      "id": "CQ-04",
+      "expected": [{"place": "BIN-12", "status": "established", "interval_basis": ["E-BIN-102", "E-BIN-103"]}],
+      "establishable": true,
+      "expected_unresolvedness": [],
+      "evidence_basis": ["bin_movements.csv:3,4", "operating_notes.md:local names"],
+      "completeness_assumptions": ["the time lies after WB-390 entered BIN-12 and before its recorded loadout"],
+      "acceptable_variants": ["B-12 or North House 12"],
+      "unsupported_closure": ["placing WB-390 in a truck before 2025-09-04 13:15"]
+    },
+    {
+      "id": "CQ-05",
+      "expected": [{"source_owner": "Cedar Ridge Farm", "role": "source_owner", "sample": "SMP-7714A", "later_title_holder": "Prairie Gate Elevator"}],
+      "establishable": true,
+      "expected_unresolvedness": [],
+      "evidence_basis": ["elevator_receipts.csv:2", "inspection_results.csv:2", "ownership_records.csv:2"],
+      "completeness_assumptions": ["source ownership means the source party at receipt, not the title holder at later sampling"],
+      "acceptable_variants": ["Cedar Ridge Farm as the only source-owner answer, with Prairie Gate noted as later title holder"],
+      "unsupported_closure": ["answering only Prairie Gate and calling it source ownership", "answering Cedar Ridge as the custody party at sample time"]
+    },
+    {
+      "id": "CQ-06",
+      "expected": [{"source_location": "Prairie Gate Elevator", "place_id": "PGE-01", "transport": "PGE-OUT-5001"}],
+      "establishable": true,
+      "expected_unresolvedness": [],
+      "evidence_basis": ["carrier_manifests.json:1", "operating_notes.md:local names"],
+      "completeness_assumptions": [],
+      "acceptable_variants": ["PG-ELEV", "17 County Route 8"],
+      "unsupported_closure": ["using the farm as transport source after the elevator received the load", "using HFM-N as the source"]
+    },
+    {
+      "id": "CQ-07",
+      "expected": [{"storage_bin": "BIN-12", "loadout_point": "LO-3", "truck": "RLT-088"}],
+      "establishable": true,
+      "expected_unresolvedness": [],
+      "evidence_basis": ["bin_movements.csv:5", "loadout_log.csv:2", "operating_notes.md:local names"],
+      "completeness_assumptions": [],
+      "acceptable_variants": ["North House 12", "Spout 3", "LOAD-PIT-2"],
+      "unsupported_closure": ["reporting only the carrier as the loadout point", "substituting South House 14"]
+    },
+    {
+      "id": "CQ-08",
+      "expected": [{"party": "Prairie Gate Elevator", "interval": ["2025-09-02T08:15:00-05:00", "2025-09-04T09:32:00-05:00"]}, {"party": "Redline Haulage", "interval": ["2025-09-04T09:32:00-05:00", "2025-09-05T11:05:00-05:00"]}, {"party": "Hearthland Feed Mill", "interval": ["2025-09-05T11:05:00-05:00", null]}],
+      "establishable": true,
+      "expected_unresolvedness": [],
+      "evidence_basis": ["ownership_records.csv:2,4,7", "carrier_manifests.json:1", "processor_receipts.json:receiving_log[0]"],
+      "completeness_assumptions": ["the custody ledger records the relevant handoffs for this shipment"],
+      "acceptable_variants": ["using outbound shipment M-201 for the interval subject", "including the handoff instants as closed/open boundary conventions"],
+      "unsupported_closure": ["treating Cedar Ridge as custodian after receipt", "treating ownership and custody as identical"]
+    },
+    {
+      "id": "CQ-09",
+      "expected": [{"party": "Prairie Gate Elevator", "interval": ["2025-09-03T09:20:00-05:00", "2025-09-04T13:05:00-05:00"]}, {"party": "Northstar Bulk Transport", "interval": ["2025-09-04T13:05:00-05:00", "2025-09-05T10:50:00-05:00"]}, {"party": "Hearthland Feed Mill", "interval": ["2025-09-05T10:50:00-05:00", null]}],
+      "establishable": true,
+      "expected_unresolvedness": [],
+      "evidence_basis": ["ownership_records.csv:3,5,6", "carrier_manifests.json:2", "processor_receipts.json:receiving_log[1]"],
+      "completeness_assumptions": ["custody is recorded for the aggregate shipment, not separately for each source contribution"],
+      "acceptable_variants": ["interval starts at the earliest contributing receipt for M-202", "explicitly stating the aggregate-load scope"],
+      "unsupported_closure": ["claiming Willow Bend or East Fork personally retained custody during transport", "claiming one inbound source owned the entire blended shipment"]
+    },
+    {
+      "id": "CQ-10",
+      "expected": [{"processor_receipt": "HFM-IN-602", "site": "HFM-N", "origin_label": "PG-OUT-5002", "carrier_bill": "NS-5002-B"}],
+      "establishable": true,
+      "expected_unresolvedness": [],
+      "evidence_basis": ["carrier_manifests.json:2", "processor_receipts.json:receiving_log[1]"],
+      "completeness_assumptions": [],
+      "acceptable_variants": ["Hearthland Feed Mill - North for HFM-N"],
+      "unsupported_closure": ["matching to HFM-IN-601 or HFM-IN-604", "matching by carrier name alone"]
+    }
+  ]
+}

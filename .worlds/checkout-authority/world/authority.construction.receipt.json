@@ -1,0 +1,188 @@
+{
+  "acceptance": null,
+  "adequacy_probe_results": [
+    {
+      "detail": "construction valid; spine lacks component-usage surface",
+      "outcome": "INADEQUATE",
+      "probe": "localize-primary-checkout-button"
+    }
+  ],
+  "authorized_source_universe": {
+    "handles": [
+      "docs/subscriptions.md",
+      "docs/adr/payment-boundary.md",
+      "docs/ambiguous.md",
+      "docs/notes.md",
+      "docs/hints.md"
+    ],
+    "id": "checkout-docs-v0"
+  },
+  "claims_persisted": {
+    "SEMANTIC_PROGRAM": 1,
+    "SOURCE_PROGRAM": 1,
+    "SOURCE_PROPOSITION": 2,
+    "SOURCE_SEMANTIC": 2,
+    "UNRESOLVED_RECORD": 1
+  },
+  "completeness_references": [
+    {
+      "basis": "every declared Markdown source has a content digest and reconstructible document range",
+      "kernel_basis": "every declared Markdown source has a content digest and reconstructible document range",
+      "kernel_receipt_id": "receipt:d7266c26e3ae4b6692900c31bc4db028",
+      "kernel_status": "COMPLETE",
+      "kernel_target": "authority_addressability",
+      "kernel_universe": "authority_source",
+      "known_gaps": [],
+      "purpose": "cancellation-flow-v1",
+      "scope": "ADDRESSABILITY",
+      "status": "COMPLETE",
+      "universe": "authority_source"
+    },
+    {
+      "basis": "construction coverage COMPLETE over declared examined regions for cancellation-flow-v1",
+      "kernel_basis": "construction coverage COMPLETE over declared examined regions for cancellation-flow-v1",
+      "kernel_receipt_id": "receipt:a82f91f73206472e9e90647c6de7aa7e",
+      "kernel_status": "COMPLETE",
+      "kernel_target": "authority_construction_coverage",
+      "kernel_universe": "authority_examined",
+      "known_gaps": [],
+      "purpose": "cancellation-flow-v1",
+      "scope": "CONSTRUCTION",
+      "status": "COMPLETE",
+      "universe": "authority_examined"
+    },
+    {
+      "basis": "attachment construction COMPLETE for explicitly identified checkout-action requirements over the declared checkout program universe under constructor profile authority-construction-v0 and purpose cancellation-flow-v1",
+      "kernel_basis": "attachment construction COMPLETE for explicitly identified checkout-action requirements over the declared checkout program universe under constructor profile authority-construction-v0 and purpose cancellation-flow-v1",
+      "kernel_receipt_id": "receipt:9b246b4b55094106a326d814081b04d4",
+      "kernel_status": "COMPLETE",
+      "kernel_target": "authority_attachment_coverage",
+      "kernel_universe": "authority_attachment_scope",
+      "known_gaps": [],
+      "purpose": "cancellation-flow-v1",
+      "scope": "ATTACHMENT",
+      "status": "COMPLETE",
+      "universe": "authority_attachment_scope"
+    }
+  ],
+  "construction_id": "checkout-authority-v0",
+  "constructor": {
+    "id": "ontology_author.authority.construction",
+    "version": "v0"
+  },
+  "contract": "authority_construction/v0",
+  "direct_source_program_links": 1,
+  "exploration_provenance": [],
+  "known_losses": [
+    "raw HTML is not interpreted",
+    "coordinates are UTF-8 byte ranges; CRLF is stored as raw bytes"
+  ],
+  "known_unbound_material": [],
+  "profile": "authority-construction-v0",
+  "program_snapshot_id": "ae2542b6b3eeb3482aafddd584a3dfff",
+  "program_universe": "declared_program_boundary",
+  "purpose": "cancellation-flow-v1",
+  "receipt_version": "authority_construction_receipt/v1",
+  "relation_support_summary": {
+    "CROSS_EVIDENCE_INFERRED": 1,
+    "HYPOTHESIZED": 0,
+    "SOURCE_EXPLICIT": 6,
+    "SOURCE_NATIVE": 0,
+    "SOURCE_STRUCTURAL": 0
+  },
+  "representative_examples": [
+    {
+      "assertion_id": "assertion:98c612cc99b0472f6d1be82f",
+      "claim_kind": "SOURCE_SEMANTIC",
+      "relation_name": "authority_grounds_semantic",
+      "relation_support": "SOURCE_EXPLICIT"
+    },
+    {
+      "assertion_id": "assertion:2a9ce2de7acb80e09a0bd9fa",
+      "claim_kind": "SOURCE_SEMANTIC",
+      "relation_name": "authority_grounds_semantic",
+      "relation_support": "SOURCE_EXPLICIT"
+    },
+    {
+      "assertion_id": "assertion:01b6f4a05a470531cfc230e8",
+      "claim_kind": "SOURCE_PROPOSITION",
+      "relation_name": "enters_flow",
+      "relation_support": "SOURCE_EXPLICIT"
+    },
+    {
+      "assertion_id": "assertion:1d03247cdba4641963ddfaa5",
+      "claim_kind": "SEMANTIC_PROGRAM",
+      "relation_name": "realized_by",
+      "relation_support": "CROSS_EVIDENCE_INFERRED"
+    },
+    {
+      "assertion_id": "assertion:b30cbd782b1104b153332136",
+      "claim_kind": "SOURCE_PROPOSITION",
+      "relation_name": "cancellation_requires_prior",
+      "relation_support": "SOURCE_EXPLICIT"
+    }
+  ],
+  "resolution_summary": {
+    "AGENT_RESOLVED": 8,
+    "AMBIGUOUS": 0,
+    "DETERMINISTIC": 0,
+    "NATIVE_ID": 0,
+    "SOURCE_DEFINED": 2,
+    "UNRESOLVED": 0
+  },
+  "reusable_resolvers": [],
+  "semantic_program_links": 1,
+  "semantic_referents_created": [
+    "semantic:CancellationEntryAction",
+    "semantic:RetentionFlow"
+  ],
+  "semantic_referents_reused": [],
+  "source_native_relationships_used": [],
+  "source_regions_examined": {
+    "count": 4,
+    "locators": [
+      {
+        "block_kind": "paragraph",
+        "native_location": "bytes:0:68",
+        "source_handle": "docs/subscriptions.md"
+      },
+      {
+        "block_kind": "paragraph",
+        "native_location": "bytes:69:147",
+        "source_handle": "docs/subscriptions.md"
+      },
+      {
+        "block_kind": "paragraph",
+        "native_location": "bytes:21:77",
+        "source_handle": "docs/adr/payment-boundary.md"
+      },
+      {
+        "block_kind": "paragraph",
+        "native_location": "bytes:0:70",
+        "source_handle": "docs/ambiguous.md"
+      }
+    ]
+  },
+  "source_revisions": {
+    "docs/adr/payment-boundary.md": "sha256:0e2403c80b77ca9086e26da783c48cbcfbae7cdbc4c7041304db392e6a5dbeb3",
+    "docs/ambiguous.md": "sha256:d12ab9e4a0e5a9bd37fc2f667a2145454e4c5c8b73ee82532d803a035ce7e053",
+    "docs/hints.md": "sha256:7dbfb452493be41676e464482aed3d875eed7326069105577d1943e91b034331",
+    "docs/notes.md": "sha256:edf9e2e441c2acd7cdaa28d76c51c485a407c3464d1e33b8d174329257a40143",
+    "docs/subscriptions.md": "sha256:633fb9833f19e7f0794a2ad47d446445aeb8833dac2e3302f1740404fcd26f43"
+  },
+  "source_semantic_links": 2,
+  "source_standing_summary": {
+    "ANALYSIS_SUPPORT": 1,
+    "AUTHORITATIVE": 3,
+    "AVAILABLE": 1
+  },
+  "unresolved_records": [
+    {
+      "detail": "source treats one checkout button; two callables remain",
+      "kind": "AMBIGUOUS_REFERENT",
+      "native_location": "bytes:0:70",
+      "record_id": "checkout-primary-button",
+      "source_handle": "docs/ambiguous.md"
+    }
+  ]
+}

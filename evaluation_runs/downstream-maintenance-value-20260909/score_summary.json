@@ -1,0 +1,77 @@
+[
+  {
+    "id": "A-D1",
+    "case": "positive-semantic-reuse",
+    "correct": false,
+    "unsupported": [
+      "DR-44"
+    ],
+    "usage": null
+  },
+  {
+    "id": "A-D2",
+    "case": "uncertainty-reuse",
+    "correct": false,
+    "unsupported": [
+      "sole source",
+      "certified"
+    ],
+    "usage": {
+      "inputTokens": 19283,
+      "outputTokens": 5090,
+      "cacheReadTokens": 286272,
+      "cacheWriteTokens": 0
+    }
+  },
+  {
+    "id": "A-D3",
+    "case": "unrelated-control",
+    "correct": true,
+    "unsupported": false,
+    "usage": {
+      "inputTokens": 10552,
+      "outputTokens": 1156,
+      "cacheReadTokens": 107859,
+      "cacheWriteTokens": 0
+    }
+  },
+  {
+    "id": "B-D1",
+    "case": "positive-semantic-reuse",
+    "correct": true,
+    "unsupported": false,
+    "usage": {
+      "inputTokens": 10529,
+      "outputTokens": 2389,
+      "cacheReadTokens": 163936,
+      "cacheWriteTokens": 0
+    }
+  },
+  {
+    "id": "B-D2",
+    "case": "uncertainty-reuse",
+    "correct": false,
+    "unsupported": [
+      "sole source",
+      "certified"
+    ],
+    "usage": {
+      "inputTokens": 15383,
+      "outputTokens": 3253,
+      "cacheReadTokens": 158912,
+      "cacheWriteTokens": 0
+    }
+  },
+  {
+    "id": "B-D3",
+    "case": "unrelated-control",
+    "correct": true,
+    "unsupported": false,
+    "usage": {
+      "inputTokens": 10634,
+      "outputTokens": 1194,
+      "cacheReadTokens": 91486,
+      "cacheWriteTokens": 0
+    }
+  }
+]

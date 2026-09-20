@@ -1,0 +1,62 @@
+[
+  {
+    "run_id": "OA-G1",
+    "world": "OA-G1",
+    "model": "cursor-grok-4.6-medium",
+    "reasoning": "medium",
+    "started": "2026-09-09T08:23:08.804688+00:00",
+    "ended": "2026-09-09T08:30:21.673981+00:00",
+    "duration_seconds": 432.869293,
+    "exit_code": 0,
+    "workspace": "/tmp/grain-traceability-v1-durable-computation-20260909-authoring/workspaces/OA-G1",
+    "output": "/home/kerem/Desktop/Personal Projects/generalauthor/evaluation_runs/grain-traceability-v1-durable-computation-20260909/application_authoring/OA-G1",
+    "stream_usage_events": [
+      {
+        "type": "result",
+        "subtype": "success",
+        "duration_ms": 425683,
+        "duration_api_ms": 425683,
+        "is_error": false,
+        "result": "I'll start by reading the instruction files and task spec so I can build and test the reusable application computation bundle.I'll inspect the World schema and data next so the computations can stay parameterized and bound to this sealed World.I have a clear World model. Next I\u2019ll add a small parameterized computation bundle and run the development tasks against it.Unresolved matching is too broad (it was picking up DR-44 from prose). I\u2019ll match identities in structured fields only, then re-run the tasks.The reusable bundle is in `application/`. It exposes four parameterized, read-only computations over the sealed World (`v0`, revision 242).\n\n**Call without reading source**\n\n```\npython3 application/run.py --list\npython3 application/run.py shipment_source_status --param dispatch=PGE-OUT-5001 --pretty\npython3 application/run.py processor_receipt_provenance --param processor_receipt=HFM-IN-601\npython3 application/run.py custody_owner_at --param material=DR-44 --param timestamp=2025-09-03T12:00:00-05:00\npython3 application/run.py inspection_downstream_scope --param sample=SMP-7714A\n```\n\nCatalog and per-computation manifests are under `application/catalog.json` and `application/manifests/`.\n\n**What the computations reuse**\n\n- Named hopper tickets vs bin occupants vs commercial ownership scopes (commercial scope is not bin allocation)\n- Explicit `purpose_requirement_failure` rows, matched on identities rather than prose\n- Covering ownership events at a timestamp for owner vs custodian\n- Lab-sample \u2192 ticket only when the World actually establishes it\n\n**Tests**\n\n`python3 application/tests/run_dev_tasks.py` ran all four development tasks twice; outputs were identical. Extra parameterized checks covered OUT-5002/5003, HFM-IN-604, and SMP-604Q (unresolved ticket preserved).\n\n`AUTHORING_REPORT.md` describes the interface and those runs.",
+        "session_id": "df326391-0353-4e2a-99de-b76e85c34834",
+        "request_id": "ad1d4db9-2f54-422d-a877-bd6a8a0d206b",
+        "usage": {
+          "inputTokens": 110409,
+          "outputTokens": 24952,
+          "cacheReadTokens": 582144,
+          "cacheWriteTokens": 0
+        }
+      }
+    ]
+  },
+  {
+    "run_id": "OA-G2",
+    "world": "OA-G2",
+    "model": "cursor-grok-4.6-medium",
+    "reasoning": "medium",
+    "started": "2026-09-09T08:23:08.804775+00:00",
+    "ended": "2026-09-09T08:30:52.521314+00:00",
+    "duration_seconds": 463.716539,
+    "exit_code": 0,
+    "workspace": "/tmp/grain-traceability-v1-durable-computation-20260909-authoring/workspaces/OA-G2",
+    "output": "/home/kerem/Desktop/Personal Projects/generalauthor/evaluation_runs/grain-traceability-v1-durable-computation-20260909/application_authoring/OA-G2",
+    "stream_usage_events": [
+      {
+        "type": "result",
+        "subtype": "success",
+        "duration_ms": 457696,
+        "duration_api_ms": 457696,
+        "is_error": false,
+        "result": "I'll start by reading the instruction files and task list so I can build and test the reusable application computation bundle.I'll inspect the World schema and data next so the computations can be parameterized and bound to this sealed database.I have the World relations and the four development tasks. Next I\u2019ll add a small parameterized catalog and run those tasks against it.I'll tighten contributor and inspection logic so hopper-named tickets stay distinct from unresolved bin occupancy.The reusable bundle is in `application/`. It talks only to the sealed World (`world/world.sqlite`, read-only) plus call parameters.\n\n**How to call it** (catalog + manifests, no need to read Python):\n\n```\napplication/run COMPUTATION --param value\n```\n\n**Computations**\n\n- `shipment_source_status` \u2014 loadout bin/site, hopper-named tickets, bin candidates, unresolved allocation  \n- `processor_receipt_provenance` \u2014 dispatch/manifest/mill path, process output, upstream gaps  \n- `custody_owner_at` \u2014 covering `ownership_event` owner (`owner_after`) and custodian (`holder_after`)  \n- `inspection_downstream_scope` \u2014 established vs unresolved forward links from a lab sample  \n- helpers: `identifier_canonical`, `unresolved_failures`, `bin_tickets_before`\n\nHopper-named tickets count as contributing identities. Quantity splits and unnamed house occupants stay unresolved.\n\n**Development tasks** (`python3 application/tests/run_dev_tasks.py`: 4 tasks + 12 extra cases)\n\n| Task | Result |\n| --- | --- |\n| DEV-SRC-001 | PGE-OUT-5001 source **BIN-12**; no established contributing tickets; DR-44 / EF-18 / WB-390 candidates; allocation unresolved |\n| DEV-PROV-001 | HFM-IN-601 path PGE-OUT-5001 / RL-8841; output **FEED-2206**; upstream allocation unresolved |\n| DEV-CUST-001 | DR-44 at that timestamp: owner and custodian **Prairie Gate Elevator** (TR-101) |\n| DEV-INSP-001 | SMP-7714A is DR-44; no established downstream shipment/receipt/output; PGE-OUT-5001 (and mill path) and PGE-OUT-5003 remain unresolved |\n\nDetails are in `AUTHORING_REPORT.md`.",
+        "session_id": "9c58761f-2dbc-4847-811e-5ce15754b757",
+        "request_id": "2ad08ab4-894a-47de-a61f-84bad9ce3a56",
+        "usage": {
+          "inputTokens": 206880,
+          "outputTokens": 29114,
+          "cacheReadTokens": 614272,
+          "cacheWriteTokens": 0
+        }
+      }
+    ]
+  }
+]

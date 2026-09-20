@@ -1,0 +1,976 @@
+{
+  "experiment": "grain-traceability-v1-durable-computation-20260909",
+  "records": [
+    {
+      "run_id": "OA-G1-DURABLE-1",
+      "world": "OA-G1",
+      "condition": "DURABLE",
+      "replicate": 1,
+      "duration_seconds": 184.893717,
+      "usage": {
+        "input": 151062,
+        "cached_input": 232064,
+        "noncached_input": 151062,
+        "output": 9438,
+        "reported_total": 160500
+      },
+      "tool_actions": 27,
+      "sqlite_actions": 2,
+      "python_actions": 6,
+      "application_invocations": 4,
+      "ad_hoc_semantic_query_actions": 2,
+      "catalog_reads": true,
+      "computation_source_reads": true,
+      "native_source_reads": false,
+      "reuse_class": "DURABLE_PLUS_WORLD",
+      "questions": {
+        "EVAL-SRC-001": {
+          "verdict": "CORRECT",
+          "reason": "named WB-390/EF-18, bin, and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-002": {
+          "verdict": "CORRECT",
+          "reason": "preserved missing source identity and missing receipt",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-003": {
+          "verdict": "CORRECT",
+          "reason": "preserved bin candidates and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-001": {
+          "verdict": "CORRECT",
+          "reason": "complete path, contributors, output, and unresolved split",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-002": {
+          "verdict": "CORRECT",
+          "reason": "receipt path and missing source/process output preserved",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-CUST-001": {
+          "verdict": "PARTIAL",
+          "reason": "owner correct but ticket-level Prairie Gate custody retained instead of gold movement custody",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-CUST-002": {
+          "verdict": "PARTIAL",
+          "reason": "intake/storage owner or custody not promoted",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-INSP-001": {
+          "verdict": "CORRECT",
+          "reason": "shipment, receipt, output, and combined-sample uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-002": {
+          "verdict": "CORRECT",
+          "reason": "shipment/receipt, no output, and source uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-003": {
+          "verdict": "CORRECT",
+          "reason": "kept unvalidated route/ticket hint unresolved",
+          "correctly_unresolved_consequence": true
+        }
+      }
+    },
+    {
+      "run_id": "OA-G1-DURABLE-2",
+      "world": "OA-G1",
+      "condition": "DURABLE",
+      "replicate": 2,
+      "duration_seconds": 186.837839,
+      "usage": {
+        "input": 76356,
+        "cached_input": 201984,
+        "noncached_input": 76356,
+        "output": 9189,
+        "reported_total": 85545
+      },
+      "tool_actions": 29,
+      "sqlite_actions": 2,
+      "python_actions": 12,
+      "application_invocations": 10,
+      "ad_hoc_semantic_query_actions": 2,
+      "catalog_reads": true,
+      "computation_source_reads": true,
+      "native_source_reads": false,
+      "reuse_class": "DURABLE_PLUS_WORLD",
+      "questions": {
+        "EVAL-SRC-001": {
+          "verdict": "CORRECT",
+          "reason": "named WB-390/EF-18, bin, and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-002": {
+          "verdict": "CORRECT",
+          "reason": "preserved missing source identity and missing receipt",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-003": {
+          "verdict": "CORRECT",
+          "reason": "preserved bin candidates and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-001": {
+          "verdict": "CORRECT",
+          "reason": "complete path, contributors, output, and unresolved split",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-002": {
+          "verdict": "CORRECT",
+          "reason": "receipt path and missing source/process output preserved",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-CUST-001": {
+          "verdict": "PARTIAL",
+          "reason": "owner correct but ticket-level Prairie Gate custody retained instead of gold movement custody",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-CUST-002": {
+          "verdict": "PARTIAL",
+          "reason": "intake/storage owner or custody not promoted",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-INSP-001": {
+          "verdict": "CORRECT",
+          "reason": "shipment, receipt, output, and combined-sample uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-002": {
+          "verdict": "CORRECT",
+          "reason": "shipment/receipt, no output, and source uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-003": {
+          "verdict": "CORRECT",
+          "reason": "kept unvalidated route/ticket hint unresolved",
+          "correctly_unresolved_consequence": true
+        }
+      }
+    },
+    {
+      "run_id": "OA-G1-DURABLE-3",
+      "world": "OA-G1",
+      "condition": "DURABLE",
+      "replicate": 3,
+      "duration_seconds": 169.295827,
+      "usage": {
+        "input": 174608,
+        "cached_input": 166144,
+        "noncached_input": 174608,
+        "output": 8523,
+        "reported_total": 183131
+      },
+      "tool_actions": 30,
+      "sqlite_actions": 2,
+      "python_actions": 13,
+      "application_invocations": 11,
+      "ad_hoc_semantic_query_actions": 2,
+      "catalog_reads": true,
+      "computation_source_reads": true,
+      "native_source_reads": false,
+      "reuse_class": "DURABLE_PLUS_WORLD",
+      "questions": {
+        "EVAL-SRC-001": {
+          "verdict": "CORRECT",
+          "reason": "named WB-390/EF-18, bin, and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-002": {
+          "verdict": "CORRECT",
+          "reason": "preserved missing source identity and missing receipt",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-003": {
+          "verdict": "CORRECT",
+          "reason": "preserved bin candidates and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-001": {
+          "verdict": "CORRECT",
+          "reason": "complete path, contributors, output, and unresolved split",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-002": {
+          "verdict": "CORRECT",
+          "reason": "receipt path and missing source/process output preserved",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-CUST-001": {
+          "verdict": "CORRECT",
+          "reason": "owner and Northstar custody consequence stated",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-CUST-002": {
+          "verdict": "PARTIAL",
+          "reason": "intake/storage owner or custody not promoted",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-INSP-001": {
+          "verdict": "CORRECT",
+          "reason": "shipment, receipt, output, and combined-sample uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-002": {
+          "verdict": "CORRECT",
+          "reason": "shipment/receipt, no output, and source uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-003": {
+          "verdict": "CORRECT",
+          "reason": "kept unvalidated route/ticket hint unresolved",
+          "correctly_unresolved_consequence": true
+        }
+      }
+    },
+    {
+      "run_id": "OA-G1-SYNOPSIS-1",
+      "world": "OA-G1",
+      "condition": "SYNOPSIS",
+      "replicate": 1,
+      "duration_seconds": 369.892729,
+      "usage": {
+        "input": 85942,
+        "cached_input": 102656,
+        "noncached_input": 85942,
+        "output": 8812,
+        "reported_total": 94754
+      },
+      "tool_actions": 26,
+      "sqlite_actions": 5,
+      "python_actions": 4,
+      "application_invocations": 0,
+      "ad_hoc_semantic_query_actions": 5,
+      "catalog_reads": false,
+      "computation_source_reads": false,
+      "native_source_reads": false,
+      "reuse_class": null,
+      "questions": {
+        "EVAL-SRC-001": {
+          "verdict": "CORRECT",
+          "reason": "named WB-390/EF-18, bin, and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-002": {
+          "verdict": "CORRECT",
+          "reason": "preserved missing source identity and missing receipt",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-003": {
+          "verdict": "PARTIAL",
+          "reason": "treated bin occupants as a contributing pool while preserving allocation uncertainty",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-PROV-001": {
+          "verdict": "CORRECT",
+          "reason": "complete path, contributors, output, and unresolved split",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-002": {
+          "verdict": "PARTIAL",
+          "reason": "incomplete receipt provenance",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-CUST-001": {
+          "verdict": "CORRECT",
+          "reason": "owner and Northstar custody consequence stated",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-CUST-002": {
+          "verdict": "CORRECT",
+          "reason": "owner and facility custody stated",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-INSP-001": {
+          "verdict": "CORRECT",
+          "reason": "shipment, receipt, output, and combined-sample uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-002": {
+          "verdict": "CORRECT",
+          "reason": "shipment/receipt, no output, and source uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-003": {
+          "verdict": "CORRECT",
+          "reason": "kept unvalidated route/ticket hint unresolved",
+          "correctly_unresolved_consequence": true
+        }
+      }
+    },
+    {
+      "run_id": "OA-G1-SYNOPSIS-2",
+      "world": "OA-G1",
+      "condition": "SYNOPSIS",
+      "replicate": 2,
+      "duration_seconds": 207.406435,
+      "usage": {
+        "input": 118699,
+        "cached_input": 261376,
+        "noncached_input": 118699,
+        "output": 12208,
+        "reported_total": 130907
+      },
+      "tool_actions": 21,
+      "sqlite_actions": 6,
+      "python_actions": 5,
+      "application_invocations": 0,
+      "ad_hoc_semantic_query_actions": 6,
+      "catalog_reads": false,
+      "computation_source_reads": false,
+      "native_source_reads": false,
+      "reuse_class": null,
+      "questions": {
+        "EVAL-SRC-001": {
+          "verdict": "CORRECT",
+          "reason": "named WB-390/EF-18, bin, and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-002": {
+          "verdict": "CORRECT",
+          "reason": "preserved missing source identity and missing receipt",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-003": {
+          "verdict": "PARTIAL",
+          "reason": "treated bin occupants as a contributing pool while preserving allocation uncertainty",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-PROV-001": {
+          "verdict": "CORRECT",
+          "reason": "complete path, contributors, output, and unresolved split",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-002": {
+          "verdict": "CORRECT",
+          "reason": "receipt path and missing source/process output preserved",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-CUST-001": {
+          "verdict": "CORRECT",
+          "reason": "owner and Northstar custody consequence stated",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-CUST-002": {
+          "verdict": "CORRECT",
+          "reason": "owner and facility custody stated",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-INSP-001": {
+          "verdict": "CORRECT",
+          "reason": "shipment, receipt, output, and combined-sample uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-002": {
+          "verdict": "CORRECT",
+          "reason": "shipment/receipt, no output, and source uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-003": {
+          "verdict": "CORRECT",
+          "reason": "kept unvalidated route/ticket hint unresolved",
+          "correctly_unresolved_consequence": true
+        }
+      }
+    },
+    {
+      "run_id": "OA-G1-SYNOPSIS-3",
+      "world": "OA-G1",
+      "condition": "SYNOPSIS",
+      "replicate": 3,
+      "duration_seconds": 185.345386,
+      "usage": {
+        "input": 169732,
+        "cached_input": 180224,
+        "noncached_input": 169732,
+        "output": 8673,
+        "reported_total": 178405
+      },
+      "tool_actions": 20,
+      "sqlite_actions": 4,
+      "python_actions": 3,
+      "application_invocations": 0,
+      "ad_hoc_semantic_query_actions": 4,
+      "catalog_reads": false,
+      "computation_source_reads": false,
+      "native_source_reads": false,
+      "reuse_class": null,
+      "questions": {
+        "EVAL-SRC-001": {
+          "verdict": "CORRECT",
+          "reason": "named WB-390/EF-18, bin, and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-002": {
+          "verdict": "PARTIAL",
+          "reason": "did not preserve missing linkage",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-SRC-003": {
+          "verdict": "CORRECT",
+          "reason": "preserved bin candidates and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-001": {
+          "verdict": "CORRECT",
+          "reason": "complete path, contributors, output, and unresolved split",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-002": {
+          "verdict": "PARTIAL",
+          "reason": "incomplete receipt provenance",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-CUST-001": {
+          "verdict": "CORRECT",
+          "reason": "owner and Northstar custody consequence stated",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-CUST-002": {
+          "verdict": "CORRECT",
+          "reason": "owner and facility custody stated",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-INSP-001": {
+          "verdict": "CORRECT",
+          "reason": "shipment, receipt, output, and combined-sample uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-002": {
+          "verdict": "CORRECT",
+          "reason": "shipment/receipt, no output, and source uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-003": {
+          "verdict": "CORRECT",
+          "reason": "kept unvalidated route/ticket hint unresolved",
+          "correctly_unresolved_consequence": true
+        }
+      }
+    },
+    {
+      "run_id": "OA-G2-DURABLE-1",
+      "world": "OA-G2",
+      "condition": "DURABLE",
+      "replicate": 1,
+      "duration_seconds": 207.72822,
+      "usage": {
+        "input": 182205,
+        "cached_input": 128512,
+        "noncached_input": 182205,
+        "output": 9733,
+        "reported_total": 191938
+      },
+      "tool_actions": 26,
+      "sqlite_actions": 3,
+      "python_actions": 2,
+      "application_invocations": 4,
+      "ad_hoc_semantic_query_actions": 3,
+      "catalog_reads": true,
+      "computation_source_reads": true,
+      "native_source_reads": false,
+      "reuse_class": "DURABLE_PLUS_WORLD",
+      "questions": {
+        "EVAL-SRC-001": {
+          "verdict": "CORRECT",
+          "reason": "named WB-390/EF-18, bin, and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-002": {
+          "verdict": "CORRECT",
+          "reason": "preserved missing source identity and missing receipt",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-003": {
+          "verdict": "CORRECT",
+          "reason": "preserved bin candidates and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-001": {
+          "verdict": "CORRECT",
+          "reason": "complete path, contributors, output, and unresolved split",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-002": {
+          "verdict": "CORRECT",
+          "reason": "receipt path and missing source/process output preserved",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-CUST-001": {
+          "verdict": "PARTIAL",
+          "reason": "owner correct but ticket-level Prairie Gate custody retained instead of gold movement custody",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-CUST-002": {
+          "verdict": "PARTIAL",
+          "reason": "intake/storage owner or custody not promoted",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-INSP-001": {
+          "verdict": "CORRECT",
+          "reason": "shipment, receipt, output, and combined-sample uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-002": {
+          "verdict": "CORRECT",
+          "reason": "shipment/receipt, no output, and source uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-003": {
+          "verdict": "CORRECT",
+          "reason": "kept unvalidated route/ticket hint unresolved",
+          "correctly_unresolved_consequence": true
+        }
+      }
+    },
+    {
+      "run_id": "OA-G2-DURABLE-2",
+      "world": "OA-G2",
+      "condition": "DURABLE",
+      "replicate": 2,
+      "duration_seconds": 179.865332,
+      "usage": {
+        "input": 79310,
+        "cached_input": 252160,
+        "noncached_input": 79310,
+        "output": 8286,
+        "reported_total": 87596
+      },
+      "tool_actions": 23,
+      "sqlite_actions": 4,
+      "python_actions": 2,
+      "application_invocations": 3,
+      "ad_hoc_semantic_query_actions": 4,
+      "catalog_reads": true,
+      "computation_source_reads": true,
+      "native_source_reads": false,
+      "reuse_class": "DURABLE_PLUS_WORLD",
+      "questions": {
+        "EVAL-SRC-001": {
+          "verdict": "CORRECT",
+          "reason": "named WB-390/EF-18, bin, and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-002": {
+          "verdict": "CORRECT",
+          "reason": "preserved missing source identity and missing receipt",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-003": {
+          "verdict": "CORRECT",
+          "reason": "preserved bin candidates and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-001": {
+          "verdict": "CORRECT",
+          "reason": "complete path, contributors, output, and unresolved split",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-002": {
+          "verdict": "CORRECT",
+          "reason": "receipt path and missing source/process output preserved",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-CUST-001": {
+          "verdict": "PARTIAL",
+          "reason": "owner correct but ticket-level Prairie Gate custody retained instead of gold movement custody",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-CUST-002": {
+          "verdict": "PARTIAL",
+          "reason": "intake/storage owner or custody not promoted",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-INSP-001": {
+          "verdict": "CORRECT",
+          "reason": "shipment, receipt, output, and combined-sample uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-002": {
+          "verdict": "CORRECT",
+          "reason": "shipment/receipt, no output, and source uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-003": {
+          "verdict": "CORRECT",
+          "reason": "kept unvalidated route/ticket hint unresolved",
+          "correctly_unresolved_consequence": true
+        }
+      }
+    },
+    {
+      "run_id": "OA-G2-DURABLE-3",
+      "world": "OA-G2",
+      "condition": "DURABLE",
+      "replicate": 3,
+      "duration_seconds": 165.11908,
+      "usage": {
+        "input": 116131,
+        "cached_input": 115072,
+        "noncached_input": 116131,
+        "output": 7024,
+        "reported_total": 123155
+      },
+      "tool_actions": 19,
+      "sqlite_actions": 1,
+      "python_actions": 1,
+      "application_invocations": 1,
+      "ad_hoc_semantic_query_actions": 1,
+      "catalog_reads": true,
+      "computation_source_reads": true,
+      "native_source_reads": false,
+      "reuse_class": "DURABLE_PLUS_WORLD",
+      "questions": {
+        "EVAL-SRC-001": {
+          "verdict": "CORRECT",
+          "reason": "named WB-390/EF-18, bin, and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-002": {
+          "verdict": "CORRECT",
+          "reason": "preserved missing source identity and missing receipt",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-003": {
+          "verdict": "CORRECT",
+          "reason": "preserved bin candidates and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-001": {
+          "verdict": "CORRECT",
+          "reason": "complete path, contributors, output, and unresolved split",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-002": {
+          "verdict": "CORRECT",
+          "reason": "receipt path and missing source/process output preserved",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-CUST-001": {
+          "verdict": "CORRECT",
+          "reason": "owner and Northstar custody consequence stated",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-CUST-002": {
+          "verdict": "PARTIAL",
+          "reason": "intake/storage owner or custody not promoted",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-INSP-001": {
+          "verdict": "CORRECT",
+          "reason": "shipment, receipt, output, and combined-sample uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-002": {
+          "verdict": "CORRECT",
+          "reason": "shipment/receipt, no output, and source uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-003": {
+          "verdict": "CORRECT",
+          "reason": "kept unvalidated route/ticket hint unresolved",
+          "correctly_unresolved_consequence": true
+        }
+      }
+    },
+    {
+      "run_id": "OA-G2-SYNOPSIS-1",
+      "world": "OA-G2",
+      "condition": "SYNOPSIS",
+      "replicate": 1,
+      "duration_seconds": 251.177618,
+      "usage": {
+        "input": 220681,
+        "cached_input": 126336,
+        "noncached_input": 220681,
+        "output": 9619,
+        "reported_total": 230300
+      },
+      "tool_actions": 25,
+      "sqlite_actions": 5,
+      "python_actions": 4,
+      "application_invocations": 0,
+      "ad_hoc_semantic_query_actions": 5,
+      "catalog_reads": false,
+      "computation_source_reads": false,
+      "native_source_reads": false,
+      "reuse_class": null,
+      "questions": {
+        "EVAL-SRC-001": {
+          "verdict": "CORRECT",
+          "reason": "named WB-390/EF-18, bin, and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-002": {
+          "verdict": "CORRECT",
+          "reason": "preserved missing source identity and missing receipt",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-003": {
+          "verdict": "CORRECT",
+          "reason": "preserved bin candidates and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-001": {
+          "verdict": "CORRECT",
+          "reason": "complete path, contributors, output, and unresolved split",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-002": {
+          "verdict": "CORRECT",
+          "reason": "receipt path and missing source/process output preserved",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-CUST-001": {
+          "verdict": "CORRECT",
+          "reason": "owner and Northstar custody consequence stated",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-CUST-002": {
+          "verdict": "CORRECT",
+          "reason": "owner and facility custody stated",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-INSP-001": {
+          "verdict": "CORRECT",
+          "reason": "shipment, receipt, output, and combined-sample uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-002": {
+          "verdict": "CORRECT",
+          "reason": "shipment/receipt, no output, and source uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-003": {
+          "verdict": "CORRECT",
+          "reason": "kept unvalidated route/ticket hint unresolved",
+          "correctly_unresolved_consequence": true
+        }
+      }
+    },
+    {
+      "run_id": "OA-G2-SYNOPSIS-2",
+      "world": "OA-G2",
+      "condition": "SYNOPSIS",
+      "replicate": 2,
+      "duration_seconds": 205.991825,
+      "usage": {
+        "input": 94411,
+        "cached_input": 181888,
+        "noncached_input": 94411,
+        "output": 8390,
+        "reported_total": 102801
+      },
+      "tool_actions": 20,
+      "sqlite_actions": 4,
+      "python_actions": 3,
+      "application_invocations": 0,
+      "ad_hoc_semantic_query_actions": 4,
+      "catalog_reads": false,
+      "computation_source_reads": false,
+      "native_source_reads": false,
+      "reuse_class": null,
+      "questions": {
+        "EVAL-SRC-001": {
+          "verdict": "CORRECT",
+          "reason": "named WB-390/EF-18, bin, and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-002": {
+          "verdict": "CORRECT",
+          "reason": "preserved missing source identity and missing receipt",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-003": {
+          "verdict": "PARTIAL",
+          "reason": "treated bin occupants as a contributing pool while preserving allocation uncertainty",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-PROV-001": {
+          "verdict": "CORRECT",
+          "reason": "complete path, contributors, output, and unresolved split",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-002": {
+          "verdict": "CORRECT",
+          "reason": "receipt path and missing source/process output preserved",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-CUST-001": {
+          "verdict": "CORRECT",
+          "reason": "owner and Northstar custody consequence stated",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-CUST-002": {
+          "verdict": "CORRECT",
+          "reason": "owner and facility custody stated",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-INSP-001": {
+          "verdict": "CORRECT",
+          "reason": "shipment, receipt, output, and combined-sample uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-002": {
+          "verdict": "CORRECT",
+          "reason": "shipment/receipt, no output, and source uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-003": {
+          "verdict": "CORRECT",
+          "reason": "kept unvalidated route/ticket hint unresolved",
+          "correctly_unresolved_consequence": true
+        }
+      }
+    },
+    {
+      "run_id": "OA-G2-SYNOPSIS-3",
+      "world": "OA-G2",
+      "condition": "SYNOPSIS",
+      "replicate": 3,
+      "duration_seconds": 175.032327,
+      "usage": {
+        "input": 71472,
+        "cached_input": 136704,
+        "noncached_input": 71472,
+        "output": 9028,
+        "reported_total": 80500
+      },
+      "tool_actions": 15,
+      "sqlite_actions": 2,
+      "python_actions": 1,
+      "application_invocations": 0,
+      "ad_hoc_semantic_query_actions": 2,
+      "catalog_reads": false,
+      "computation_source_reads": false,
+      "native_source_reads": false,
+      "reuse_class": null,
+      "questions": {
+        "EVAL-SRC-001": {
+          "verdict": "CORRECT",
+          "reason": "named WB-390/EF-18, bin, and unresolved allocation",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-002": {
+          "verdict": "CORRECT",
+          "reason": "preserved missing source identity and missing receipt",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-SRC-003": {
+          "verdict": "PARTIAL",
+          "reason": "treated bin occupants as a contributing pool while preserving allocation uncertainty",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-PROV-001": {
+          "verdict": "CORRECT",
+          "reason": "complete path, contributors, output, and unresolved split",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-PROV-002": {
+          "verdict": "CORRECT",
+          "reason": "receipt path and missing source/process output preserved",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-CUST-001": {
+          "verdict": "CORRECT",
+          "reason": "owner and Northstar custody consequence stated",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-CUST-002": {
+          "verdict": "CORRECT",
+          "reason": "owner and facility custody stated",
+          "correctly_unresolved_consequence": false
+        },
+        "EVAL-INSP-001": {
+          "verdict": "CORRECT",
+          "reason": "shipment, receipt, output, and combined-sample uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-002": {
+          "verdict": "CORRECT",
+          "reason": "shipment/receipt, no output, and source uncertainty stated",
+          "correctly_unresolved_consequence": true
+        },
+        "EVAL-INSP-003": {
+          "verdict": "CORRECT",
+          "reason": "kept unvalidated route/ticket hint unresolved",
+          "correctly_unresolved_consequence": true
+        }
+      }
+    }
+  ],
+  "aggregates": {
+    "OA-G1-SYNOPSIS": {
+      "runs": 3,
+      "question_counts": {
+        "CORRECT": 25,
+        "PARTIAL": 5
+      },
+      "mean_input": 124791,
+      "mean_output": 9897.666666666666,
+      "mean_reported_total": 134688.66666666666,
+      "mean_tool_actions": 22.333333333333332,
+      "mean_ad_hoc_semantic_queries": 5,
+      "mean_application_invocations": 0,
+      "mean_duration_seconds": 254.21484999999998,
+      "native_source_reads": 0,
+      "reuse_classes": {}
+    },
+    "OA-G1-DURABLE": {
+      "runs": 3,
+      "question_counts": {
+        "CORRECT": 25,
+        "PARTIAL": 5
+      },
+      "mean_input": 134008.66666666666,
+      "mean_output": 9050,
+      "mean_reported_total": 143058.66666666666,
+      "mean_tool_actions": 28.666666666666668,
+      "mean_ad_hoc_semantic_queries": 2,
+      "mean_application_invocations": 8.333333333333334,
+      "mean_duration_seconds": 180.34246100000001,
+      "native_source_reads": 0,
+      "reuse_classes": {
+        "DURABLE_PLUS_WORLD": 3
+      }
+    },
+    "OA-G2-SYNOPSIS": {
+      "runs": 3,
+      "question_counts": {
+        "CORRECT": 28,
+        "PARTIAL": 2
+      },
+      "mean_input": 128854.66666666667,
+      "mean_output": 9012.333333333334,
+      "mean_reported_total": 137867,
+      "mean_tool_actions": 20,
+      "mean_ad_hoc_semantic_queries": 3.6666666666666665,
+      "mean_application_invocations": 0,
+      "mean_duration_seconds": 210.73392333333334,
+      "native_source_reads": 0,
+      "reuse_classes": {}
+    },
+    "OA-G2-DURABLE": {
+      "runs": 3,
+      "question_counts": {
+        "CORRECT": 25,
+        "PARTIAL": 5
+      },
+      "mean_input": 125882,
+      "mean_output": 8347.666666666666,
+      "mean_reported_total": 134229.66666666666,
+      "mean_tool_actions": 22.666666666666668,
+      "mean_ad_hoc_semantic_queries": 2.6666666666666665,
+      "mean_application_invocations": 2.6666666666666665,
+      "mean_duration_seconds": 184.23754399999999,
+      "native_source_reads": 0,
+      "reuse_classes": {
+        "DURABLE_PLUS_WORLD": 3
+      }
+    }
+  },
+  "scoring_note": "Frozen gold was used; CUST-001 remains a scope-sensitive case and is scored against its precommitted gold while flagged in the report."
+}

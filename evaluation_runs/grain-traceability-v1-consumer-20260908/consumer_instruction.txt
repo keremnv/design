@@ -1,0 +1,7 @@
+Answer the downstream questions in consumer_questions.md using only the available
+workspace and its declared purpose. Inspect the available representation with
+ordinary shell, Python, SQLite, or other local tools as useful. Return a concise
+answer for every question, preserving uncertainty and distinguishing an absent
+assertion from a justified negative. Include the identifiers and supporting
+facts needed for an evaluator to audit each answer. Do not seek information
+outside the workspace.

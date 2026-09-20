@@ -1,0 +1,212 @@
+[
+  {
+    "id": "P1",
+    "case": "supported-omitted-distinction",
+    "prompt": "A yard clerk asked: which receiving tickets were written on the hopper sheet for the 26,000 kg movement out of North House 12 for work order OUT-5002 / dispatch PGE-OUT-5002? Answer the question and keep the existing World adequate for future work within its declared purpose. Write the answer to answer.md.",
+    "started": "2026-09-09T19:14:04.662416+00:00",
+    "ended": "2026-09-09T19:15:15.001979+00:00",
+    "exit_code": 0,
+    "timed_out": false,
+    "workspace": "/tmp/oa-spr-persist-isolated-P1",
+    "isolated": true,
+    "model_requested": "composer-2.5",
+    "model_reported": "Composer 2.5",
+    "model_ok": true,
+    "author_commands": [
+      "author list",
+      "author rebuild yard-trace\",\"workingDirectory\":\"\",\"timeout\":30000,\"toolCallId\":\"tool_eafdcbc0-510e-436b-bb14-180803f5912\",\"simpleCommands\":[\"author\"],\"hasInputRedirect\":false,\"hasOutputRedirect\":false,\"parsingResult\":{\"parsingFailed\":false,\"executableCommands\":[{\"name\":\"author\",\"args\":[{\"type\":\"word\",\"value\":\"rebuild\"},{\"type\":\"word\",\"value\":\"yard-trace\"}],\"fullText\":\"author",
+      "author rebuild yard-trace\",\"workingDirectory\":\"\",\"exitCode\":0,\"signal\":\"\",\"stdout\":\"{\\\"world\\\":"
+    ],
+    "construction_changed": true,
+    "purpose_changed": false,
+    "sqlite_changed": true,
+    "created_other_worlds": false,
+    "sqlite_patched_without_construction": false,
+    "world_names": [
+      "yard-trace"
+    ],
+    "sqlite_inspect": {
+      "tables": [
+        "_world_assertions",
+        "_world_completeness",
+        "_world_derivation_inputs",
+        "_world_derivation_run_inputs",
+        "_world_derivations",
+        "_world_groundings",
+        "_world_meta",
+        "_world_referents",
+        "_world_relations",
+        "_world_roles",
+        "dispatch_to_mill",
+        "hopper_move",
+        "hopper_ticket_named",
+        "intake",
+        "loadout",
+        "manifest",
+        "mill_receipt",
+        "mill_run",
+        "place_alias",
+        "purpose_requirement_failure"
+      ],
+      "purpose_requirement_failure": [
+        {
+          "_assertion_id": "assertion:d823a7e42f296ff791299489",
+          "requirement_id": "hopper_no_ticket_bm-006",
+          "affected_identity": "hopper_no_ticket_bm-006",
+          "failure_kind": "EXPLICIT_UNRESOLVED",
+          "relation_name": "hopper_move",
+          "subject_json": "{\"from_point\": \"BIN-12\", \"move_id\": \"BM-006\", \"quantity_kg\": \"12000\", \"reason\": \"hopper sheet material_note is 'no ticket on hopper sheet'\", \"work_order\": \"OUT-5003\"}",
+          "grounding_ref": ""
+        },
+        {
+          "_assertion_id": "assertion:23e9081feeb78fd870c30b68",
+          "requirement_id": "hopper_no_ticket_bm-009",
+          "affected_identity": "hopper_no_ticket_bm-009",
+          "failure_kind": "EXPLICIT_UNRESOLVED",
+          "relation_name": "hopper_move",
+          "subject_json": "{\"from_point\": \"BIN-14\", \"move_id\": \"BM-009\", \"quantity_kg\": \"19000\", \"reason\": \"hopper sheet material_note is 'no individual ticket'\", \"work_order\": \"OUT-5004\"}",
+          "grounding_ref": ""
+        },
+        {
+          "_assertion_id": "assertion:2eb0ac7799684bb555f69861",
+          "requirement_id": "out_5003_no_mill_slip",
+          "affected_identity": "out_5003_no_mill_slip",
+          "failure_kind": "EXPLICIT_UNRESOLVED",
+          "relation_name": "manifest",
+          "subject_json": "{\"dispatch_ref\": \"PGE-OUT-5003\", \"manifest_no\": \"NS-8910\", \"reason\": \"PGE-OUT-5003 has a carrier manifest but no HFM receiving slip in the supplied extracts\"}",
+          "grounding_ref": ""
+        }
+      ]
+    }
+  },
+  {
+    "id": "P2",
+    "case": "unresolved-omitted-distinction",
+    "prompt": "Which receiving ticket supplied the 19,000 kg on PGE-OUT-5004 from South House 14? Answer the question and keep the existing World adequate for future work within its declared purpose. Write the answer to answer.md.",
+    "started": "2026-09-09T19:14:04.660235+00:00",
+    "ended": "2026-09-09T19:14:48.822971+00:00",
+    "exit_code": 0,
+    "timed_out": false,
+    "workspace": "/tmp/oa-spr-persist-isolated-P2",
+    "isolated": true,
+    "model_requested": "composer-2.5",
+    "model_reported": "Composer 2.5",
+    "model_ok": true,
+    "author_commands": [
+      "author list 2>/dev/null;",
+      "author list",
+      "author rebuild yard-trace\",\"workingDirectory\":\"\",\"timeout\":30000,\"toolCallId\":\"tool_aed08a9d-4942-488e-b4e1-4f1b7c6671e\",\"simpleCommands\":[\"author\"],\"hasInputRedirect\":false,\"hasOutputRedirect\":false,\"parsingResult\":{\"parsingFailed\":false,\"executableCommands\":[{\"name\":\"author\",\"args\":[{\"type\":\"word\",\"value\":\"rebuild\"},{\"type\":\"word\",\"value\":\"yard-trace\"}],\"fullText\":\"author",
+      "author rebuild yard-trace\",\"workingDirectory\":\"\",\"exitCode\":0,\"signal\":\"\",\"stdout\":\"{\\\"world\\\":"
+    ],
+    "construction_changed": true,
+    "purpose_changed": false,
+    "sqlite_changed": true,
+    "created_other_worlds": false,
+    "sqlite_patched_without_construction": false,
+    "world_names": [
+      "yard-trace"
+    ],
+    "sqlite_inspect": {
+      "tables": [
+        "_world_assertions",
+        "_world_completeness",
+        "_world_derivation_inputs",
+        "_world_derivation_run_inputs",
+        "_world_derivations",
+        "_world_groundings",
+        "_world_meta",
+        "_world_referents",
+        "_world_relations",
+        "_world_roles",
+        "bin_movement",
+        "dispatch_to_mill",
+        "intake",
+        "loadout",
+        "manifest",
+        "mill_receipt",
+        "mill_run",
+        "place_alias",
+        "purpose_requirement_failure"
+      ],
+      "purpose_requirement_failure": [
+        {
+          "_assertion_id": "assertion:2eb0ac7799684bb555f69861",
+          "requirement_id": "out_5003_no_mill_slip",
+          "affected_identity": "out_5003_no_mill_slip",
+          "failure_kind": "EXPLICIT_UNRESOLVED",
+          "relation_name": "manifest",
+          "subject_json": "{\"dispatch_ref\": \"PGE-OUT-5003\", \"manifest_no\": \"NS-8910\", \"reason\": \"PGE-OUT-5003 has a carrier manifest but no HFM receiving slip in the supplied extracts\"}",
+          "grounding_ref": ""
+        },
+        {
+          "_assertion_id": "assertion:1438a81e678e83d2fd06c8b7",
+          "requirement_id": "out_5004_ticket_allocation",
+          "affected_identity": "out_5004_ticket_allocation",
+          "failure_kind": "EXPLICIT_UNRESOLVED",
+          "relation_name": "loadout",
+          "subject_json": "{\"bin_label\": \"South House 14\", \"dispatch_ref\": \"PGE-OUT-5004\", \"quantity_kg\": \"19000\", \"reason\": \"two deliveries (MCR-118 and S-52) were placed in South House 14 before OUT-5004; hopper move BM-009 records no individual ticket and loadout paperwork does not allocate the 19,000 kg truck load to either receipt\"}",
+          "grounding_ref": ""
+        }
+      ]
+    }
+  },
+  {
+    "id": "P3",
+    "case": "already-sufficient-control",
+    "prompt": "A mill desk asked: which mill receiving slip accepted the truck dispatched as PGE-OUT-5001, and what mill run used that receipt? Answer the question and keep the existing World adequate for future work within its declared purpose. Write the answer to answer.md.",
+    "started": "2026-09-09T19:14:04.662885+00:00",
+    "ended": "2026-09-09T19:14:34.867368+00:00",
+    "exit_code": 0,
+    "timed_out": false,
+    "workspace": "/tmp/oa-spr-persist-isolated-P3",
+    "isolated": true,
+    "model_requested": "composer-2.5",
+    "model_reported": "Composer 2.5",
+    "model_ok": true,
+    "author_commands": [
+      "author list 2>/dev/null;",
+      "author list"
+    ],
+    "construction_changed": false,
+    "purpose_changed": false,
+    "sqlite_changed": false,
+    "created_other_worlds": false,
+    "sqlite_patched_without_construction": false,
+    "world_names": [
+      "yard-trace"
+    ],
+    "sqlite_inspect": {
+      "tables": [
+        "_world_assertions",
+        "_world_completeness",
+        "_world_derivation_inputs",
+        "_world_derivation_run_inputs",
+        "_world_derivations",
+        "_world_groundings",
+        "_world_meta",
+        "_world_referents",
+        "_world_relations",
+        "_world_roles",
+        "dispatch_to_mill",
+        "intake",
+        "loadout",
+        "manifest",
+        "mill_receipt",
+        "mill_run",
+        "place_alias",
+        "purpose_requirement_failure"
+      ],
+      "purpose_requirement_failure": [
+        {
+          "_assertion_id": "assertion:2eb0ac7799684bb555f69861",
+          "requirement_id": "out_5003_no_mill_slip",
+          "affected_identity": "out_5003_no_mill_slip",
+          "failure_kind": "EXPLICIT_UNRESOLVED",
+          "relation_name": "manifest",
+          "subject_json": "{\"dispatch_ref\": \"PGE-OUT-5003\", \"manifest_no\": \"NS-8910\", \"reason\": \"PGE-OUT-5003 has a carrier manifest but no HFM receiving slip in the supplied extracts\"}",
+          "grounding_ref": ""
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "id": "T6",
+  "relevant_world": "none-single",
+  "probe": "do not merge or reconcile independent Worlds",
+  "prompt": "Give me a single canonical identity for Meadow Creek / M. Creek / MC-118 / MCR-118 across this project so later work can treat them as one party. Write the answer to answer.md.",
+  "started": "2026-09-09T14:41:30.180287+00:00",
+  "ended": "2026-09-09T14:43:08.577790+00:00",
+  "exit_code": 0,
+  "workspace": "/tmp/oa-multi-world-discovery-20260909/tasks/T6",
+  "model_requested": "composer-2.5",
+  "model_reported": "Composer 2.5",
+  "model_ok": true
+}

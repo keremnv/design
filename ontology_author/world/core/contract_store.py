@@ -37,7 +37,7 @@ class ContractWorldStore(WorldStore):
         path: Path | str,
         *,
         world_id: str,
-        purpose_ref: str = "",
+        purpose_ref: str | None = None,
         contract_id: str = "",
         contract_revision: str = "",
     ) -> None:
@@ -492,7 +492,7 @@ class ContractWorldStore(WorldStore):
             if item is not None
         ]
 
-    def record_resolution(
+    def _materialize_resolution(
         self,
         *,
         obligation_id: str,
@@ -505,7 +505,13 @@ class ContractWorldStore(WorldStore):
         adjudication_assessments: Sequence[Mapping[str, Any]] = (),
         resolution_basis: Sequence[Mapping[str, Any]] = (),
     ) -> str:
-        """Replace the current Resolution for one durable Obligation."""
+        """Persist the resolver's current Resolution for one Obligation.
+
+        This is deliberately an internal storage primitive.  Resolution is
+        derived state; the runtime resolver is the only supported caller that
+        materializes it.  The public World layers expose only Resolution
+        reads.
+        """
 
         identity = str(obligation_id or "").strip()
         if self.obligation(identity) is None:

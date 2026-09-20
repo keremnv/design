@@ -1,0 +1,30 @@
+{
+  "OA-G1": {
+    "world_hash": "dc2e7e45c1327fc997691b4fa4071c5fd44edb6aed2b57e2d1e4e4c70a471eb8",
+    "renderer": "world-context-renderer-v1.0.0",
+    "context": "evaluation_runs/grain-traceability-v1-cursor-grok-medium-20260909/world_context/contexts/OA-G1-world-context.md",
+    "renderer_output": {
+      "renderer": "world-context-renderer-v1.0.0",
+      "world_hash": "dc2e7e45c1327fc997691b4fa4071c5fd44edb6aed2b57e2d1e4e4c70a471eb8",
+      "output": "evaluation_runs/grain-traceability-v1-cursor-grok-medium-20260909/world_context/contexts/OA-G1-world-context.md",
+      "bytes": 4005,
+      "characters": 3973,
+      "words": 460,
+      "sha256": "6fb8764c0df1caa724b1345696a9cc7d6b6afb6a5299ba3e860c5a097b404527"
+    }
+  },
+  "OA-G2": {
+    "world_hash": "24f183176c742ec1326776de12cb73aae98250bb0e8bc89df0f8b37be6f1d220",
+    "renderer": "world-context-renderer-v1.0.0",
+    "context": "evaluation_runs/grain-traceability-v1-cursor-grok-medium-20260909/world_context/contexts/OA-G2-world-context.md",
+    "renderer_output": {
+      "renderer": "world-context-renderer-v1.0.0",
+      "world_hash": "24f183176c742ec1326776de12cb73aae98250bb0e8bc89df0f8b37be6f1d220",
+      "output": "evaluation_runs/grain-traceability-v1-cursor-grok-medium-20260909/world_context/contexts/OA-G2-world-context.md",
+      "bytes": 4610,
+      "characters": 4573,
+      "words": 544,
+      "sha256": "b7eb9dc1392a67ec0cd7169c274c09b166662b80d0ec90d5ae25633b86f1d99d"
+    }
+  }
+}

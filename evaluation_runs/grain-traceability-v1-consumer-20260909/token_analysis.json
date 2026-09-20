@@ -1,0 +1,126 @@
+{
+  "analysis": "grain-traceability-v1-token-analysis",
+  "status": "frozen_post_hoc",
+  "benchmark": {
+    "id": "grain-traceability-v1",
+    "commit": "17e1314f10d8b491b4462f821876a0a42642f1f8"
+  },
+  "product": {
+    "name": "Ontology Author",
+    "version": "0.1.0",
+    "commit": "17e1314f10d8b491b4462f821876a0a42642f1f8",
+    "harness": "Codex CLI 0.153.4 via codex exec",
+    "model": "gpt-6-astra",
+    "reasoning": "medium"
+  },
+  "extraction": {
+    "event": "turn.completed",
+    "usage_events_per_run": 1,
+    "duplicate_snapshots_summed": false,
+    "reported_fields": [
+      "input_tokens",
+      "cached_input_tokens",
+      "cache_write_input_tokens",
+      "output_tokens",
+      "reasoning_output_tokens"
+    ],
+    "derived_fields": {
+      "noncached_input": "input_tokens - cached_input_tokens",
+      "reported_total": "input_tokens + output_tokens"
+    },
+    "reasoning_output_added_to_total": false,
+    "classification": "TRUSTWORTHY",
+    "scope_note": "Trustworthy for descriptive reported-token accounting, not a provider billing receipt."
+  },
+  "construction": {
+    "OA-1": {
+      "duration_seconds": 341.0,
+      "rebuilds": 10,
+      "input_tokens": 446817,
+      "cached_input_tokens": 388096,
+      "noncached_input_tokens": 58721,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 9639,
+      "reasoning_output_tokens": 365,
+      "reported_total_tokens": 456456,
+      "classification": "TRUSTWORTHY"
+    },
+    "OA-2": {
+      "duration_seconds": 327.0,
+      "rebuilds": 12,
+      "input_tokens": 559288,
+      "cached_input_tokens": 514176,
+      "noncached_input_tokens": 45112,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 8822,
+      "reasoning_output_tokens": 499,
+      "reported_total_tokens": 568110,
+      "classification": "TRUSTWORTHY"
+    }
+  },
+  "consumers": [
+    {"condition":"RAW","run":"RAW-1","input_tokens":64305,"cached_input_tokens":50688,"noncached_input_tokens":13617,"cache_write_input_tokens":0,"output_tokens":1962,"reasoning_output_tokens":116,"reported_total_tokens":66267,"tool_actions":4,"native_source_reads":true,"duration_seconds":71.3,"classification":"TRUSTWORTHY"},
+    {"condition":"RAW","run":"RAW-2","input_tokens":64373,"cached_input_tokens":55808,"noncached_input_tokens":8565,"cache_write_input_tokens":0,"output_tokens":2159,"reasoning_output_tokens":121,"reported_total_tokens":66532,"tool_actions":5,"native_source_reads":true,"duration_seconds":78.6,"classification":"TRUSTWORTHY"},
+    {"condition":"REFERENCE","run":"REFERENCE-1","input_tokens":136811,"cached_input_tokens":112384,"noncached_input_tokens":24427,"cache_write_input_tokens":0,"output_tokens":2725,"reasoning_output_tokens":36,"reported_total_tokens":139536,"tool_actions":6,"native_source_reads":false,"duration_seconds":106.8,"classification":"TRUSTWORTHY"},
+    {"condition":"REFERENCE","run":"REFERENCE-2","input_tokens":136108,"cached_input_tokens":112384,"noncached_input_tokens":23724,"cache_write_input_tokens":0,"output_tokens":2522,"reasoning_output_tokens":34,"reported_total_tokens":138630,"tool_actions":6,"native_source_reads":false,"duration_seconds":96.5,"classification":"TRUSTWORTHY"},
+    {"condition":"OA-1","run":"OA-1-1","metadata_run":"OA1-C1","input_tokens":184509,"cached_input_tokens":144128,"noncached_input_tokens":40381,"cache_write_input_tokens":0,"output_tokens":2551,"reasoning_output_tokens":17,"reported_total_tokens":187060,"tool_actions":8,"native_source_reads":false,"duration_seconds":98.6,"classification":"TRUSTWORTHY"},
+    {"condition":"OA-1","run":"OA-1-2","metadata_run":"OA1-C2","input_tokens":199451,"cached_input_tokens":150656,"noncached_input_tokens":48795,"cache_write_input_tokens":0,"output_tokens":2482,"reasoning_output_tokens":11,"reported_total_tokens":201933,"tool_actions":8,"native_source_reads":false,"duration_seconds":97.5,"classification":"TRUSTWORTHY"},
+    {"condition":"OA-2","run":"OA-2-1","metadata_run":"OA2-C1","input_tokens":163545,"cached_input_tokens":131968,"noncached_input_tokens":31577,"cache_write_input_tokens":0,"output_tokens":2716,"reasoning_output_tokens":36,"reported_total_tokens":166261,"tool_actions":8,"native_source_reads":false,"duration_seconds":104.0,"classification":"TRUSTWORTHY"},
+    {"condition":"OA-2","run":"OA-2-2","metadata_run":"OA2-C2","input_tokens":160738,"cached_input_tokens":123648,"noncached_input_tokens":37090,"cache_write_input_tokens":0,"output_tokens":2667,"reasoning_output_tokens":40,"reported_total_tokens":163405,"tool_actions":8,"native_source_reads":false,"duration_seconds":102.7,"classification":"TRUSTWORTHY"}
+  ],
+  "consumer_means": {
+    "RAW": {"input":64339.0,"cached_input":53248.0,"noncached_input":11091.0,"output":2060.5,"reasoning_output":118.5,"reported_total":66399.5},
+    "REFERENCE": {"input":136459.5,"cached_input":112384.0,"noncached_input":24075.5,"output":2623.5,"reasoning_output":35.0,"reported_total":139083.0},
+    "OA-1": {"input":191980.0,"cached_input":147392.0,"noncached_input":44588.0,"output":2516.5,"reasoning_output":14.0,"reported_total":194496.5},
+    "OA-2": {"input":162141.5,"cached_input":127808.0,"noncached_input":34333.5,"output":2691.5,"reasoning_output":38.0,"reported_total":164833.0}
+  },
+  "amortization": {
+    "reported_total_curves": {
+      "RAW": "66399.5*n",
+      "OA-1": "456456 + 194496.5*n",
+      "OA-2": "568110 + 164833*n"
+    },
+    "noncached_input_plus_output_curves": {
+      "RAW": "13151.5*n",
+      "OA-1": "68360 + 47104.5*n",
+      "OA-2": "53934 + 37025*n"
+    },
+    "break_even_n_reported_total": {"OA-1": -3.5633621396, "OA-2": -5.7715107154},
+    "break_even_n_noncached_sensitivity": {"OA-1": -2.0133714252, "OA-2": -2.2591576434},
+    "values": [
+      {"n":1,"RAW":66399.5,"OA-1":650952.5,"OA-2":732943.0},
+      {"n":2,"RAW":132799.0,"OA-1":845449.0,"OA-2":897776.0},
+      {"n":5,"RAW":331997.5,"OA-1":1428938.5,"OA-2":1392275.0},
+      {"n":10,"RAW":663995.0,"OA-1":2401421.0,"OA-2":2216440.0},
+      {"n":25,"RAW":1659987.5,"OA-1":5318868.5,"OA-2":4688935.0},
+      {"n":100,"RAW":6639950.0,"OA-1":19906106.0,"OA-2":17051410.0}
+    ]
+  },
+  "prior_campaigns": [
+    {"campaign":"philips_regulatory_v1/reuse_raw_vs_product_v1","classification":"PARTIAL","reason":"Per-run fields retained and directionally descriptive, but report did not claim token cost and omitted one-time construction amortization."},
+    {"campaign":"philips_regulatory_v1/frontier_organic_reuse_v1","classification":"TRUNCATED","reason":"Input counters 21--48 for consumers and 141/135 for construction were explicitly documented as truncated."},
+    {"campaign":"bom/llm_world_programming_v3","classification":"TRUNCATED","reason":"20--30 input-token counters were explicitly documented as incomplete full-context usage."},
+    {"campaign":"bom/llm_world_programming_composer25","classification":"PARTIAL","reason":"Provider usage and cache fields retained, but report calls them incomplete session accounting and exposes no monetary cost."},
+    {"campaign":"capability/end_to_end_v1","classification":"PARTIAL","reason":"Per-run input/output/total fields exist, but no frozen construction-plus-repeated-consumption token amortization analysis."},
+    {"campaign":"other reuse/read campaigns","classification":"UNAVAILABLE","reason":"No comparable validated token-amortization pair was frozen."}
+  ],
+  "verdicts": {
+    "token_amortization": "NOT_SUPPORTED",
+    "semantic_amortization": "SUPPORTED",
+    "monetary_amortization": "NOT_DEMONSTRATED"
+  },
+  "source_hashes": {
+    "/tmp/grain-traceability-v1-experiment-final-20260908/transcripts/OA-1.jsonl": "6894d485f2b4c65fe9632367a9600cc68e6fefe4a4a2f30f878b112c7c08d7d5",
+    "/tmp/grain-traceability-v1-experiment-final-20260908/transcripts/OA-2.jsonl": "ccc65221419949a686262df458540ccc46f3d75ba28b2d523208504a44b9deaa",
+    "/tmp/grain-traceability-v1-experiment-final-20260908/metadata/construction_result_report.json": "08ba636a44879073982be64402fe49969a477eb0f4d7ca93314c1da14b7af2c8",
+    "evaluation_runs/grain-traceability-v1-consumer-20260909/consumer_telemetry.json": "8249b1581c27c70543c5d845b81d95d591ef7d28ca70f358accbee4bd3a4f88b",
+    "evaluation_runs/grain-traceability-v1-consumer-20260909/consumer_runs/RAW-1/transcript.jsonl": "11334368584ce651b2d8965d3c222538088fb7afae5bf7e2d036eb6680fafc62",
+    "evaluation_runs/grain-traceability-v1-consumer-20260909/consumer_runs/RAW-2/transcript.jsonl": "3ec251d749a1cd237c633dc19ea4673fc204aaa09aff639416d4365c57cb816e",
+    "evaluation_runs/grain-traceability-v1-consumer-20260909/consumer_runs/REFERENCE-1/transcript.jsonl": "84e4fc037d35ba6c29e2145b846e72f71cc9eb828f199b3262c34c6344b7a463",
+    "evaluation_runs/grain-traceability-v1-consumer-20260909/consumer_runs/REFERENCE-2/transcript.jsonl": "44ca891913b81b001a566518014dab3c1d0bfadf923fcad58f68129a024ac784",
+    "evaluation_runs/grain-traceability-v1-consumer-20260909/consumer_runs/OA-1-1/transcript.jsonl": "1ae7a495269d5b5c5beddd04c19c09d0f28405a9a7d182c512920726d23770a5",
+    "evaluation_runs/grain-traceability-v1-consumer-20260909/consumer_runs/OA-1-2/transcript.jsonl": "46128e45753f68571efbd39613393187ea01f3aae1c962ea3836e7760ada0b54",
+    "evaluation_runs/grain-traceability-v1-consumer-20260909/consumer_runs/OA-2-1/transcript.jsonl": "4adb49bae2a54a1096ee50d40cd6d5b63e3d27c8fec0a2acd31092d0244e5ba1",
+    "evaluation_runs/grain-traceability-v1-consumer-20260909/consumer_runs/OA-2-2/transcript.jsonl": "ec420226f2bf66fc9fa623e4a451e767c9598320a2619b3535177b6a643610f6"
+  }
+}

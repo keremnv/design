@@ -1,0 +1,45 @@
+{
+  "maintenance": "Answer the question and keep the existing World adequate for future work within its declared purpose.",
+  "upstream": [
+    {
+      "id": "U1",
+      "exposes": "supported-hopper-named-tickets",
+      "prompt": "A yard clerk asked: which receiving tickets were written on the hopper sheet for the 26,000 kg movement out of North House 12 for work order OUT-5002 / dispatch PGE-OUT-5002? Write the answer to answer.md."
+    },
+    {
+      "id": "U2",
+      "exposes": "unresolved-south-house-allocation",
+      "prompt": "Which receiving ticket supplied the 19,000 kg on PGE-OUT-5004 from South House 14? Write the answer to answer.md."
+    }
+  ],
+  "downstream": [
+    {
+      "id": "D1",
+      "case": "positive-semantic-reuse",
+      "prompt": "A mill nutritionist asked: which Prairie Gate receiving tickets were named as the sources of the grain that the mill processed as grower-feed batch FEED-2207? Write the answer to answer.md.",
+      "gold": {
+        "must_include": ["WB-390", "EF-18"],
+        "must_not_commit": ["DR-44", "MCR-118", "S-52"],
+        "unresolved_ok": false
+      }
+    },
+    {
+      "id": "D2",
+      "case": "uncertainty-reuse",
+      "prompt": "A mill clerk asked whether Meadow Creek ticket MCR-118 can be certified as the sole Prairie Gate source of mill receipt HFM-IN-604. Write the answer to answer.md.",
+      "gold": {
+        "must_not_commit": ["sole source", "only MCR-118", "certified"],
+        "must_refuse_or_unresolved": true,
+        "unsupported_if_yes": true
+      }
+    },
+    {
+      "id": "D3",
+      "case": "unrelated-control",
+      "prompt": "A mill desk asked: which mill receiving slip accepted the truck dispatched as PGE-OUT-5001, and what mill run used that receipt? Write the answer to answer.md.",
+      "gold": {
+        "must_include": ["HFM-IN-601", "MILL-2206"]
+      }
+    }
+  ]
+}

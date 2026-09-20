@@ -1,0 +1,92 @@
+{
+  "authoring_usage": {
+    "OA-G1": {
+      "inputTokens": 110409,
+      "outputTokens": 24952,
+      "cacheReadTokens": 582144,
+      "cacheWriteTokens": 0
+    },
+    "OA-G2": {
+      "inputTokens": 206880,
+      "outputTokens": 29114,
+      "cacheReadTokens": 614272,
+      "cacheWriteTokens": 0
+    }
+  },
+  "curves": {
+    "OA-G1": {
+      "author_reported_total": 135361,
+      "synopsis_mean_reported_total": 134688.66666666666,
+      "durable_mean_reported_total": 143058.66666666666,
+      "synopsis_mean_input": 124791,
+      "durable_mean_input": 134008.66666666666,
+      "break_even_n": null,
+      "values": {
+        "1": {
+          "synopsis": 134688.66666666666,
+          "durable": 278419.6666666666
+        },
+        "2": {
+          "synopsis": 269377.3333333333,
+          "durable": 421478.3333333333
+        },
+        "5": {
+          "synopsis": 673443.3333333333,
+          "durable": 850654.3333333333
+        },
+        "10": {
+          "synopsis": 1346886.6666666665,
+          "durable": 1565947.6666666665
+        },
+        "25": {
+          "synopsis": 3367216.6666666665,
+          "durable": 3711827.6666666665
+        },
+        "100": {
+          "synopsis": 13468866.666666666,
+          "durable": 14441227.666666666
+        }
+      }
+    },
+    "OA-G2": {
+      "author_reported_total": 235994,
+      "synopsis_mean_reported_total": 137867,
+      "durable_mean_reported_total": 134229.66666666666,
+      "synopsis_mean_input": 128854.66666666667,
+      "durable_mean_input": 125882,
+      "break_even_n": 64.8810483870966,
+      "values": {
+        "1": {
+          "synopsis": 137867,
+          "durable": 370223.6666666666
+        },
+        "2": {
+          "synopsis": 275734,
+          "durable": 504453.3333333333
+        },
+        "5": {
+          "synopsis": 689335,
+          "durable": 907142.3333333333
+        },
+        "10": {
+          "synopsis": 1378670,
+          "durable": 1578290.6666666665
+        },
+        "25": {
+          "synopsis": 3446675,
+          "durable": 3591735.6666666665
+        },
+        "100": {
+          "synopsis": 13786700,
+          "durable": 13658960.666666666
+        }
+      }
+    }
+  },
+  "telemetry_semantics": {
+    "reported_total": "inputTokens + outputTokens",
+    "noncached_input": "unavailable for Cursor provider result",
+    "reasoning_output": "unavailable"
+  },
+  "verdict": "PARTIALLY_SUPPORTED"
+}

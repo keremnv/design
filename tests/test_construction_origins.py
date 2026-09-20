@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from ontology_author.world.core.kernel import SemanticWorld
 from ontology_author.world.core.model import (
     Completeness,
@@ -11,10 +9,7 @@ from ontology_author.world.core.model import (
     Role,
     RoleType,
 )
-from ontology_author.world.core.origins import (
-    ConstructionOrigin,
-    OriginMetadataError,
-)
+from ontology_author.world.core.origins import ConstructionOrigin
 from ontology_author.world.core.source import AssertionGrounding, SourceObservation
 from ontology_author.world.explorer import WorldExplorerAdapter
 
@@ -71,8 +66,6 @@ def test_one_commitment_keeps_distinct_support_path_origins_after_reopen(tmp_pat
             "MECHANICAL",
             "SEMANTIC",
         ]
-        with pytest.raises(OriginMetadataError, match="multiple construction origins"):
-            world.origin_for_assertion(first.assertion_id)
 
         warrant = world.warrant_for_assertion(first.assertion_id)
         assert warrant["recorded_construction_origin"] == "MULTIPLE"

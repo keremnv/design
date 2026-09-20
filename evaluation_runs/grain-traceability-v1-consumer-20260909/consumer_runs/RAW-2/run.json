@@ -1,0 +1,10 @@
+{
+  "condition": "RAW",
+  "replicate": 2,
+  "started": "2026-09-08T22:31:22.692185+00:00",
+  "ended": "2026-09-08T22:32:41.273456+00:00",
+  "exit_code": 0,
+  "workspace": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/workspaces/RAW-2",
+  "codex_home": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/codex-home/RAW-2",
+  "run_output": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/runs/RAW-2"
+}

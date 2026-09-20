@@ -1,0 +1,127 @@
+{
+  "prompt": "A mill nutritionist asked: which Prairie Gate receiving tickets were named as the sources of the grain that the mill processed as grower-feed batch FEED-2207? Write the answer to answer.md.",
+  "started": "2026-09-09T19:51:38.049558+00:00",
+  "ended": "2026-09-09T19:52:11.575752+00:00",
+  "exit_code": 0,
+  "timed_out": false,
+  "workspace": "/tmp/oa-dmv-down-B-D1",
+  "isolated": true,
+  "model_requested": "composer-2.5",
+  "model_reported": "Composer 2.5",
+  "usage": {
+    "inputTokens": 10529,
+    "outputTokens": 2389,
+    "cacheReadTokens": 163936,
+    "cacheWriteTokens": 0
+  },
+  "author_commands": [],
+  "shell_commands": [
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \".tables\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT name FROM _world_relations ORDER BY name;\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"PRAGMA table_info(mill_run); PRAGMA table_info(hopper_ticket_named); PRAGMA table_info(dispatch_to_mill); PRAGMA table_info(intake);\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT * FROM mill_run WHERE output_batch LIKE '%2207%' OR output_name LIKE '%2207%' OR run_no LIKE '%2207%';\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT * FROM mill_run LIMIT 10;\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT * FROM hopper_ticket_named LIMIT 10;\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"PRAGMA table_info(mill_receipt); PRAGMA table_info(loadout); PRAGMA table_info(manifest); PRAGMA table_info(bin_movement);\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT * FROM mill_receipt WHERE receipt_no LIKE '%602%' OR receipt_no LIKE '%HFM%';\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT * FROM dispatch_to_mill;\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT * FROM mill_receipt WHERE local_receipt LIKE '%602%';\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT * FROM loadout WHERE dispatch_ref LIKE '%5002%';\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT * FROM hopper_ticket_named WHERE work_order LIKE '%5002%' OR move_id LIKE '%5002%';\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT * FROM bin_movement WHERE work_order LIKE '%5002%' OR move_id LIKE '%5002%';\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT * FROM intake WHERE ticket_id IN ('ticket:WB-390', 'ticket:EF-18') OR receipt_no LIKE '%390%' OR receipt_no LIKE '%EF%';\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT * FROM manifest WHERE manifest_no LIKE '%8848%' OR cargo_mark LIKE '%5002%';\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT * FROM _world_derivations; SELECT name, sql FROM _world_derivations;\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"\nSELECT 'mill_run' as rel, run_no, input_receipt, output_batch, output_name FROM mill_run WHERE output_batch='FEED-2207';\nSELECT 'dispatch' as rel, dispatch_ref, manifest_no, mill_receipt FROM dispatch_to_mill WHERE mill_receipt='HFM-IN-602';\nSELECT 'hopper' as rel, move_id, work_order, ticket_code FROM hopper_ticket_named WHERE work_order='OUT-5002';\nSELECT 'intake' as rel, ticket_id, receipt_no, grower_recorded FROM intake WHERE ticket_id IN ('ticket:WB-390','ticket:EF-18');\n\""
+  ],
+  "evidence_access": [],
+  "construction_changed": false,
+  "purpose_changed": false,
+  "sqlite_changed": false,
+  "world_names": [
+    "yard-trace"
+  ],
+  "sqlite_inspect": {
+    "tables": [
+      "_world_assertions",
+      "_world_completeness",
+      "_world_derivation_inputs",
+      "_world_derivation_run_inputs",
+      "_world_derivations",
+      "_world_groundings",
+      "_world_meta",
+      "_world_referents",
+      "_world_relations",
+      "_world_roles",
+      "bin_movement",
+      "dispatch_to_mill",
+      "hopper_ticket_named",
+      "intake",
+      "loadout",
+      "manifest",
+      "mill_receipt",
+      "mill_run",
+      "place_alias",
+      "purpose_requirement_failure"
+    ],
+    "purpose_requirement_failure": [
+      {
+        "_assertion_id": "assertion:2eb0ac7799684bb555f69861",
+        "requirement_id": "out_5003_no_mill_slip",
+        "affected_identity": "out_5003_no_mill_slip",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "manifest",
+        "subject_json": "{\"dispatch_ref\": \"PGE-OUT-5003\", \"manifest_no\": \"NS-8910\", \"reason\": \"PGE-OUT-5003 has a carrier manifest but no HFM receiving slip in the supplied extracts\"}",
+        "grounding_ref": ""
+      },
+      {
+        "_assertion_id": "assertion:597b56f4cc9f80fbae965074",
+        "requirement_id": "out_5003_hopper_tickets",
+        "affected_identity": "out_5003_hopper_tickets",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "bin_movement",
+        "subject_json": "{\"move_id\": \"BM-006\", \"reason\": \"hopper sheet material_note records no ticket on hopper sheet\", \"work_order\": \"OUT-5003\"}",
+        "grounding_ref": ""
+      },
+      {
+        "_assertion_id": "assertion:f460c37c8b50da070764bb16",
+        "requirement_id": "out_5004_hopper_tickets",
+        "affected_identity": "out_5004_hopper_tickets",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "bin_movement",
+        "subject_json": "{\"move_id\": \"BM-009\", \"reason\": \"hopper sheet material_note records no individual ticket for the blended load\", \"work_order\": \"OUT-5004\"}",
+        "grounding_ref": ""
+      }
+    ],
+    "hopper_named_out5002": true,
+    "unresolved_out5004": true,
+    "control_out5001": true
+  },
+  "model_ok": true,
+  "id": "B-D1",
+  "condition": "B",
+  "task": "D1",
+  "case": "positive-semantic-reuse",
+  "gold": {
+    "must_include": [
+      "WB-390",
+      "EF-18"
+    ],
+    "must_not_commit": [
+      "DR-44",
+      "MCR-118",
+      "S-52"
+    ],
+    "unresolved_ok": false
+  },
+  "raw_evidence_unavailable": true,
+  "construction_absent": true,
+  "answer_text": "# FEED-2207 source receiving tickets\n\nGrower-feed batch **FEED-2207** was produced in mill run **MILL-2207** from Hearthland intake receipt **HFM-IN-602**. That receipt traces to Prairie Gate loadout **PGE-OUT-5002** (carrier manifest **NS-8848**).\n\nHopper paperwork for that loadout (**OUT-5002**, bin movement **BM-004**) named two Prairie Gate receiving tickets as the grain sources:\n\n- **WB-390** (receiving record ER-7721, Willow Bend Farms)\n- **EF-18** (receiving record ER-7729, East Fork Co-op)\n\nThose are the receiving tickets named on the hopper sheet for the grain the mill processed as FEED-2207.\n",
+  "score": {
+    "correct": true,
+    "missing_required": [],
+    "unsupported_commitments": [],
+    "refused_or_unresolved": false,
+    "yes_commit": false
+  }
+}

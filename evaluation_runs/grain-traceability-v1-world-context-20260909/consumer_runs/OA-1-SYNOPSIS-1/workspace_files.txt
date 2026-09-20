@@ -1,0 +1,8 @@
+INSTRUCTION.md
+PURPOSE.md
+consumer_questions.md
+world/world.admission.json
+world/world.purpose.json
+world/world.sqlite
+world/world.sqlite.origins.json
+world-context.md

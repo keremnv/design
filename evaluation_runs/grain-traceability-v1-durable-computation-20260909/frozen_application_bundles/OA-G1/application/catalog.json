@@ -1,0 +1,44 @@
+{
+  "name": "grain-trace-computations",
+  "version": "1.0.0",
+  "description": "Deterministic, parameterized grain-trace queries bound to this sealed World. Call via application/run.py; do not read source to use.",
+  "world_binding": {
+    "world_id": "v0",
+    "revision": 242,
+    "world_hash": "dc2e7e45c1327fc997691b4fa4071c5fd44edb6aed2b57e2d1e4e4c70a471eb8",
+    "sqlite_sha256": "b2053bcf7c9e02a39b64a77065ff952c4357e494b024292c08eb9a6ff9481a4c",
+    "sqlite_path": "world/world.sqlite"
+  },
+  "invoke": {
+    "entrypoint": "application/run.py",
+    "usage": "python3 application/run.py <computation_id> --param NAME=VALUE [--param NAME=VALUE ...] [--pretty]",
+    "list": "python3 application/run.py --list",
+    "params_json": "python3 application/run.py <computation_id> --params-json '{\"dispatch\":\"PGE-OUT-5001\"}'"
+  },
+  "computations": [
+    {
+      "id": "shipment_source_status",
+      "family": "shipment_source_status",
+      "manifest": "manifests/shipment_source_status.json",
+      "parameters": ["dispatch"]
+    },
+    {
+      "id": "processor_receipt_provenance",
+      "family": "processor_receipt_provenance",
+      "manifest": "manifests/processor_receipt_provenance.json",
+      "parameters": ["processor_receipt"]
+    },
+    {
+      "id": "custody_owner_at",
+      "family": "custody_owner_at",
+      "manifest": "manifests/custody_owner_at.json",
+      "parameters": ["material", "timestamp"]
+    },
+    {
+      "id": "inspection_downstream_scope",
+      "family": "inspection_downstream_scope",
+      "manifest": "manifests/inspection_downstream_scope.json",
+      "parameters": ["sample"]
+    }
+  ]
+}

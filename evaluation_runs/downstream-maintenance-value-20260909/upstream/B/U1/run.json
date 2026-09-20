@@ -1,0 +1,104 @@
+{
+  "prompt": "A yard clerk asked: which receiving tickets were written on the hopper sheet for the 26,000 kg movement out of North House 12 for work order OUT-5002 / dispatch PGE-OUT-5002? Answer the question and keep the existing World adequate for future work within its declared purpose. Write the answer to answer.md.",
+  "started": "2026-09-09T19:50:13.321979+00:00",
+  "ended": "2026-09-09T19:51:01.611659+00:00",
+  "exit_code": 0,
+  "timed_out": false,
+  "workspace": "/tmp/oa-downstream-maintenance-value-20260909/condition_B",
+  "isolated": true,
+  "model_requested": "composer-2.5",
+  "model_reported": "Composer 2.5",
+  "usage": {
+    "inputTokens": 18366,
+    "outputTokens": 4176,
+    "cacheReadTokens": 249344,
+    "cacheWriteTokens": 0
+  },
+  "author_commands": [
+    "author list",
+    "author rebuild"
+  ],
+  "shell_commands": [
+    "author list 2>/dev/null; ls -la /workspace",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \".tables\" && sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT * FROM loadout WHERE dispatch_ref='PGE-OUT-5002';\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT name, mode, scope FROM _world_relations;\" && sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"SELECT * FROM purpose_requirement_failure;\" 2>/dev/null; cat /workspace/.worlds/yard-trace/world/world.purpose.json",
+    "author rebuild yard-trace",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"\nSELECT bm.move_id, bm.work_order, bm.from_point, bm.quantity_kg, bm.material_note\nFROM bin_movement bm\nWHERE bm.work_order='OUT-5002' AND bm.from_point='BIN-12';\n\nSELECT h.work_order, h.ticket_code, i.receipt_no, i.grower_recorded\nFROM hopper_ticket_named h\nJOIN intake i ON h.ticket = i.ticket\nWHERE h.work_order='OUT-5002';\n\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"PRAGMA table_info(hopper_ticket_named); SELECT * FROM hopper_ticket_named WHERE work_order='OUT-5002';\"",
+    "sqlite3 /workspace/.worlds/yard-trace/world/world.sqlite \"\nSELECT h.ticket_code, i.receipt_no, i.grower_recorded, i.net_kg\nFROM hopper_ticket_named h\nJOIN intake i ON h.ticket_id = i.ticket_id\nWHERE h.work_order='OUT-5002';\n\""
+  ],
+  "evidence_access": [
+    "evidence/bin_movements",
+    "evidence/operating_notes",
+    "evidence/elevator_receipts",
+    "/workspace/evidence",
+    "evidence_dir_present"
+  ],
+  "construction_changed": true,
+  "purpose_changed": false,
+  "sqlite_changed": true,
+  "world_names": [
+    "yard-trace"
+  ],
+  "sqlite_inspect": {
+    "tables": [
+      "_world_assertions",
+      "_world_completeness",
+      "_world_derivation_inputs",
+      "_world_derivation_run_inputs",
+      "_world_derivations",
+      "_world_groundings",
+      "_world_meta",
+      "_world_referents",
+      "_world_relations",
+      "_world_roles",
+      "bin_movement",
+      "dispatch_to_mill",
+      "hopper_ticket_named",
+      "intake",
+      "loadout",
+      "manifest",
+      "mill_receipt",
+      "mill_run",
+      "place_alias",
+      "purpose_requirement_failure"
+    ],
+    "purpose_requirement_failure": [
+      {
+        "_assertion_id": "assertion:2eb0ac7799684bb555f69861",
+        "requirement_id": "out_5003_no_mill_slip",
+        "affected_identity": "out_5003_no_mill_slip",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "manifest",
+        "subject_json": "{\"dispatch_ref\": \"PGE-OUT-5003\", \"manifest_no\": \"NS-8910\", \"reason\": \"PGE-OUT-5003 has a carrier manifest but no HFM receiving slip in the supplied extracts\"}",
+        "grounding_ref": ""
+      },
+      {
+        "_assertion_id": "assertion:597b56f4cc9f80fbae965074",
+        "requirement_id": "out_5003_hopper_tickets",
+        "affected_identity": "out_5003_hopper_tickets",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "bin_movement",
+        "subject_json": "{\"move_id\": \"BM-006\", \"reason\": \"hopper sheet material_note records no ticket on hopper sheet\", \"work_order\": \"OUT-5003\"}",
+        "grounding_ref": ""
+      },
+      {
+        "_assertion_id": "assertion:f460c37c8b50da070764bb16",
+        "requirement_id": "out_5004_hopper_tickets",
+        "affected_identity": "out_5004_hopper_tickets",
+        "failure_kind": "EXPLICIT_UNRESOLVED",
+        "relation_name": "bin_movement",
+        "subject_json": "{\"move_id\": \"BM-009\", \"reason\": \"hopper sheet material_note records no individual ticket for the blended load\", \"work_order\": \"OUT-5004\"}",
+        "grounding_ref": ""
+      }
+    ],
+    "hopper_named_out5002": true,
+    "unresolved_out5004": true,
+    "control_out5001": true
+  },
+  "model_ok": true,
+  "id": "B-U1",
+  "condition": "B",
+  "task": "U1",
+  "maintain": true
+}

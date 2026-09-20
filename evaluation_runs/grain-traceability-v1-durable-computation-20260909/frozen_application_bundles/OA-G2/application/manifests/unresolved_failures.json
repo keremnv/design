@@ -1,0 +1,11 @@
+{
+  "id": "unresolved_failures",
+  "description": "Return purpose_requirement_failure records. If identity is supplied, restrict to aliases of that identity.",
+  "parameters": {
+    "identity": {"type": "string", "required": false}
+  },
+  "result": {
+    "failures": "array of {requirement_id, affected_identity, failure_kind, relation_name, reason, subject}"
+  },
+  "invoke": "application/run unresolved_failures --identity PGE-OUT-5001"
+}

@@ -1,0 +1,11 @@
+{
+  "world_names": [
+    "yard-trace"
+  ],
+  "purpose_sha256": null,
+  "construction_sha256": null,
+  "sqlite_sha256": "8b0b5e34a1c7b7731bb4c702fd02dffae90fbbf7db8166cc9793df2171c15d24",
+  "has_construction": false,
+  "has_evidence": false,
+  "has_purpose_md": false
+}

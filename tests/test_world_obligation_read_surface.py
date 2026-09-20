@@ -221,7 +221,7 @@ def _mixed_world(tmp_path: Path) -> Path:
 ''',
         encoding="utf-8",
     )
-    result = rebuild(root)
+    result = rebuild(root, purpose=root / "PURPOSE.md")
     assert result.succeeded, result.errors
     return root
 

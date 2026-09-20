@@ -1,0 +1,10 @@
+{
+  "condition": "REFERENCE",
+  "replicate": 2,
+  "started": "2026-09-08T22:31:22.689539+00:00",
+  "ended": "2026-09-08T22:32:59.174171+00:00",
+  "exit_code": 0,
+  "workspace": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/workspaces/REFERENCE-2",
+  "codex_home": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/codex-home/REFERENCE-2",
+  "run_output": "/tmp/grain-traceability-v1-consumer-20260908/attempt3/runs/REFERENCE-2"
+}

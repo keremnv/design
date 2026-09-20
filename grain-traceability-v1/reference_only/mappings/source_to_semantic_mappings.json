@@ -1,0 +1,19 @@
+{
+  "mapping_version": "1.0",
+  "source_mappings": [
+    {"source": "elevator_receipts.csv", "grain": "one receiving ticket", "maps_to": ["MaterialPortion", "receiving OperationalEvent", "source Organization", "initial Place", "quantity"], "identity_fields": ["scale_ticket", "receipt_no"], "transformation": "normalize local time; map supplier aliases; create inbound material referent"},
+    {"source": "bin_movements.csv", "grain": "one physical movement log row", "maps_to": ["storage/loadout OperationalEvent", "from/to Place or Container", "quantity"], "identity_fields": ["move_id", "material_note", "work_order"], "transformation": "split slash-delimited material notes only when supported by another source; preserve aggregate rows"},
+    {"source": "loadout_log.csv", "grain": "one truck loading record", "maps_to": ["Shipment", "loadout OperationalEvent", "source Container", "truck Container", "route destination"], "identity_fields": ["dispatch_ref", "truck_tag", "dispatch_id"], "transformation": "normalize PGE-OUT references to shipment referents; map bin labels and spouts"},
+    {"source": "carrier_manifests.json", "grain": "one carrier departure record", "maps_to": ["transport OperationalEvent", "carrier Organization", "truck Container", "source/destination Place"], "identity_fields": ["bill_of_lading", "cargo_mark", "vehicle"], "transformation": "cross-reference bills to processor receipt records; keep question-marked cargo marks as candidates"},
+    {"source": "processor_receipts.json", "grain": "one processor receiving record or mill run", "maps_to": ["processor receipt OperationalEvent", "downstream MaterialPortion", "processor Place", "silo Container", "ProcessedProduct"], "identity_fields": ["local_receipt", "bill_reference", "origin_label", "output_batch"], "transformation": "reconcile carrier bill and origin label; add processor-local referents"},
+    {"source": "inspection_results.csv", "grain": "one sample test result", "maps_to": ["Sample", "Observation", "result", "material or shipment candidate"], "identity_fields": ["sample_no", "lab_ticket", "local_lot"], "transformation": "map sample to receiving or shipment using exact references first, then bounded time/bin/lot evidence"},
+    {"source": "ownership_records.csv", "grain": "one title or custody ledger entry", "maps_to": ["ownership interval", "custody interval", "Organization participants"], "identity_fields": ["record_no", "scope_ref"], "transformation": "separate title changes from custody changes; attach intervals to material or aggregate shipment scope"},
+    {"source": "operating_notes.md", "grain": "operational policy and exception note", "maps_to": ["alias dictionary", "completeness scope", "identity candidate status", "data-quality constraint"], "identity_fields": ["named local terms"], "transformation": "compile bounded normalization and completeness assertions; never convert absence outside scope to false"}
+  ],
+  "identity_resolution_rules": [
+    {"rule": "exact_external_reference", "priority": 1, "examples": ["RL-5001-A to HFM-IN-601", "NS-5002-B to HFM-IN-602"]},
+    {"rule": "documented_alias_plus_time_quantity", "priority": 2, "examples": ["DR-44 to DR44", "North House 12 to BIN-12"]},
+    {"rule": "aggregate_material_note", "priority": 3, "examples": ["WB-390 / EF-18 to blended OUT-5002"], "constraint": "does not license allocation absent quantities or source evidence"},
+    {"rule": "question_marked_or_competing_identity", "priority": 99, "examples": ["N3 / EF-18?", "MCR-118 owner claims"], "result": "candidate only"}
+  ]
+}

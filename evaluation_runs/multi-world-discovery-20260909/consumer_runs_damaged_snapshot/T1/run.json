@@ -1,0 +1,14 @@
+{
+  "id": "T1",
+  "relevant_world": "grain-flow",
+  "probe": "purpose-fit selection / use",
+  "prompt": "A mill desk asked: which mill receiving slip accepted the truck dispatched as PGE-OUT-5001, and what mill run used that receipt? Write the answer to answer.md.",
+  "started": "2026-09-09T14:45:01.456696+00:00",
+  "ended": "2026-09-09T14:45:43.699385+00:00",
+  "exit_code": 0,
+  "workspace": "/tmp/oa-mwd-isolated-T1",
+  "isolated": true,
+  "model_requested": "composer-2.5",
+  "model_reported": "Composer 2.5",
+  "model_ok": true
+}

@@ -10,14 +10,14 @@ notes define the limits of each reuse.
 | Kernel concept | What it actually provides | Governance use | What governance must not infer |
 |---|---|---|---|
 | `REFERENT` | A thin stable string handle. Relation roles of type `REFERENT` are foreign-key checked. | Store constructed semantic referents and mechanically derived program referents. Store source-native referents only when the provider supplies useful object identity. | Generic storage does not make source, semantic, and program identities interchangeable. An addressable source region need not be a referent. A referent is not a property-bearing object or a real-world entity by default. |
-| KDM v1.4 program profile | KDM supplies the normative meaning of selected program entities and mechanical relationships; the World supplies storage and admission. | Encode the selected KDM profile with ordinary referents, typed relations, grounding, and profile metadata. See [`KDM_PROFILE.md`](KDM_PROFILE.md). | KDM model/XMI IDs, ownership, `SourceRef`, `SourceRegion`, or a KDM model's existence do not by themselves define our snapshot identity, exhaustive program universe, completeness receipt, external boundary, or cross-version lineage. |
+| native spine core and capabilities | The application-level spine contracts define the meaning and integrity obligations of mechanically recovered program identities and relations; the World supplies storage and admission. | Encode declared spine capabilities with ordinary referents, typed relations, grounding, capability records, and construction receipts. | A profile or receipt does not make unsupported program facts true, complete beyond its declared basis, or adequate for every governance purpose. |
 | `SourceObservation` | A provider, native handle, source revision, native location, and optional payload describing an observation. | Address the exact source evidence region that supports a claim or describes a source-native object, and make reconstruction possible. | It primarily addresses evidence. It is not automatically the persistent identity of the source-side thing, and it does not create a source referent merely by being addressable. |
 | `AssertionGrounding` / `Grounding` | Grounding stores compact pointers on referents or assertions. `Grounding` has `SOURCE`, `WORLD`, `ASSERTION`, and `DERIVATION` kinds. `AssertionGrounding` packages observations, construction method, and extra metadata. | Preserve evidence for claims, identity-resolution context, construction/support context, and later derivation or assertion links. | Grounding does not confer governance authority or prove a proposition. A `WORLD` grounding is not a source authority declaration. |
 | governance claim / proposition | The generic kernel has no separate `Claim` primitive. A claim is currently represented by an assertion tuple in a named typed relation, with its grounds stored separately. | Treat propositions as conceptually distinct from the source, semantic, and program identities that participate in them. Preserve precise relation names and n-ary roles. | A relation row is not an entity, and a source region that grounds a claim is not thereby one of the claim's referents. |
 | `ConstructionOrigin.MECHANICAL` | One support/construction path was marked mechanical by the constructor. | Record a coarse support-path summary where useful. | It is not proof that the external fact is true or source-native in the governance sense. |
 | `ConstructionOrigin.SEMANTIC` | One support/construction path was marked semantic; the current kernel treats this as a coarse path origin. | Use as a compatibility/storage signal alongside finer governance metadata. | It is not the complete epistemic classification. It must not erase `source_explicit`, `cross_evidence_inferred`, `hypothesized`, or referent-resolution detail. |
 | `ConstructionOrigin.DERIVED` | A relation row was materialized by a registered deterministic derivation. | Preserve the derivation path and its inputs. | Deterministic computation from an inferred premise is not independent mechanical truth about reality. |
-| `ConstructionOrigin.ADJUDICATED` | A constructor can label a support path as adjudicated. The current kernel does not turn this into a general adjudication record or authority model. | Treat as a coarse compatibility label only until governance defines adjudication state. | The label does not establish who adjudicated, what authority they had, or what bounded case they saw. |
+| `ConstructionOrigin.ADJUDICATED` | A constructor can label a support path as adjudicated. The current kernel does not turn this into a general adjudication record or authority model. | Treat as a coarse compatibility label only. Case-local interpretation is `GovernanceAdjudication` in [`GOVERNANCE_ADJUDICATION_CONTRACT.md`](GOVERNANCE_ADJUDICATION_CONTRACT.md). | The label does not establish who adjudicated, what authority they had, or what bounded case they saw. |
 | `BASE` assertion | A manually asserted tuple in a `BASE` relation. The tuple is stored in a typed relation and receives `ASSERTED` assertion bookkeeping. | Store durable claims, including claims relating source-native, semantic, and program identities. | `BASE` does not mean source-native, authoritative, true, normative, or globally complete. |
 | `DERIVED` relation | A relation that cannot be manually asserted; a registered `SELECT`/`WITH` query materializes it from declared inputs. | Compute repeatable selections and consequences after their premises are persisted. | `DERIVED` does not mean mechanically obtained from external reality, and it does not remove the provenance of inferred inputs. |
 | `WORLD` scope | In the current runtime, an admission scope in `ConstructionWorld.admission`, persisted in `world.admission.json`; it is not a generic relation field in the core SQLite schema. | Mark records admitted as part of the reusable semantic World. | It does not mean global truth, authoritative material, program-spine state, or corpus-wide coverage. |
@@ -33,7 +33,7 @@ notes define the limits of each reuse.
 | experimental `Commitment` | Provisionally, an addressable assertion ID used as a candidate answer. | Use the content-addressed assertion as a candidate semantic claim only if the governance application chooses that representation. | A Commitment is not a new independent proposition identity and must not be confused with a source commitment, implementation commitment, or adjudicated decision. |
 | experimental `Candidate` association | Kernel bookkeeping connects an Obligation to an existing assertion without making a semantic relation. | Keep candidate selection metadata separate from domain relations when appropriate. | Candidate association is not semantic correspondence, authority, adjudication, or proof of applicability. |
 | experimental `Resolution` | Runtime-derived current read state for an Obligation, with candidate assessments and status; the public World layers do not expose a general resolution writer. | Study the separation of selection/evaluation from construction. | It is not the future adjudicator, policy engine, or authoritative governance decision model. |
-| experimental `Adjudication` | An immutable recorded selection of an existing candidate, with an external `source_id` in its authority basis; standing is assessed from separate configuration. | Reuse the separation between a recorded decision and the authority used to assess it. | Recording an adjudication does not grant authority, establish truth, or define the future case format. |
+| experimental `Adjudication` | An immutable recorded selection of an existing candidate, with an external `source_id` in its authority basis; standing is assessed from separate configuration. | Reuse the separation between a recorded decision and the authority used to assess it. | Recording a kernel adjudication does not grant authority, establish truth, or define `GovernanceAdjudication`. Do not retrofit the governance-adjudication contract onto this type. |
 
 ## What is especially valuable to preserve
 
@@ -94,12 +94,28 @@ World dependencies only.
 
 ### Does not exist yet
 
-The current implementation does not provide the program spine, mechanical
-program extraction, source adapters, adapter contracts or lifecycle, source
-revision comparison for governance, cross-version program lineage, a durable
-governance authority model, a permanent epistemic schema, semantic traversal,
-case assembly, adjudication, governance policy, or a universal identity
-reconciliation service.
+The program spine exists as application contracts and a TypeScript extractor.
+Cross-snapshot comparison exists as an application sidecar. Authoritative-source
+construction exists as an application contract in
+[`AUTHORITY_CONSTRUCTION_CONTRACT.md`](AUTHORITY_CONSTRUCTION_CONTRACT.md)
+and a v0 implementation in `ontology_author.authority`. Attachment maintenance
+and governance-case assembly exist as application contracts and v0 sidecar
+writers in
+[`AUTHORITY_MAINTENANCE_CONTRACT.md`](AUTHORITY_MAINTENANCE_CONTRACT.md) and
+[`GOVERNANCE_CASE_CONTRACT.md`](GOVERNANCE_CASE_CONTRACT.md). They are not
+kernel primitives. Change-impact (`AuthorityChangeImpact`) is part of that
+case-assembly design, not a kernel relevance score. Governance adjudication
+exists as an application contract in
+[`GOVERNANCE_ADJUDICATION_CONTRACT.md`](GOVERNANCE_ADJUDICATION_CONTRACT.md).
+It is not implemented in this milestone and is not a kernel primitive.
+Experimental kernel `Adjudication` is not that contract.
+
+The current implementation does not provide additional source drivers, an
+autonomous constructor, source revision comparison for governance, semantic
+traversal, an adjudicator runtime, governance policy, or a universal identity
+reconciliation service. The kernel still has no Claim primitive,
+authority-standing field, or lineage primitive, and those remain application
+concerns until a concrete correctness need appears.
 
 Those absences are deliberate at this milestone.
 
