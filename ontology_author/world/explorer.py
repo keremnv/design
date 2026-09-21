@@ -1,18 +1,16 @@
 """`WorldExplorerAdapter` — the read surface the canvas talks to.
 
-The front end needs the answers listed in §14 of the World IR front-end spec:
+The supported inspector exposes:
 relation schemas, tuples, SQL, tuple inspection, construction origin, grounding,
 staleness, completeness, derivation dependencies and unresolved obligations.
 `SemanticWorld` already answers nearly all of it — `describe()`
 alone carries roles, types, columns, mode, counts, staleness and completeness —
 so this module formats; it does not store.
 
-That distinction is the one rule worth stating outright, because it is the one
-that would quietly be broken first: **the adapter holds no state.** Every method
-reads through to the open world. Nothing is cached, denormalised, or kept
-between calls. An adapter that starts remembering is a second copy of the world
-with its own staleness, which is exactly what rule 10 of the spec forbids and
-what the tests here pin.
+The adapter owns no authoritative semantic state: relational reads use the
+open World and optional sidecars describe the opened bundle. Supported shapes
+are pinned by the stable-read tests; the Core v1 boundary is documented in
+docs/CORE_PRODUCT_V1_BASELINE.md.
 
 Two things it does have to reconcile, because the store and the product disagree
 about words:
@@ -62,7 +60,7 @@ MAX_FIELDS = 200
 PURPOSE_FAILURE_RELATION = "purpose_requirement_failure"
 
 def _purpose_path(db_path: Path) -> Path:
-    """`world.sqlite` -> `world.purpose.json`, the v1 boundary's sidecar."""
+    """`world.sqlite` -> the optional legacy `world.purpose.json` sidecar."""
     return db_path.with_suffix(".purpose.json")
 
 
@@ -699,7 +697,7 @@ class WorldExplorerAdapter:
     def role_kinds(self, relation: str, column: str) -> list[str]:
         """The referent namespaces actually seen in one role, e.g. `["part"]`.
 
-        World IR types a role as REFERENT and stops there — a role knows it
+        The World schema types a role as REFERENT and stops there — a role knows it
         takes a referent, not that it takes a *part*. But §7.1's schema view is
         drawn in exactly those terms (`SupplierListing ─ listing_of ─ Part`), so
         the kinds have to come from somewhere.

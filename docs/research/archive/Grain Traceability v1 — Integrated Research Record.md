@@ -1,3 +1,6 @@
+> Historical research record — not current product or agent instructions.
+> See the [Core v1 baseline](../../CORE_PRODUCT_V1_BASELINE.md).
+
 # Grain Traceability v1: Integrated Research Record
 
 **Status:** Frozen experimental record  

@@ -1,32 +1,43 @@
-# Docs status
+# Documentation map
 
-- `CORE_PRODUCT_V1_COMPLETION_CONTRACT.md` is the frozen core-v1 acceptance
-  contract. It separates core capability, application completion, and value;
-  it governs acceptance where older architecture/experiment notes differ.
-- `CORE_PRODUCT_V1_ACCEPTANCE.md` records the golden scenario, executable
-  evidence, minimal read-path fix, and the limits of the acceptance result.
-- `CORE_PRODUCT_V1_BASELINE.md` is the solidified capability/read-surface and
-  publication boundary, working-tree inventory, and application handoff.
-- `ARCHITECTURE.md` is the authoritative architecture summary, subject to
-  the frozen core-v1 acceptance contract.
-- `FOUNDATIONS.md` states current product constraints.
-- `RESEARCH_DIRECTION.md` records the older purpose-relative research
-  programme. Historical; it is not product specification.
-- `CONSTRUCTION_AND_APPLICATION_RESEARCH.md` synthesizes the newer
-  construction-envelope and epistemic-guarantee research. Non-normative;
-  conclusions and open questions, not requirements.
-- `GOVERNANCE_FOUNDATIONS.md` freezes the software-governance layer's
-  meaning; its application contracts are normative only for the
-  experiments they describe.
-- `DESIGN_CHECKOUT_CONSTRUCTION_CONTRACT.md` records the checkout
-  adequacy/currentness experiment. "Contract" there predates the reserved
-  term; read it as experiment record.
-- All other `*_CONTRACT.md`, `SEMANTIC_*`, `SPINE_*`, `PROGRAM_*`,
-  `MARKDOWN_*`, and `TYPESCRIPT_*` notes are historical experiment or
-  profile records. They explain past work; they do not specify the
-  architecture. Payload `contract: ".../v0"` tags named in them are
-  record schemas (see `ARCHITECTURE.md` §8); only the World admission /
-  resolution Contract and the workflow authorization boundaries are
-  executable contracts.
-- `CURSOR_GUIDE.md`, `AGENT_CLIENTS.md`, `RELEASING.md` are operational
-  notes.
+## Start here — current Core Product v1 authority
+
+- [Baseline and application handoff](CORE_PRODUCT_V1_BASELINE.md): frozen capabilities, limits, supported reads and retained debt.
+- [Completion contract](CORE_PRODUCT_V1_COMPLETION_CONTRACT.md): acceptance requirements.
+- [Acceptance evidence](CORE_PRODUCT_V1_ACCEPTANCE.md): executable evidence and exact verification commands.
+- [Architecture](ARCHITECTURE.md): application, ontology/construction, evidence adapters, World kernel.
+- [Golden scenario](../profiles/core_v1/README.md): reproducible heterogeneous-source example.
+
+Core capability is demonstrated; application completeness and value are separate
+questions. Adapters observe source material; construction assigns meaning.
+Canonical history retains separately addressed sealed revisions.
+
+## Applications and extensions — not core prerequisites
+
+These contracts describe bounded downstream mechanisms, not requirements that
+every World must implement:
+
+- Program representation: [spine](PROGRAM_SPINE_CONTRACT.md), [extractor](SPINE_EXTRACTOR_CONTRACT.md), [comparison](SPINE_COMPARISON_CONTRACT.md), [TypeScript profile](TYPESCRIPT_SPINE_PROFILE.md).
+- [Semantic persistence and recorded-dependency maintenance](SEMANTIC_PERSISTENCE_CONTRACT.md).
+- Authority: [construction](AUTHORITY_CONSTRUCTION_CONTRACT.md), [maintenance](AUTHORITY_MAINTENANCE_CONTRACT.md).
+- Governance: [foundations](GOVERNANCE_FOUNDATIONS.md), [cases](GOVERNANCE_CASE_CONTRACT.md), [adjudication](GOVERNANCE_ADJUDICATION_CONTRACT.md), [kernel mapping](GOVERNANCE_KERNEL_MAPPING.md), [candidate lifecycle](GOVERNED_CANDIDATE_LIFECYCLE.md).
+- [Design checkout experiment](DESIGN_CHECKOUT_CONSTRUCTION_CONTRACT.md) and [profile](../profiles/design_checkout/).
+- [Markdown adapter profile](MARKDOWN_SOURCE_PROFILE.md): source addressing, not semantic interpretation.
+
+## Research and historical records — non-authoritative
+
+- [Construction/application research](CONSTRUCTION_AND_APPLICATION_RESEARCH.md) remains a research synthesis, not a core specification.
+- [Downstream experiments](../experiments/README.md) preserve maintenance-locality, direct semantic selection and design-granularity findings.
+- Other `SEMANTIC_*.md` files are bounded experimental protocols/results. They do not impose a universal construction workflow.
+- [Research inventory and archive](research/README.md) preserves earlier product directions and evidence.
+- [Earlier foundations](FOUNDATIONS.md) and [research direction](RESEARCH_DIRECTION.md) are superseded as product authority.
+- [Graph-native versus SQL-native experiment](<Experiment_ Graph-native vs SQL-native access to a frozen agent-authored relational view.md>) is historical evidence.
+
+Payload `contract: ".../v0"` tags in experiments name record schemas; they do
+not turn an experimental mechanism into a Core v1 requirement.
+
+## Operations
+
+[Agent attachment](AGENT_CLIENTS.md) · [Cursor](CURSOR_GUIDE.md) ·
+[Release checklist](RELEASING.md) · [Contributor guidance](../AGENTS.md)
+· [Repository checkpoint and verification](REPOSITORY_CHECKPOINT.md)

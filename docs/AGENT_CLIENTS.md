@@ -1,9 +1,13 @@
 # Ontology Author agent attachment
 
-Install the World runtime once:
+Attachment is an optional agent workflow, not a Core v1 requirement. No live
+model is required for core construction or acceptance. Start with the
+[core baseline](CORE_PRODUCT_V1_BASELINE.md).
+
+Install the World runtime from this checkout:
 
 ```bash
-uv tool install ontology-author
+uv tool install .
 ```
 
 Run the command from the project root you want the agent to work in:

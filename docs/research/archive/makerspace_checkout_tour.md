@@ -1,3 +1,6 @@
+> Historical research record — not current product or agent instructions.
+> See the [Core v1 baseline](../../CORE_PRODUCT_V1_BASELINE.md).
+
 # A second world to walk through — `makerspace_checkout` T1
 
 A small, complete World built through the **v1 construction boundary**

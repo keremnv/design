@@ -1,10 +1,12 @@
 # Releasing Ontology Author
 
-The user-facing distribution is the `ontology-author` package on PyPI. Users
-install it with:
+Maintainer checklist for a separately authorized release. Building or pushing
+the repository does not publish a release. The package name is `ontology-author`;
+this document does not assert that a particular version is available on PyPI.
+For a local checkout install:
 
 ```bash
-uv tool install ontology-author
+uv tool install .
 ```
 
 ## One-time publisher setup
@@ -36,3 +38,18 @@ or long-lived upload token is stored in this repository. See the
 The released wheel must include `ontology_author.world`, its bundled inspector
 assets and the World SQLite implementation. Historical graph/MCP code is not part of the
 normal installation.
+
+Repository tests are deliberately excluded from the sdist: they require the
+checkout's profiles, frontend dependencies and historical fixtures. Run the
+documented gates from a checkout. The wheel includes the current package,
+its capability document, TypeScript extractor and bundled inspector, not
+historical root graph modules, experiment transcripts or generated Worlds.
+
+Checkpoint note (2026-09-21): `npm ci --prefix frontend` and the frontend build
+succeed and reproduce the committed assets. `npm audit --prefix frontend --json`
+reports four existing dependency advisories (one moderate, three high) in
+`baseline-browser-mapping`, `browserslist`, `nanoid`, and `postcss`. These remain
+dependency-maintenance debt, not a clean security audit. No lockfile upgrade
+or vulnerability remediation was attempted during the Core v1 checkpoint.
+Vite also warns about the existing large JavaScript chunk. Review these before
+a separately authorized release; this checkpoint is not a release.

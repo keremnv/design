@@ -185,8 +185,8 @@ still explicit; this is not an arbitrary-ontology reasoning engine.
 
 ### Reproduction and final solidification results
 
-Run from the repository root with the complete baseline working-tree files
-(including the new profile/tests/docs), not the pre-baseline `HEAD` alone.
+Run from the repository root at the Core v1 checkpoint or later, including
+the tracked profile/tests/docs, not a pre-baseline revision.
 Dependencies are described by `pyproject.toml`, `uv.lock` and the frontend lock:
 
 ```sh
@@ -238,11 +238,13 @@ uv run --extra dev pytest -q \
   tests/test_authority_maintenance.py
 ```
 
-This last command is a local research-checkout regression, **not a clean-clone
-core gate**: some tests import `experiments/run_payment_semantic_persistence_experiment.py`,
-which is ignored and not distributed. That dependency was not silently added
-to core. The default and golden gates do not require it. The test counts above
-overlap and must not be summed; the full historical repository suite was not run.
+At solidification, this last command required the locally ignored payment
+experiment helper and was not a clean-clone regression. The subsequent
+checkpoint tracks that helper and its governance import in the separate
+downstream experiment commit; it is now reproducible from tracked sources.
+Neither helper is a core dependency or part of the installed distribution.
+The test counts above overlap and must not be summed; the full historical
+repository suite was not run.
 
 A temporary export excluding `experiments/` and frontend artifacts also passed
 **46 core checks**. It reused
@@ -270,7 +272,12 @@ No Python formatter/linter command is configured in `pyproject.toml` or release
 CI; none was introduced for this pass. The frontend has a TypeScript/build
 command rather than a lint script; no frontend source was changed.
 
-Final judgment: the documented core capability/publication/read boundary is
+Solidification judgment: the documented core capability/publication/read boundary is
 frozen enough for application development. No new kernel primitive, generic
 framework, package migration, cleanup removal, application implementation,
 commit or push occurred.
+
+The later authorized repository checkpoint is a separate pass: it preserves
+this acceptance result, commits core and downstream research separately, and
+reconciles onboarding. See the [checkpoint record](REPOSITORY_CHECKPOINT.md)
+for its verification, retained limitations and archive inventory.

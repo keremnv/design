@@ -1,5 +1,9 @@
 # Ontology Author foundations
 
+> Historical / superseded product framing. Retained as research evidence, not
+> current contributor instructions. The [Core v1 baseline](CORE_PRODUCT_V1_BASELINE.md)
+> and [completion contract](CORE_PRODUCT_V1_COMPLETION_CONTRACT.md) take precedence.
+
 This note records the design principles that currently define Ontology Author.
 
 It is intentionally smaller than the research vision around the product. These

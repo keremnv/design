@@ -3,7 +3,7 @@
 Status: frozen capability boundary, solidified 2026-09-21. Read with the
 [completion contract](CORE_PRODUCT_V1_COMPLETION_CONTRACT.md),
 [acceptance evidence](CORE_PRODUCT_V1_ACCEPTANCE.md), and
-[four-region architecture](ARCHITECTURE.md). This is a repository working-tree
+[four-region architecture](ARCHITECTURE.md). This is a repository capability
 baseline, not a release tag or a claim of application/value completion.
 
 ## Core Product v1 consists of
@@ -116,10 +116,11 @@ hook disallows source/evidence-blob reads and writable SQLite. Linux bubblewrap
 also excludes the source tree and mounts the bundle read-only. The audited test
 is mandatory; physical isolation needs bubblewrap and available user namespaces.
 
-## Working-tree boundary
+## Checkpoint boundary
 
-No files are staged or committed by this pass. These categories must remain
-distinct in any later commit/release preparation:
+The solidification pass did not commit files. The subsequent authorized hygiene
+pass checkpointed the following categories separately; this inventory describes
+the entry work, not outstanding changes:
 
 - **CORE V1 BASELINE:** `docs/CORE_PRODUCT_V1_{COMPLETION_CONTRACT,ACCEPTANCE,BASELINE}.md`,
   architecture/docs index/README and `world/CAPABILITY.md` clarifications;
@@ -142,8 +143,11 @@ distinct in any later commit/release preparation:
   changes at entry. Ignored research artifacts, installed dependencies and
   ignored `experiments/` scripts are not promoted into the core baseline.
 
-The new core files are still untracked until an authorized later commit adds
-them. The baseline is the listed working-tree contents, not current `HEAD`.
+The core milestone is commit `252e0fec`; downstream experiments are commit
+`e6f64c5b`. The latter also tracks the two experiment source helpers imported
+by its tests and the semantic-persistence dependency limitation. They are not
+core dependencies. Subsequent hygiene reconciles onboarding and archives
+historical material without changing the frozen capability boundary.
 
 ## Retained implementation debt
 

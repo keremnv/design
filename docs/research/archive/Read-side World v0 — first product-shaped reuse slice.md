@@ -1,3 +1,6 @@
+> Historical research record — not current product or agent instructions.
+> See the [Core v1 baseline](../../CORE_PRODUCT_V1_BASELINE.md).
+
 # Read-side World v0 — first product-shaped reuse slice
 
 **Status:** early read-side product thesis (BOM explorer slice).  

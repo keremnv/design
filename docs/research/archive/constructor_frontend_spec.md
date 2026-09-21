@@ -1,3 +1,6 @@
+> Historical research record — not current product or agent instructions.
+> See the [Core v1 baseline](../../CORE_PRODUCT_V1_BASELINE.md).
+
 # Constructor Front-End Specification
 
 **Status:** Working front-end contract for the construction-review surface

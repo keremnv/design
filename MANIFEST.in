@@ -3,4 +3,7 @@ include LICENSE*
 include NOTICE
 include pyproject.toml
 recursive-include ontology_author/world *.md *.html *.js *.css *.woff *.woff2
+# Repository tests depend on profiles and historical fixtures not shipped here.
+# Run them from a checkout, not an incomplete automatically selected sdist subset.
+prune tests
 global-exclude *.py[cod] __pycache__ *.so .env

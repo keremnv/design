@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ontology-author"
 version = "0.1.0"
-description = "Construct and maintain purpose-fit ontologies called Worlds"
+description = "Construct inspectable relational Worlds from heterogeneous evidence"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 license = "Apache-2.0"
@@ -31,9 +31,9 @@ author = "ontology_author.world.cli:main"
 governance = "ontology_author.governance.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/keremnv/ontology-author"
-Repository = "https://github.com/keremnv/ontology-author"
-Issues = "https://github.com/keremnv/ontology-author/issues"
+Homepage = "https://github.com/keremnv/design"
+Repository = "https://github.com/keremnv/design"
+Issues = "https://github.com/keremnv/design/issues"
 
 [tool.setuptools]
 include-package-data = true

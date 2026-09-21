@@ -38,11 +38,8 @@ frontend/data/
 *.lbug.snapshots/
 *.sqlite
 /data/
-!.worlds/
-!.worlds/**
+/.worlds/
 /runtime/
-!research/semantic_integration/**/runtime/
-!research/semantic_integration/**/runtime/*.py
 
 # --- Lab-only paths; never copy back from the private checkout ---
 experiments/*
@@ -60,5 +57,11 @@ research/repoprobe_prep/snapshots/
 research/repoprobe_prep/exports/
 research/repoprobe_prep/export_manifests/
 
-# Re-exclude binaries under the un-ignored .worlds/ tree (text fixtures stay tracked).
-*.sqlite
+# Curated historical documentation is source, not a private experiment checkout.
+!docs/research/
+!docs/research/**
+
+# Existing tracked research evidence stays frozen; new runs require review.
+/evaluation_runs/*
+!/evaluation_runs/README.md
+!/evaluation_runs/checkout-authority-snapshot/

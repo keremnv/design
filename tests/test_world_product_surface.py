@@ -248,6 +248,7 @@ def test_attached_capability_exposes_construction_surface_without_package_inspec
         attached = path.read_text(encoding="utf-8")
         assert body in attached
         for token in (
+            "def construct(source, world)",
             "def construct(source, world, purpose)",
             "does not currently",
             "generate `construction.py`",
@@ -291,11 +292,11 @@ def test_capability_example_constructs_from_the_documented_namespace(tmp_path):
     examples = [
         block
         for block in blocks
-        if "def construct(source, world, purpose)" in block and "source.grounding" in block
+        if "def construct(source, world)" in block and "source.grounding" in block
     ]
     assert len(examples) == 1
     example = examples[0]
-    assert "def construct(source, world, purpose)" in example
+    assert "def construct(source, world)" in example
     assert "import " not in example
 
     (tmp_path / "accounts.csv").write_text(
@@ -303,7 +304,7 @@ def test_capability_example_constructs_from_the_documented_namespace(tmp_path):
     )
     workspace = create(tmp_path / ".worlds" / "capability-example")
     (workspace / "construction.py").write_text(example, encoding="utf-8")
-    result = rebuild(workspace, purpose="Determine legal identity for each account.")
+    result = rebuild(workspace)
     assert result.succeeded, result.errors
 
     world = Project(workspace).open_world()
@@ -316,8 +317,10 @@ def test_capability_example_constructs_from_the_documented_namespace(tmp_path):
                 "legal_name": "Acme Ltd",
             }
         ]
-        failures = world.relation_rows("purpose_requirement_failure")
-        assert any(row["requirement_id"] == "legal_identity" for row in failures)
+        with WorldExplorerAdapter(workspace / "world" / "world.sqlite") as explorer:
+            assert "purpose_requirement_failure" not in {
+                relation["name"] for relation in explorer.schema()
+            }
     finally:
         world.close()
 

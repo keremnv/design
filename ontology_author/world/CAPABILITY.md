@@ -1,5 +1,10 @@
 # Ontology Author capability
 
+Core Product v1 constructs inspectable relational knowledge from heterogeneous
+evidence. Applications own domain semantics and workflows. Adapters provide
+source identity, revision, bounded addressing, reconstruction and mechanical
+structure; construction assigns meaning. No live model or Purpose is required.
+
 Ontology Author enables coding agents to construct and maintain bounded
 ontologies called Worlds from the evidence in the current workspace.
 
@@ -17,9 +22,9 @@ purpose is not what makes something a World.
 
 A World is a sealed, read-only semantic artifact: named typed relations,
 referents, grounding, derivations, explicit unresolvedness, origins,
-and revisions. Conversation is the construction control plane. Work with the
-user to understand purpose, inspect project evidence, author or maintain
-construction, test queries, and rebuild as meaning or evidence changes.
+and revisions. Conversation is one optional construction workflow. When the
+user requests it, inspect project evidence, author or maintain construction,
+test queries, and publish new revisions as meaning or evidence changes.
 
 Use ordinary filesystem, shell, Python, and SQLite access. Do not add MCP or a
 model launcher. Do not patch `world/world.sqlite`. Use the installed commands:
@@ -46,8 +51,9 @@ boundary and application handoff are in `docs/CORE_PRODUCT_V1_BASELINE.md`.
 generate `construction.py`. Write that file before `author rebuild`.
 
 If the user has not named a World, choose a concise human-readable name and
-tell the user which one you used. Maintain that World's `PURPOSE.md` from the
-conversation. Its normal shape is:
+tell the user which one you used. If the application requests purpose context,
+it may maintain a `PURPOSE.md` note from the conversation. This optional legacy
+convention is not a required World input. Its conventional shape is:
 
 ```markdown
 # Purpose
@@ -166,13 +172,20 @@ Derived relations are registered and derived rather than directly asserted.
 Mechanical validation is a hard output boundary, not proof that the World is
 adequate or true.
 
+Scoped completeness is recorded and inspectable; supported negative/exhaustive
+inference must check it. Arbitrary SQL can misuse absence. Recorded maintenance
+dependencies need not exhaust every semantic dependency; their preservation is
+not proof that an interpretation remains true. There is no automatic semantic
+renewal or demonstrated agent-productivity/value guarantee.
+
 ## Example
 
-The example below uses the legacy Purpose form, so it requires an
-explicit Purpose request at rebuild time; otherwise `purpose` is `None`.
+The example below uses the ordinary two-argument constructor. Applications
+can represent unresolved questions as ordinary grounded relations; the
+repository golden scenario demonstrates that separately.
 
 ```python
-def construct(source, world, purpose):
+def construct(source, world):
     world.declare_relation(
         "account",
         [
@@ -198,17 +211,12 @@ def construct(source, world, purpose):
                 f"account_code={row['account_code']}",
             ),
         )
-    purpose.unresolved(
-        "legal_identity",
-        relation="account",
-        subject={"account": "account:A1"},
-        reason="this extract does not establish whether A1 is a legal entity or a trading name",
-    )
 ```
 
 The reusable bundle is `.worlds/<name>/world/` and includes `world.sqlite` plus
 its semantic sidecars. A generated `world.construction-receipt.json` records
 which `construction.py` produced the bundle. Query it directly with SQLite or
-Python. The bundle is portable for semantic consumption; project evidence is
-needed for provenance verification, and the World construction state plus
-project evidence is needed for reconstruction.
+Python. The bundle is portable for semantic consumption. Historical evidence
+reconstruction requires retained supporting bytes or the exact source revision;
+rerunning construction also requires its program and inputs. The canonical
+fresh-root pattern must retain these independently for each sealed revision.

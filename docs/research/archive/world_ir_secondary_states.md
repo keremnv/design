@@ -1,3 +1,6 @@
+> Historical research record — not current product or agent instructions.
+> See the [Core v1 baseline](../../CORE_PRODUCT_V1_BASELINE.md).
+
 # Secondary states — failure, absence, waiting
 
 A design authority for the World IR read plane. Companion to

@@ -1,6 +1,7 @@
 """World semantic implementation over SQLite storage.
 
-The calculus is CONSTITUTION.md. This module is the current kernel *mechanism*:
+The boundary is docs/CORE_PRODUCT_V1_COMPLETION_CONTRACT.md.
+This module is the current kernel *mechanism*:
 domain vocabularies live in fixture/config code, while construction-origin
 metadata is recorded on the grounding/support paths for assertions.
 """

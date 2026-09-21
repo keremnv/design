@@ -1,7 +1,8 @@
 """Deterministic purpose requirements. Failures are an ordinary PURPOSE relation.
 
 ``purpose_requirement_failure`` is a mechanism for explicit unresolvedness, not
-a kernel primitive. See CONSTITUTION.md.
+a kernel primitive. This is legacy explicit-only compatibility; see
+docs/CORE_PRODUCT_V1_BASELINE.md.
 """
 
 from __future__ import annotations

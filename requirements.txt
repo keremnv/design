@@ -1,3 +1,5 @@
+# Historical graph/agent research dependencies, not the Core v1 installation.
+# For the supported package and default tests use pyproject.toml / uv.lock.
 real_ladybug>=0.15.0,<0.16
 requests>=2.31.0  # engine.py imports it at module scope
 pydantic>=2.0

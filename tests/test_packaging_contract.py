@@ -31,6 +31,7 @@ def test_legacy_graph_and_agent_dependencies_are_not_packaged():
     text = (ROOT / "pyproject.toml").read_text(encoding="utf-8").lower()
     for forbidden in ("ladybug", "mcp", "openrouter", "cursor-sdk", "graphauthor"):
         assert forbidden not in text
+    assert "prune tests" in (ROOT / "MANIFEST.in").read_text(encoding="utf-8")
 def test_ignored_runtime_rule_does_not_hide_world_runtime():
     tracked = {path.as_posix() for path in (ROOT / "ontology_author/world/runtime").rglob("*.py")}
     assert tracked
