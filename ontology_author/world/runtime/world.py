@@ -31,7 +31,7 @@ class ConstructionError(ValueError):
 
 
 def world_id_of(db_path: Path | str) -> str:
-    connection = sqlite3.connect(f"file:{Path(db_path)}?mode=ro", uri=True)
+    connection = sqlite3.connect(f"{Path(db_path).resolve().as_uri()}?mode=ro", uri=True)
     try:
         row = connection.execute(
             "SELECT world_id FROM _world_meta WHERE singleton = 1"

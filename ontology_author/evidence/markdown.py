@@ -201,11 +201,15 @@ class MarkdownSource:
             if region.handle != self.handle or region.revision != self.revision:
                 raise EvidenceError("region does not belong to this Markdown source")
             start, end = region.start, region.end
+        # Externally supplied pointers/regions must not inherit Python slice
+        # truncation or negative-index semantics as a successful reconstruction.
+        self.region(start, end)
         return self.data[start:end].decode("utf-8")
 
     def observe(self, region: MarkdownRegion) -> SourceObservation:
         if region.handle != self.handle or region.revision != self.revision:
             raise EvidenceError("region does not belong to this Markdown source")
+        self.region(region.start, region.end)
         return SourceObservation(
             provider=MARKDOWN_PROVIDER,
             native_handle=self.handle,
@@ -216,6 +220,7 @@ class MarkdownSource:
 
     def known_losses(self) -> tuple[str, ...]:
         losses = [
+            "block/link segmentation is a bounded lexical subset, not a complete CommonMark parser",
             "raw HTML is not interpreted",
             "coordinates are UTF-8 byte ranges; CRLF is stored as raw bytes",
         ]

@@ -11,6 +11,12 @@ Ontology Author is a local semantic compilation layer. The coding agent does
 the interpretive work in conversation; Ontology Author gives that work a
 durable, testable, computational form.
 
+The [Core v1 baseline](docs/CORE_PRODUCT_V1_BASELINE.md) freezes the demonstrated
+heterogeneous-evidence capability and application handoff. It does not establish
+application completeness or productivity/value advantages. Human-authored or
+deterministic construction suffices; a live model is not a core requirement.
+The conversational workflow below is one consumer of that capability.
+
 ## Why a World?
 
 Many repository questions are not just retrieval questions. Before an agent
@@ -140,8 +146,9 @@ meaning into either node properties or binary edges.
 World assertions retain compact grounding references to the evidence and
 construction context that support them. Grounding makes a semantic commitment
 auditable; it is not a claim that the system has mathematically proven the
-commitment true. Source content remains in the project workspace rather than
-being copied into every World.
+commitment true. Source bodies are not copied into relation tuples. Adapters or
+construction may retain revisioned evidence blobs beside the database for
+historical reconstruction, as the Core v1 golden scenario does.
 
 ### Derived meaning
 
@@ -156,6 +163,10 @@ Absence is not automatically false. An empty query result supports a negative
 conclusion only when an explicit completeness claim establishes that the
 relevant universe was completely considered. Otherwise, the result may simply
 mean that the World does not currently establish the requested tuple.
+Core records/exposes this scoped claim; supported reasoning and application
+logic must consult it. Arbitrary SQL can still misuse absence. Likewise,
+preserving explicitly recorded dependencies is not proof that they exhaust
+every condition on which semantic truth depends.
 
 ### Unresolved meaning
 

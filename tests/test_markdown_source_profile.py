@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
+import pytest
+
+from ontology_author.evidence import EvidenceError
 from ontology_author.evidence.markdown import MarkdownSource
 from ontology_author.world.core.source import SourceObservation
 
@@ -50,3 +55,28 @@ def test_markdown_driver_does_not_mint_identities(tmp_path):
     observation = source.observe(source.paragraphs()[0])
     assert isinstance(observation, SourceObservation)
     assert "Purchase Action" not in observation.native_handle
+
+
+@pytest.mark.parametrize("start,end", [(0, 100), (100, 101), (-1, 2), (3, 2)])
+def test_markdown_rejects_out_of_bounds_addresses(tmp_path, start, end):
+    source = MarkdownSource(tmp_path / "note.md", handle="note.md", data=b"hello\n")
+    region = replace(source.document(), start=start, end=end)
+    with pytest.raises(EvidenceError):
+        source.observe(region)
+    with pytest.raises(EvidenceError):
+        source.reconstruct(region)
+    observation = replace(source.observe(source.document()), native_location=f"bytes:{start}:{end}")
+    with pytest.raises(EvidenceError):
+        source.reconstruct(observation)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("provider", "other"),
+    ("native_handle", "other.md"),
+    ("source_revision", "sha256:wrong"),
+])
+def test_markdown_rejects_foreign_observation_identity(tmp_path, field, value):
+    source = MarkdownSource(tmp_path / "note.md", handle="note.md", data=b"hello\n")
+    observation = replace(source.observe(source.document()), **{field: value})
+    with pytest.raises(EvidenceError):
+        source.reconstruct(observation)

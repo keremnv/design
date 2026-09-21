@@ -74,13 +74,20 @@ class WorldStore:
         *,
         world_id: str,
         purpose_ref: str | None = None,
+        read_only: bool = False,
     ) -> None:
         self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._db = sqlite3.connect(self.path)
+        if read_only:
+            # Readers must work on genuinely read-only sealed bundles. Never
+            # create, migrate, or repair historical state while inspecting it.
+            self._db = sqlite3.connect(f"{self.path.resolve().as_uri()}?mode=ro", uri=True)
+        else:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self._db = sqlite3.connect(self.path)
         self._db.row_factory = sqlite3.Row
         self._db.execute("PRAGMA foreign_keys = ON")
-        self._create_system_schema()
+        if not read_only:
+            self._create_system_schema()
         existing = self._db.execute(
             "SELECT world_id, purpose_ref FROM _world_meta WHERE singleton = 1"
         ).fetchone()
@@ -88,6 +95,9 @@ class WorldStore:
             str(purpose_ref) if purpose_ref is not None and str(purpose_ref) else None
         )
         if existing is None:
+            if read_only:
+                self._db.close()
+                raise WorldStoreError("read-only database has no World identity")
             with self._db:
                 self._db.execute(
                     "INSERT INTO _world_meta(singleton, world_id, purpose_ref, revision) "

@@ -35,6 +35,13 @@ author list                           # discover project-local Worlds
 stopped. It is not needed to verify a successful rebuild; query
 `world/world.sqlite` or read `diagnostics.json`.
 
+These are legacy in-place publication commands: a successful `author rebuild`
+replaces the previous bundle. They do not by themselves provide Core v1
+historical retention. For retained reconstruction, reserve a fresh publication
+root for each revision and invoke `Project.run()` there, leaving earlier roots
+untouched. The repository reference is `profiles/core_v1/build.py`; the complete
+boundary and application handoff are in `docs/CORE_PRODUCT_V1_BASELINE.md`.
+
 `author create <name>` creates the World workspace but does not currently
 generate `construction.py`. Write that file before `author rebuild`.
 
@@ -59,7 +66,9 @@ harness message reference is optional and must never be required for use.
 
 Keep `construction.py` and any other host-authored helpers or checks in the
 World directory. The ordinary project tree is the evidence environment; do
-not copy project evidence into `.worlds/<name>/`. Construction may be
+not indiscriminately copy it into `.worlds/<name>/`. Retain addressed supporting
+bytes in a sealed bundle when historical evidence reconstruction requires it.
+Construction may be
 exploratory. Rebuild constructs a temporary candidate, validates it, and
 replaces that World's `world/` only on success. A failed rebuild leaves the
 existing World unchanged. Semantic interpretation, clarification, and

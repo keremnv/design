@@ -8,7 +8,6 @@ metadata is recorded on the grounding/support paths for assertions.
 from __future__ import annotations
 
 import json
-import stat
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -44,21 +43,14 @@ class SemanticWorld:
         self.path = Path(path)
         self.world_id = world_id
         self.read_only = read_only
-        original_mode: int | None = None
-        if read_only and self.path.exists():
-            original_mode = stat.S_IMODE(self.path.stat().st_mode)
-            self.path.chmod(original_mode | stat.S_IWUSR)
-        try:
-            self._store = ContractWorldStore(
-                self.path,
-                world_id=world_id,
-                purpose_ref=None,
-                contract_id=contract_id,
-                contract_revision=contract_revision,
-            )
-        finally:
-            if original_mode is not None:
-                self.path.chmod(original_mode)
+        self._store = ContractWorldStore(
+            self.path,
+            world_id=world_id,
+            purpose_ref=None,
+            contract_id=contract_id,
+            contract_revision=contract_revision,
+            read_only=read_only,
+        )
 
     def close(self) -> None:
         self._store.close()

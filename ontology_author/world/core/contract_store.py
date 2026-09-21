@@ -40,9 +40,11 @@ class ContractWorldStore(WorldStore):
         purpose_ref: str | None = None,
         contract_id: str = "",
         contract_revision: str = "",
+        read_only: bool = False,
     ) -> None:
-        super().__init__(path, world_id=world_id, purpose_ref=purpose_ref)
-        self._create_contract_schema()
+        super().__init__(path, world_id=world_id, purpose_ref=purpose_ref, read_only=read_only)
+        if not read_only:
+            self._create_contract_schema()
         if contract_id or contract_revision:
             self.bind_contract(contract_id, contract_revision)
 

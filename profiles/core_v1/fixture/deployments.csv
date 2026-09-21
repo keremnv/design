@@ -1,0 +1,4 @@
+deployment,environment,operation,entrypoint,boundary,implementation,provider
+main,production,checkout,checkout,Harbor,route_payment,Stripe
+returns-eu,production,refunds,refund,Returns,refund_eu,Stripe
+returns-us,production,refunds,refund,Returns,refund_us,Adyen
