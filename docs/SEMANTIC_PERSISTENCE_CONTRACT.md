@@ -239,6 +239,13 @@ reports the strongest affected status, never calls an LLM, never transfers the
 assertion to the candidate endpoint, and never creates a negative semantic
 fact. The S0 assertion remains in the S0 World.
 
+Core v1 limitation (also applicable to this experiment): `PRESERVED` means
+preservation of the explicitly recorded maintenance basis, not exhaustive
+preservation of semantic truth. The system can inspect and reassess recorded
+dependencies; it does not generally establish that they include every condition
+on which the interpretation depends. Dependency adequacy remains the
+constructor/application's responsibility.
+
 The warrant is not a watch query and does not authorize semantic renewal. A
 changed dependency produces a candidate-side affected or unknown status. It
 does not copy the old assertion to the new endpoint, and it does not produce
@@ -251,8 +258,9 @@ construction occurs automatically. A caller must explicitly create a new,
 bounded `ConstructionObligation` for a candidate endpoint before construction
 may run again.
 
-Thus semantic work is proportional to newly relevant unresolved questions, not
-to all commitments on every revision.
+This permits callers to target semantic work at selected unresolved questions.
+It is not a demonstrated complexity bound or productivity advantage: selection
+may scan commitments, and relevance depends on the adequacy of recorded bases.
 
 ## Storage boundaries
 

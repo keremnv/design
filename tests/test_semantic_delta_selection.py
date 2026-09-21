@@ -113,6 +113,19 @@ def selection_worlds(tmp_path_factory):
         empty = compare_program_spines(
             scratch / "baseline-spine", scratch / "baseline-spine"
         )
+        moved_files = dict(payment.PAYMENT_S0)
+        moved_files["src/payment-gateway.ts"] = (
+            "import { throughGateway } from './payment-service';\n"
+        )
+        moved_files["src/payment-service.ts"] = (
+            payment.PAYMENT_S0["src/payment-service.ts"]
+            + "\nexport function throughGateway(amount: number): string "
+            + "{ return 'gateway:' + amount; }\n"
+        )
+        _spine(scratch, moved_files, "moved-spine")
+        moved = compare_program_spines(
+            scratch / "baseline-spine", scratch / "moved-spine"
+        )
         g1_full = ConstructionWorld.open(
             scratch / "g1-full" / "world.sqlite", read_only=True
         )
@@ -124,6 +137,7 @@ def selection_worlds(tmp_path_factory):
             "comparison": comparison,
             "unrelated": unrelated,
             "empty": empty,
+            "moved": moved,
             "g1_full": g1_full,
             "g1_tuples": g1_tuples,
             "full_warrant": full["warrant"],
@@ -200,30 +214,31 @@ def test_retarget_surfaces_persisted_commitment(worlds):
     _assert_no_verdict_language(selection)
 
 
-def test_unrelated_change_preserves_tuple_commitment(worlds):
+def test_unrelated_change_preserves_full_commitment(worlds):
     direct = maintain_semantic_commitment(
-        worlds["tuples_warrant"], worlds["unrelated"]
+        worlds["full_warrant"], worlds["unrelated"]
     )
     assert direct["status"] == "PRESERVED"
     selection = select_affected_semantic_commitments(
-        worlds["g1_tuples"], worlds["unrelated"]
+        worlds["g1_full"], worlds["unrelated"]
     )
     assert selection["warrants_considered"] == 1
     assert selection["selected"] == []
-
-    # Non-vacuity: the same delta is detected against the full warrant, and
-    # the tuple-only warrant is selectable under the retargeting delta.
-    full_under_unrelated = select_affected_semantic_commitments(
-        worlds["g1_full"], worlds["unrelated"]
-    )
-    assert len(full_under_unrelated["selected"]) == 1
-    assert {
-        item["dependency"].get("kind")
-        for item in full_under_unrelated["selected"][0]["maintenance"][
-            "assessments"
+    assert (
+        select_affected_semantic_commitments(worlds["g1_full"], worlds["empty"])[
+            "selected"
         ]
-        if item["status"] != "PRESERVED"
-    } == {"manifestation_property"}
+        == []
+    )
+
+    # Non-vacuity: the unrelated delta is real (added entities exist), the
+    # tuple-only warrant behaves the same way, and it still selects under
+    # the retargeting delta.
+    assert worlds["unrelated"].delta.identity.get("added")
+    tuples_selection = select_affected_semantic_commitments(
+        worlds["g1_tuples"], worlds["unrelated"]
+    )
+    assert tuples_selection["selected"] == []
     tuples_under_retarget = select_affected_semantic_commitments(
         worlds["g1_tuples"], worlds["comparison"]
     )
@@ -233,31 +248,28 @@ def test_unrelated_change_preserves_tuple_commitment(worlds):
     )
 
 
-def test_empty_delta_surfaces_unknown_without_verdict(worlds):
+def test_unresolved_move_surfaces_not_comparable_without_verdict(worlds):
     selection = select_affected_semantic_commitments(
-        worlds["g1_full"], worlds["empty"]
+        worlds["g1_full"], worlds["moved"]
     )
     assert selection["warrants_considered"] == 1
     assert len(selection["selected"]) == 1
     entry = selection["selected"][0]
     maintenance = entry["maintenance"]
-    assert maintenance["status"] == "UNKNOWN"
+    assert maintenance["status"] == "NOT_COMPARABLE"
     assert maintenance["model_invoked"] is False
     assert maintenance["transferred"] is False
-    unknown = [
+    gateway = worlds["endpoints"]["gateway"]
+    identity = [
         item
         for item in maintenance["assessments"]
-        if item["status"] == "UNKNOWN"
+        if item["dependency"].get("kind") == "program_identity"
+        and item["dependency"].get("program_entity") == gateway
     ]
-    assert unknown
-    assert all("manifestation not found" in str(item["evidence"]) for item in unknown)
-    preserved = [
-        item
-        for item in maintenance["assessments"]
-        if item["status"] == "PRESERVED"
-    ]
-    assert preserved, "preserved dependencies must stay visible, not collapse"
-    assert entry["tuple"]["service"] == worlds["endpoints"]["service"]
+    assert len(identity) == 1
+    assert identity[0]["status"] == "NOT_COMPARABLE"
+    assert "unresolved" in str(identity[0]["evidence"])
+    assert entry["tuple"]["gateway"] == gateway
     assert entry["warrant"]["assertion_id"] == entry["assertion_id"]
     _assert_no_verdict_language(selection)
 

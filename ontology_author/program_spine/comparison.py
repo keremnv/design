@@ -524,13 +524,19 @@ def _signature_shape(descriptor: str) -> str:
     return ""
 
 
-def _source_manifestation(entity: _Entity) -> tuple[tuple[str, str, str, str], ...]:
+def _source_manifestation(entity: _Entity) -> tuple[tuple[str, str, str], ...]:
+    # Entity source manifestation: provider, native handle (path plus file
+    # content digest), and entity byte range. Snapshot source_revision is
+    # deliberately excluded: it identifies the snapshot, not the entity's
+    # manifestation, so including it would report every entity changed on
+    # any unrelated snapshot change. File-level sensitivity remains: the
+    # spine records file digests, not entity content digests, so a
+    # same-file edit outside the entity still moves its manifestation.
     return tuple(
         sorted(
             (
                 str(item.get("provider") or ""),
                 str(item.get("native_handle") or ""),
-                str(item.get("source_revision") or ""),
                 str(item.get("native_location") or ""),
             )
             for item in entity.evidence

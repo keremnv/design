@@ -634,7 +634,12 @@ def _comparison(*, relation_bucket="retargeted"):
         receipt=SimpleNamespace(comparison_id="comparison:s0-s1"),
         delta=delta,
         correspondences=(
-            SimpleNamespace(old_entity=old, new_entity=new, continuity="CONTINUED"),
+            SimpleNamespace(
+                old_entity=old,
+                new_entity=new,
+                continuity="CONTINUED",
+                changes={},
+            ),
         ),
     )
 

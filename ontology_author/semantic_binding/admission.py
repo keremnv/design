@@ -1069,7 +1069,7 @@ def _dependency_status(
 ) -> tuple[str, dict[str, Any]]:
     kind = str(dependency.get("kind") or "")
     entity = str(dependency.get("program_entity") or "")
-    if kind == "program_identity" or kind == "structural_context":
+    if kind == "program_identity":
         claims = [
             item for item in comparison.correspondences if item.old_entity == entity
         ]
@@ -1078,6 +1078,42 @@ def _dependency_status(
                 "kind": kind,
                 "old_entity": entity,
                 "new_entity": claims[0].new_entity,
+            }
+        if any(item.continuity == "AMBIGUOUS" for item in claims):
+            return "UNKNOWN", {
+                "kind": kind,
+                "old_entity": entity,
+                "reason": "ambiguous correspondence",
+            }
+        if not claims or any(item.continuity == "UNRESOLVED" for item in claims):
+            return "NOT_COMPARABLE", {
+                "kind": kind,
+                "old_entity": entity,
+                "reason": "unresolved correspondence",
+            }
+        return "LOST", {
+            "kind": kind,
+            "old_entity": entity,
+            "reason": "no continued correspondence",
+        }
+    if kind == "structural_context":
+        claims = [
+            item for item in comparison.correspondences if item.old_entity == entity
+        ]
+        if len(claims) == 1 and claims[0].continuity == "CONTINUED":
+            change = str(claims[0].changes.get("structural_context") or "")
+            if change == "CHANGED":
+                return "CHANGED", {
+                    "kind": kind,
+                    "old_entity": entity,
+                    "new_entity": claims[0].new_entity,
+                    "structural_context": change,
+                }
+            return "PRESERVED", {
+                "kind": kind,
+                "old_entity": entity,
+                "new_entity": claims[0].new_entity,
+                "structural_context": change,
             }
         if any(item.continuity == "AMBIGUOUS" for item in claims):
             return "UNKNOWN", {
@@ -1120,37 +1156,56 @@ def _dependency_status(
         }
     if kind == "manifestation_property":
         property_name = str(dependency.get("property") or "")
-        for item in comparison.delta.manifestations:
-            if str(item.get("old_entity") or "") == entity:
-                changes = item.get("changes") or {}
-                if str(changes.get(property_name) or "") in {
-                    "CHANGED",
-                    "LOST",
-                    "UNKNOWN",
-                    "NOT_COMPARABLE",
-                }:
-                    return {
-                        "CHANGED": "CHANGED",
-                        "LOST": "LOST",
-                        "UNKNOWN": "UNKNOWN",
-                        "NOT_COMPARABLE": "NOT_COMPARABLE",
-                    }[str(changes[property_name])], {
-                        "kind": kind,
-                        "old_entity": entity,
-                        "property": property_name,
-                        "change": changes[property_name],
-                    }
+        claims = [
+            item for item in comparison.correspondences if item.old_entity == entity
+        ]
+        if len(claims) == 1 and claims[0].continuity == "CONTINUED":
+            # CorrespondenceClaim.changes is the authoritative per-property
+            # comparison. delta.manifestations is only a sparse projection
+            # of changed manifestations, so absence from it must never read
+            # as uncertainty beside a unique continued correspondence.
+            change = str(claims[0].changes.get(property_name) or "")
+            if change == "CHANGED":
+                return "CHANGED", {
+                    "kind": kind,
+                    "old_entity": entity,
+                    "new_entity": claims[0].new_entity,
+                    "property": property_name,
+                    "change": change,
+                }
+            if change == "PRESERVED":
                 return "PRESERVED", {
                     "kind": kind,
                     "old_entity": entity,
+                    "new_entity": claims[0].new_entity,
                     "property": property_name,
-                    "change": changes.get(property_name),
+                    "change": change,
                 }
-        return "UNKNOWN", {
+            return "UNKNOWN", {
+                "kind": kind,
+                "old_entity": entity,
+                "property": property_name,
+                "reason": "comparison does not assess property",
+            }
+        if any(item.continuity == "AMBIGUOUS" for item in claims):
+            return "UNKNOWN", {
+                "kind": kind,
+                "old_entity": entity,
+                "property": property_name,
+                "reason": "ambiguous correspondence",
+            }
+        if not claims or any(item.continuity == "UNRESOLVED" for item in claims):
+            return "NOT_COMPARABLE", {
+                "kind": kind,
+                "old_entity": entity,
+                "property": property_name,
+                "reason": "unresolved correspondence",
+            }
+        return "LOST", {
             "kind": kind,
             "old_entity": entity,
             "property": property_name,
-            "reason": "manifestation not found",
+            "reason": "no continued correspondence",
         }
     return "UNKNOWN", {"kind": kind, "reason": "unsupported dependency kind"}
 

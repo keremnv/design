@@ -45,7 +45,10 @@ frontend/data/
 !research/semantic_integration/**/runtime/*.py
 
 # --- Lab-only paths; never copy back from the private checkout ---
-experiments/
+experiments/*
+!experiments/README.md
+!experiments/run_payment_semantic_persistence_experiment.py
+!experiments/run_governance_product_experiments.py
 benchmarks/
 examples/
 archive/
