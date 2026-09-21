@@ -1,0 +1,44 @@
+name: CI
+
+# Regression gate for the frozen Core v1 baseline. Boring by design:
+# locked installs, default pytest gate, frontend build, package build.
+# No release/publish step, no credentials, no audit gate.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-v1:
+    name: Core v1 baseline gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # No repo-pinned Node version; 22 is the current LTS satisfying
+      # the Vite 7 engines range and matching the local toolchain.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: astral-sh/setup-uv@v10.2.0
+
+      - run: uv sync --locked --extra dev
+      - run: npm ci --prefix frontend
+      - run: uv run --extra dev pytest
+      - run: npm run build --prefix frontend
+      - run: uv build
