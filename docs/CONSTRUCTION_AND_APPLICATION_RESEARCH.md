@@ -3,6 +3,11 @@
 **Status:** Research synthesis, not architecture authority  
 **Date:** 2026-09-18
 
+The reconciled downstream conclusions drawn from this synthesis are recorded
+in [PRE_APPLICATION_RESEARCH_BASELINE.md](PRE_APPLICATION_RESEARCH_BASELINE.md);
+that baseline is downstream guidance, and the future Application v1 contract
+will be the concrete normative application specification.
+
 ## 1. Research question
 
 The constructor is intentionally able to perform arbitrary computation over heterogeneous evidence. That makes computational expressiveness a poor product boundary: almost any structured representation could be emitted.

@@ -27,6 +27,7 @@ every World must implement:
 ## Research and historical records — non-authoritative
 
 - [Construction/application research](CONSTRUCTION_AND_APPLICATION_RESEARCH.md) remains a research synthesis, not a core specification.
+- [Pre-application research baseline](PRE_APPLICATION_RESEARCH_BASELINE.md): reconciled downstream conclusions carried into Application v1; not Core authority and not the application contract.
 - [Downstream experiments](../experiments/README.md) preserve maintenance-locality, direct semantic selection and design-granularity findings.
 - Other `SEMANTIC_*.md` files are bounded experimental protocols/results. They do not impose a universal construction workflow.
 - [Research inventory and archive](research/README.md) preserves earlier product directions and evidence.
