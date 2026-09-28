@@ -234,6 +234,37 @@ def missing_route_gap(route_id: str) -> str:
     return "missing_route_" + gap_token(route_id)
 
 
+def evaluator_for_statement(
+    statement: str, establishment_rule: str
+) -> tuple[str, str | None, str | None]:
+    """Decide evaluator support from durable World content alone.
+
+    Re-applies this profile's versioned grammar to the retained statement,
+    so discovery is provably consistent with construction. Returns
+    ``(status, route_id, reason)`` with ``status`` ``"covered"`` or
+    ``"unsupported"``. Inconsistent provenance (rule says specific but the
+    statement parses otherwise) is ``"unsupported"`` with an explicit
+    reason, never a guessed evaluator.
+    """
+    kind, match = classify_paragraph(statement)
+    if kind == "specific" and establishment_rule == RULE_PROPOSITION_SPECIFIC:
+        route_id = match.group("route_id") if match is not None else None
+        if route_id in EVALUATOR_COVERED_ROUTE_IDS:
+            return "covered", route_id, None
+        return "unsupported", route_id, (
+            f"no evaluator declared for route {route_id!r} "
+            f"under {RULE_EVALUATOR}"
+        )
+    if kind == "generic" and establishment_rule == RULE_PROPOSITION_GENERIC:
+        return "unsupported", None, (
+            f"generic propositions have no evaluator under {RULE_EVALUATOR}"
+        )
+    return "unsupported", None, (
+        "proposition provenance does not match a supported "
+        f"{PROFILE_ID} establishment rule"
+    )
+
+
 def evaluator_status(
     proposition_id: str, route_id: str | None
 ) -> tuple[str, dict[str, str] | None, str | None]:

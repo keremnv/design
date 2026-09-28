@@ -13,6 +13,17 @@ from ontology_author.config_routes.construct import (
     ConfigRoutesReport,
     construct_config_world,
 )
+from ontology_author.config_routes.inspect import (
+    inspect_binding,
+    inspect_config_world,
+    inspect_proposition,
+    inspect_subject,
+)
+from ontology_author.config_routes.judge import (
+    judge_config_world,
+    read_judgment_bundle,
+    verify_judgment_bundle,
+)
 from ontology_author.config_routes.rules import (
     EVALUATOR_RULE,
     PROFILE_ID,
@@ -27,4 +38,11 @@ __all__ = [
     "EVALUATOR_RULE",
     "ConfigRoutesReport",
     "construct_config_world",
+    "inspect_binding",
+    "inspect_config_world",
+    "inspect_proposition",
+    "inspect_subject",
+    "judge_config_world",
+    "read_judgment_bundle",
+    "verify_judgment_bundle",
 ]

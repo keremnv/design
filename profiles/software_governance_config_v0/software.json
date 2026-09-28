@@ -1,0 +1,14 @@
+{
+  "routes": [
+    {
+      "id": "customer-export",
+      "path": "/customers/export",
+      "handler": "CustomerExport"
+    },
+    {
+      "id": "health",
+      "path": "/health",
+      "handler": "Health"
+    }
+  ]
+}
