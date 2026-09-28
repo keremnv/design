@@ -186,3 +186,18 @@ now describe corrected behavior:
 - Evaluator duplication (`config_routes/evaluate.py` vs the repository
   fixture evaluator) intentionally retained with the cross-check test;
   two-place maintenance risk acknowledged, no framework introduced.
+
+## Final hardening (on top of the freeze candidate)
+
+Two small verifier robustness fixes from the last review pass, no
+redesign:
+
+- Canonical Case comparison is multiset-sensitive: supplied facts are
+  compared to the canonical facts as a `Counter` of normalized facts,
+  so ordering stays irrelevant but a duplicated canonical fact fails
+  `canonical_match` instead of verifying.
+- Malformed recorded World metadata fails structurally: the recorded
+  `world` block now requires a non-empty string address/id/fingerprint
+  and an integer revision before any path use, so values such as
+  `None`/`[]`/`{}`/`123` yield a `shape` negative even with an explicit
+  valid World override — never an uncaught `TypeError`.

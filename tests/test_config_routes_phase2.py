@@ -477,6 +477,53 @@ def test_verify_rejects_selective_case_with_recomputed_artifact(
     assert any("omits" in error for error in verdict["errors"])
 
 
+@pytest.mark.parametrize("relation", ["software_subject", "governance_proposition"])
+def test_verify_rejects_duplicated_canonical_fact(
+    tmp_path: Path, relation: str
+) -> None:
+    _address, bundle = _judged_bundle(tmp_path)
+    forged = json.loads(json.dumps(bundle))
+    duplicate = next(fact for fact in forged["case"]["facts"] if fact["relation"] == relation)
+    forged["case"]["facts"].append(json.loads(json.dumps(duplicate)))
+    verdict = verify_judgment_bundle(forged)
+    assert verdict["verified"] is False
+    assert verdict["checks"]["canonical_match"] is False
+    assert any("non-canonical fact occurrence" in error for error in verdict["errors"])
+
+
+def test_verify_ignores_fact_ordering(tmp_path: Path) -> None:
+    _address, bundle = _judged_bundle(tmp_path)
+    forged = json.loads(json.dumps(bundle))
+    forged["case"]["facts"] = list(reversed(forged["case"]["facts"]))
+    assert verify_judgment_bundle(forged)["verified"] is True
+
+
+@pytest.mark.parametrize("bad_address", [None, [], {}, 123])
+def test_malformed_recorded_address_is_structured_failure(
+    tmp_path: Path, bad_address: object
+) -> None:
+    address, bundle = _judged_bundle(tmp_path)
+    forged = json.loads(json.dumps(bundle))
+    forged["world"]["address"] = bad_address
+    override = verify_judgment_bundle(forged, world=address)
+    assert override["verified"] is False
+    assert override["checks"]["shape"] is False
+    assert override["errors"]
+    direct = verify_judgment_bundle(json.loads(json.dumps(forged)))
+    assert direct["verified"] is False
+    assert direct["errors"]
+
+
+def test_relative_recorded_address_still_verifies(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    address, bundle = _judged_bundle(tmp_path)
+    forged = json.loads(json.dumps(bundle))
+    forged["world"]["address"] = os.path.relpath(address, tmp_path)
+    monkeypatch.chdir(tmp_path)
+    assert verify_judgment_bundle(forged)["verified"] is True
+
+
 @pytest.mark.parametrize("field", ["question", "proposition_ids", "subject_ids", "world_address"])
 def test_verify_rejects_altered_case_identity(tmp_path: Path, field: str) -> None:
     _address, bundle = _judged_bundle(tmp_path)

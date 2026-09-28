@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -297,6 +298,9 @@ def verify_judgment_bundle(
             checks, errors, "shape",
             "invalid bundle shape: world/request blocks lack required keys",
         )
+    world_value_error = _world_block_error(recorded_world)
+    if world_value_error is not None:
+        return _negative(checks, errors, "shape", world_value_error)
     checks["shape"] = True
     if request["question"] != JUDGE_QUESTION:
         return _negative(
@@ -479,24 +483,39 @@ def _canonical_mismatch(
         errors.append("supplied case subject selection differs from the request")
     if _resolved(str(supplied.get("world_address", ""))) != opened:
         errors.append("supplied case address differs from the opened publication")
-    want = {_normalize_fact(fact) for fact in canonical.get("facts") or []}
-    got = set()
+    want = Counter(_normalize_fact(fact) for fact in canonical.get("facts") or [])
+    got: Counter[str] = Counter()
     facts = supplied.get("facts")
     if not isinstance(facts, list):
         errors.append("supplied case facts are not a fact list")
         facts = []
     for fact in facts:
         try:
-            got.add(_normalize_fact(fact))
+            got[_normalize_fact(fact)] += 1
         except (KeyError, TypeError, AttributeError):
             errors.append("supplied case contains a malformed fact")
-    missing = want - got
-    extra = got - want
+    missing = sum((want - got).values())
+    extra = sum((got - want).values())
     if missing:
-        errors.append(f"supplied case omits {len(missing)} canonical fact(s)")
+        errors.append(f"supplied case omits {missing} canonical fact occurrence(s)")
     if extra:
-        errors.append(f"supplied case adds {len(extra)} non-canonical fact(s)")
+        errors.append(f"supplied case adds {extra} non-canonical fact occurrence(s)")
     return errors
+
+
+def _world_block_error(recorded_world: dict[str, Any]) -> str | None:
+    """Reject malformed recorded World metadata before any path use."""
+    if not isinstance(recorded_world.get("address"), str) or not recorded_world["address"]:
+        return "invalid bundle shape: recorded world address is not a non-empty string"
+    if not isinstance(recorded_world.get("world_id"), str) or not recorded_world["world_id"]:
+        return "invalid bundle shape: recorded world id is not a non-empty string"
+    revision = recorded_world.get("revision")
+    if not isinstance(revision, int) or isinstance(revision, bool):
+        return "invalid bundle shape: recorded revision is not an integer"
+    fingerprint = recorded_world.get("database_fingerprint")
+    if not isinstance(fingerprint, str) or not fingerprint:
+        return "invalid bundle shape: recorded database fingerprint is not a non-empty string"
+    return None
 
 
 def _normalize_fact(fact: dict[str, Any]) -> str:
