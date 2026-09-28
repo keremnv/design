@@ -695,6 +695,75 @@ def test_unread_sidecar_mutation_does_not_invalidate(tmp_path: Path) -> None:
     assert verify_judgment_bundle(bundle)["verified"] is True
 
 
+def _hash_tree(root: Path) -> dict[str, str]:
+    return {
+        str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(p for p in root.rglob("*") if p.is_file())
+    }
+
+
+def _writable_child_world(tmp_path: Path) -> tuple[Path, str]:
+    address = _construct(tmp_path)
+    child = address / "governance_evidence"
+    child.chmod(0o755)
+    from ontology_author.config_routes import inspect_config_world as _inspect
+
+    assert _inspect(address)["address"] == str(address.resolve())
+    return address, _subject_for_world(address, "customer-export")
+
+
+def test_judge_persist_inside_world_is_refused(tmp_path: Path) -> None:
+    address, export = _writable_child_world(tmp_path)
+    before = _hash_tree(address)
+    with pytest.raises(ValueError, match="inside the sealed World"):
+        judge_config_world(
+            world=address, proposition=EXPORT, subject=export,
+            persist_to=address / "governance_evidence" / "J-inside.json",
+        )
+    assert _hash_tree(address) == before
+    with pytest.raises(ValueError, match="inside the sealed World"):
+        judge_config_world(
+            world=address, proposition=EXPORT, subject=export,
+            persist_to=address / "new" / "subdir" / "J-inside.json",
+        )
+    assert _hash_tree(address) == before
+    assert not (address / "new").exists()
+
+
+def test_judge_persist_through_symlink_into_world_is_refused(tmp_path: Path) -> None:
+    address, export = _writable_child_world(tmp_path)
+    before = _hash_tree(address)
+    linkdir = tmp_path / "ev-link"
+    linkdir.symlink_to(address / "governance_evidence", target_is_directory=True)
+    with pytest.raises(ValueError, match="inside the sealed World"):
+        judge_config_world(
+            world=address, proposition=EXPORT, subject=export,
+            persist_to=linkdir / "J-inside.json",
+        )
+    assert _hash_tree(address) == before
+    link = tmp_path / "J-link.json"
+    link.symlink_to(address / "governance_evidence" / "J-inside.json")
+    with pytest.raises(ValueError, match="inside the sealed World"):
+        judge_config_world(
+            world=address, proposition=EXPORT, subject=export, persist_to=link
+        )
+    assert _hash_tree(address) == before
+    assert not (address / "governance_evidence" / "J-inside.json").exists()
+
+
+def test_judge_persist_relative_into_world_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    address, export = _writable_child_world(tmp_path)
+    before = _hash_tree(address)
+    monkeypatch.chdir(address / "governance_evidence")
+    with pytest.raises(ValueError, match="inside the sealed World"):
+        judge_config_world(
+            world=address, proposition=EXPORT, subject=export, persist_to="J-inside.json"
+        )
+    assert _hash_tree(address) == before
+
+
 def test_persist_refuses_dangling_symlink(tmp_path: Path) -> None:
     address = _construct(tmp_path)
     export = _subject_for_world(address, "customer-export")

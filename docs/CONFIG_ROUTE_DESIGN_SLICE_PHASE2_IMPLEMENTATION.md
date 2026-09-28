@@ -201,3 +201,13 @@ redesign:
   and an integer revision before any path use, so values such as
   `None`/`[]`/`{}`/`123` yield a `shape` negative even with an explicit
   valid World override — never an uncaught `TypeError`.
+
+## Persistence containment parity (with Phase 3)
+
+Judgment persistence now refuses any target resolving to or beneath
+the exact World directory, before any parent directory is created or
+file opened, regardless of permission bits. Direct, nested (including
+missing parents, which are never created), relative, and
+symlink-resolved in-World targets all refuse with W0 byte-identical;
+external no-clobber behavior is unchanged. No Judgment semantics
+changed; only where a persisted J0 may live.

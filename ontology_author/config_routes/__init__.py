@@ -24,6 +24,11 @@ from ontology_author.config_routes.judge import (
     read_judgment_bundle,
     verify_judgment_bundle,
 )
+from ontology_author.config_routes.investigate import (
+    investigate_config_world,
+    read_investigation_bundle,
+    verify_investigation_bundle,
+)
 from ontology_author.config_routes.rules import (
     EVALUATOR_RULE,
     PROFILE_ID,
@@ -45,4 +50,7 @@ __all__ = [
     "judge_config_world",
     "read_judgment_bundle",
     "verify_judgment_bundle",
+    "investigate_config_world",
+    "read_investigation_bundle",
+    "verify_investigation_bundle",
 ]

@@ -209,7 +209,11 @@ def write_judgment_bundle(
     Exclusive no-clobber creation: an existing path entry (including a
     symlink) is never followed or replaced. No atomic-publish claim is
     made; a truncated file fails verification as a structured negative.
+    Judgment artifacts always live outside the sealed World: any target
+    resolving to or underneath the World directory is refused before
+    any parent directory is created or file opened.
     """
+    _reject_inside_world(path, world["address"])
     target = Path(path)
     if os.path.lexists(target):
         raise ValueError(f"judgment bundle address already exists: {target}")
@@ -247,6 +251,14 @@ def write_judgment_bundle(
 def read_judgment_bundle(path: Path | str) -> dict[str, Any]:
     """Read one persisted judgment bundle."""
     return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def _reject_inside_world(path: Path | str, world_address: str) -> None:
+    """Refuse any artifact target at or under the sealed World directory."""
+    root = Path(world_address).resolve()
+    target = Path(path).resolve()
+    if target == root or root in target.parents:
+        raise ValueError(f"judgment bundle address is inside the sealed World: {path}")
 
 
 def verify_judgment_bundle(
