@@ -30,6 +30,7 @@ FORBIDDEN_WORLD_IMPORTS = (
     "ontology_author.semantic_binding",
     "ontology_author.governance",
     "ontology_author.program_spine",
+    "ontology_author.software_governance",
     "profiles",
 )
 
