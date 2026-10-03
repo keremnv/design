@@ -56,6 +56,7 @@ export function FrontierTable({
   demand,
   relations,
   problem,
+  settled,
   present,
   chrome,
   onFocus,
@@ -64,6 +65,8 @@ export function FrontierTable({
   /** The vocabulary, so a tuple prints in role order rather than JSON order. */
   relations: WorldRelation[];
   problem: string | null;
+  /** The frontier read has answered — content, null, or failure. */
+  settled: boolean;
   /** Obligation keys and assertion ids already on the field. */
   present: Set<string>;
   chrome: TableChrome;
@@ -74,6 +77,7 @@ export function FrontierTable({
       demand={demand}
       relations={relations}
       problem={problem}
+      settled={settled}
       present={present}
       chrome={chrome}
       onFocus={onFocus}
@@ -92,11 +96,14 @@ function statusLabel(status: WorldResolutionStatus): string {
 export function GovernedObligationTable({
   obligations,
   problem,
+  settled,
   chrome,
   onFocus,
 }: {
   obligations: GovernedObligation[];
   problem: string | null;
+  /** The read has landed or failed — an empty list before that is outstanding. */
+  settled: boolean;
   chrome: TableChrome;
   onFocus: (obligation: GovernedObligation) => void;
 }) {
@@ -121,13 +128,17 @@ export function GovernedObligationTable({
       <TableBar
         chrome={chrome}
         meta={
-          <>
-            {obligations.length} governed obligation
-            {obligations.length === 1 ? "" : "s"}
-            {counts.get("RESOLVED")
-              ? ` · ${counts.get("RESOLVED")} resolved`
-              : ""}
-          </>
+          settled ? (
+            <>
+              {obligations.length} governed obligation
+              {obligations.length === 1 ? "" : "s"}
+              {counts.get("RESOLVED")
+                ? ` · ${counts.get("RESOLVED")} resolved`
+                : ""}
+            </>
+          ) : (
+            "Reading obligations…"
+          )
         }
       />
       <TableSearch value={query} onChange={setQuery} label="Search governed obligations" />
@@ -174,6 +185,7 @@ function LegacyFrontierTable({
   demand,
   relations,
   problem,
+  settled,
   present,
   chrome,
   onFocus,
@@ -182,6 +194,8 @@ function LegacyFrontierTable({
   /** The vocabulary, so a tuple prints in role order rather than JSON order. */
   relations: WorldRelation[];
   problem: string | null;
+  /** The frontier read has answered — content, null, or failure. */
+  settled: boolean;
   /** Obligation keys and assertion ids already on the field. */
   present: Set<string>;
   chrome: TableChrome;
@@ -234,6 +248,8 @@ function LegacyFrontierTable({
               {demand.purpose.id ? ` · ${demand.purpose.id}` : ""}
               {demand.purpose.revision ? ` rev ${demand.purpose.revision}` : ""}
             </>
+          ) : !settled ? (
+            "Reading purpose…"
           ) : (
             "no purpose loaded"
           )
@@ -274,10 +290,10 @@ function LegacyFrontierTable({
       </div>
 
       {problem ? <ProblemNotice message={problem} title="Unable to load obligations" /> : null}
-      {demand || problem ? null : (
-        <p className="table__problem">
-          No Purpose demand is loaded.
-        </p>
+      {demand || problem ? null : settled ? (
+        <p className="table__rule">This world records no Purpose demand.</p>
+      ) : (
+        <p className="world__hint">Reading the Purpose demand…</p>
       )}
 
       <div className="table__scroll" ref={window_.ref} onScroll={window_.onScroll}>

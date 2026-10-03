@@ -482,10 +482,19 @@ export const GRAPH_DNA_CHIP = {
    */
   roleSpokeWidth: 1,
   roleSpokeOpacity: 0.5,
-  /** The role name on a focused spoke. */
-  roleLabelSize: 8,
-  /** Thinner than the relation name, which is how the two stay ordered. */
-  roleLabelWeight: 300,
+  /**
+   * The role name on a focused spoke.
+   *
+   * The same size as the relation name: no hierarchy by size. The kind
+   * distinction is the face — roles are set in the mono while relations
+   * stay in the sans — and nothing else. See `roleWidth`.
+   */
+  roleLabelSize: 7,
+  /**
+   * The loaded mono face. Only 400 ships for the monos, so this is not the
+   * place to order roles below relations by thinning them.
+   */
+  roleLabelWeight: 400,
   /**
    * Where the role name sits along its spoke, 0 at the referent and 1 at the
    * chip.

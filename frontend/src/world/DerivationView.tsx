@@ -238,20 +238,19 @@ export function DerivationView({
         <Sql sql={run?.sql ?? ""} open={showSql && Boolean(run)} />
 
         {/*
-          * One line while the closure is in flight — the idiom every other
-          * panel on this surface already uses, and the reason this one felt
-          * rough. It used to emit the two headings over nothing and then snap
-          * the trees, the run table and the bar's meta in together when the
-          * fetch landed: a cross-fade to an empty skeleton followed by an
-          * uncaused jump. Nothing here is a `flow`; a read is a lookup, and
-          * `Waiting` is for writes.
+          * One line while the closure is in flight, and the trees emit when it
+          * lands — the second and fifth reading laws. It used to emit the two
+          * headings over nothing and then snap the trees, the run table and
+          * the bar's meta in together when the fetch landed: a cross-fade to
+          * an empty skeleton followed by an uncaused jump. Nothing here is a
+          * `flow`; a read is a lookup, and `Waiting` is for writes.
           */}
         {!closure && !problem ? (
           <p className="world__hint deriv__note">Reading what this rests on…</p>
         ) : null}
 
         {closure ? (
-          <div className="deriv__columns">
+          <div className="deriv__columns motion-emit">
             <section>
               <h3>rests on</h3>
               <Tree
@@ -277,7 +276,7 @@ export function DerivationView({
         ) : null}
 
         {run ? (
-          <section className="deriv__run">
+          <section className="deriv__run motion-emit">
             <h3>
               last run
               <span>
@@ -326,7 +325,7 @@ export function DerivationView({
         ) : null}
 
         {support?.derived ? (
-          <section className="deriv__support">
+          <section className="deriv__support motion-emit">
             <h3>
               candidate support
               <span>{support.referents.join(" · ")}</span>

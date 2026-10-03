@@ -11,6 +11,18 @@
 import { useEffect, useRef, useState } from "react";
 import { SHOW_LAYERS, type ShowState } from "./show";
 
+/**
+ * How long the menu waits after the pointer leaves before closing.
+ *
+ * The standard hover-intent grace period: the key row is a thin target, and
+ * without it any overshoot above or below the keys — or a diagonal approach
+ * that clips the corner — snaps the menu shut mid-pick. A quarter second is
+ * inside the usual 200–500ms band: long enough to forgive travel, short
+ * enough that a deliberate departure still reads as instant. Re-entering
+ * cancels the close. Opening stays immediate.
+ */
+const SHOW_MENU_CLOSE_DELAY_MS = 250;
+
 export type ShowBandProps = {
   show: ShowState;
   onShow: (next: (current: ShowState) => ShowState) => void;
@@ -29,12 +41,18 @@ export type ShowBandProps = {
    * it is omitted on a surface with no field for it to act on.
    */
   spread?: { on: boolean; onToggle: () => void };
+  /**
+   * Framing: referents present in every claim of a relation stop being drawn
+   * as participants and become the frame those claims hold in — see `frame.ts`.
+   */
+  frame?: { on: boolean; onToggle: () => void };
 };
 
-export function ShowBand({ show, onShow, names, spread }: ShowBandProps) {
+export function ShowBand({ show, onShow, names, spread, frame }: ShowBandProps) {
   const [pinned, setPinned] = useState(false);
   const [hovered, setHovered] = useState(false);
   const suppressHover = useRef(false);
+  const closeTimer = useRef<number | undefined>(undefined);
   const rootRef = useRef<HTMLDivElement>(null);
   const open = pinned || hovered;
 
@@ -48,17 +66,25 @@ export function ShowBand({ show, onShow, names, spread }: ShowBandProps) {
     return () => document.removeEventListener("pointerdown", close, true);
   }, [pinned]);
 
+  useEffect(() => () => window.clearTimeout(closeTimer.current), []);
+
   return (
     <div
       ref={rootRef}
       className={`world-filter${open ? " is-open" : ""}`}
       onMouseEnter={() => {
+        window.clearTimeout(closeTimer.current);
+        closeTimer.current = undefined;
         if (suppressHover.current) return;
         setHovered(true);
       }}
       onMouseLeave={() => {
         suppressHover.current = false;
-        setHovered(false);
+        window.clearTimeout(closeTimer.current);
+        closeTimer.current = window.setTimeout(
+          () => setHovered(false),
+          SHOW_MENU_CLOSE_DELAY_MS,
+        );
       }}
     >
       <div className="instrument__group">
@@ -126,6 +152,23 @@ export function ShowBand({ show, onShow, names, spread }: ShowBandProps) {
             >
               <span className="world-show__key" aria-hidden="true" />
               <span className="world-show__name">spread</span>
+            </button>
+          ) : null}
+          {frame ? (
+            <button
+              type="button"
+              className="world-show__filter"
+              data-layer="frame"
+              aria-pressed={frame.on}
+              title={
+                frame.on
+                  ? "Draw every referent as a participant"
+                  : "Draw referents present in every claim of a relation as its frame"
+              }
+              onClick={frame.onToggle}
+            >
+              <span className="world-show__key" aria-hidden="true" />
+              <span className="world-show__name">frame</span>
             </button>
           ) : null}
         </div>

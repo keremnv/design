@@ -21,28 +21,24 @@
  * is given the old marks as pins rather than asked to leave them alone, so the
  * rule holds by construction and not by care.
  *
- * **The field is bounded by count, not by hope.** `MAX_FIELD_NODES` is the
- * cap, checked before an expansion runs, and the caller is expected to offer
- * the table instead rather than to quietly truncate. What makes this workable
- * is that the cost is known in advance: `/world/referent` returns a count per
+ * **The field is not bounded by count.** Expansions place what the world
+ * returns, and the reader counts what is standing. The cost is still known in
+ * advance: `/world/referent` returns a count per
  * relation, so the question "what would this cost" is answered before anything
  * is drawn.
  */
 
 import type { WorldRole, WorldTuple } from "../api/world";
-import { projectionOf } from "./marks";
+import {
+  MARK_DEPTH_CEILING,
+  MARK_DEPTH_STEP,
+  markDepthZ,
+  PAINT_LAYER_MARK,
+  PAINT_LAYER_NAME,
+  projectionOf,
+} from "./marks";
 import { fieldGraph } from "./hops";
 import { relax, type RelaxBody, type RelaxLink } from "./relax";
-
-/**
- * How much matter the field will hold.
- *
- * Not a rendering limit — G6 draws thousands. It is a reading limit: past
- * roughly this many marks a neighborhood stops being a thing you can hold in
- * your head, which is the only reason to be looking at a graph rather than a
- * table.
- */
-export const MAX_FIELD_NODES = 100;
 
 /** Where new matter lands relative to what it came from. */
 const RING_RADIUS = 190;
@@ -133,6 +129,23 @@ export type WorkingSet = {
   demands: Map<string, FieldDemand>;
   bonds: FieldBond[];
   positions: Map<string, Point>;
+  /**
+   * Paint depth, for the depth stack. A mark id maps to the `zIndex` its
+   * last drop stamped; higher is fronter.
+   *
+   * Scene sibling order is creation-frozen — G6 does not move survivors when
+   * the model reorders — so depth can only be restated as `zIndex`, and only
+   * the lane can state it, since every redraw restates `zIndex` from the
+   * data it draws. A drop therefore records its paint here, and the lane
+   * stamps it verbatim. Marks with no entry keep the layer's own `zIndex`
+   * and paint in creation order behind every restacked mark. Display state
+   * like `positions`, kept and pruned alongside it.
+   *
+   * Values from before paint lived here are bare drop counts, and read back
+   * as the order they always were: `paintDepths` re-homes them to dense
+   * ranks on first paint, so a stored field comes back standing as it stood.
+   */
+  depth: Map<string, number>;
   /** Expansions that completed, including empty expansions. This is completion
    *  provenance, not the source of truth for whether their tuples are still on
    *  the field; `expansionOnField` derives that from the material itself. */
@@ -146,6 +159,7 @@ export function emptySet(): WorkingSet {
     demands: new Map(),
     bonds: [],
     positions: new Map(),
+    depth: new Map(),
     expanded: new Set(),
   };
 }
@@ -242,6 +256,7 @@ export function retractExpansion(
   for (const id of assertionIds) {
     next.assertions.delete(id);
     next.positions.delete(id);
+    next.depth.delete(id);
   }
   next.bonds = next.bonds.filter(
     (bond) => !assertionIds.has(bond.assertion_id),
@@ -262,6 +277,7 @@ export function retractExpansion(
     if (id === referentId || referent.via !== referentId || used.has(id)) continue;
     next.referents.delete(id);
     next.positions.delete(id);
+    next.depth.delete(id);
     for (const expanded of [...next.expanded]) {
       if (expanded.startsWith(`${id}\u0000`)) next.expanded.delete(expanded);
     }
@@ -284,8 +300,126 @@ function clone(set: WorkingSet): WorkingSet {
     demands: new Map(set.demands),
     bonds: [...set.bonds],
     positions: new Map(set.positions),
+    depth: new Map(set.depth),
     expanded: new Set(set.expanded),
   };
+}
+
+/**
+ * Drop order as paint, for the lane, the gesture, and the drop itself.
+ *
+ * Three readers, one sort: the draw lane stamps these numbers verbatim, a
+ * drag predicts its drop's top from them before that drop exists, and the
+ * drop records through them. Values already paint come back untouched — a
+ * drop must not move a single standing number — and anything else is a
+ * legacy sequence from before paint lived here, re-homed to dense ranks in
+ * the order it already stood in. Paint lives strictly inside the mark
+ * layer, so anything on the layer or past the names is a sequence by
+ * elimination.
+ */
+export function paintDepths(
+  depth: ReadonlyMap<string, number>,
+): Map<string, number> {
+  for (const z of depth.values()) {
+    if (!(z > PAINT_LAYER_MARK && z < PAINT_LAYER_NAME)) {
+      const order = rankedDepths(depth, [...depth.keys()].sort()).map(
+        (entry) => entry.id,
+      );
+      return denseDepths(order);
+    }
+  }
+  return new Map(depth);
+}
+
+/** Dense ranks, lowest first, laid out with the compression. */
+function denseDepths(orderedIds: string[]): Map<string, number> {
+  const out = new Map<string, number>();
+  orderedIds.forEach((id, rank) =>
+    out.set(id, markDepthZ(rank, orderedIds.length)),
+  );
+  return out;
+}
+
+/**
+ * The stack after this drop, as paint — the one append all three readers
+ * share, so the gesture's prediction, the drop's record, and the lane's
+ * stamp cannot disagree about a single number.
+ */
+function nextDepths(
+  depth: ReadonlyMap<string, number>,
+  id: string,
+): Map<string, number> {
+  const paint = paintDepths(depth);
+  let top = PAINT_LAYER_MARK;
+  for (const z of paint.values()) top = Math.max(top, z);
+  // Already the top: a drop that fronts nothing restacks nothing.
+  if (paint.has(id) && paint.get(id) === top) return paint;
+  // Room to append: the mark takes one step above the top and every
+  // standing number stays exactly where it was.
+  if (top + MARK_DEPTH_STEP <= MARK_DEPTH_CEILING) {
+    paint.set(id, top + MARK_DEPTH_STEP);
+    return paint;
+  }
+  // The ceiling: ninety drops of headroom spent, so the stack is laid dense
+  // again with this mark on top. Past eighty-nine stacked marks this binds
+  // every drop, which is the old behavior kept as the floor for fields that
+  // large — order-preserving throughout, so even there nothing swaps.
+  const order = [...paint.keys()]
+    .filter((key) => key !== id)
+    .sort((a, b) => (paint.get(a) ?? 0) - (paint.get(b) ?? 0));
+  order.push(id);
+  return denseDepths(order);
+}
+
+/**
+ * A drop brings its mark to the front of the depth stack.
+ *
+ * The value is paint — one step above the current top — not a sequence, so
+ * the lane stamps it verbatim and every other standing number survives the
+ * drop untouched. Called only for drops that moved; a press that went
+ * nowhere restacks nothing, the way it repositions nothing.
+ */
+export function restack(set: WorkingSet, id: string): WorkingSet {
+  const next = clone(set);
+  next.depth = nextDepths(next.depth, id);
+  return next;
+}
+
+/**
+ * The paint a drop of this mark will stamp — what `restack` records.
+ *
+ * The gesture reads this, not the formula: the grab rides the number the
+ * release restates because both are the same call.
+ */
+export function restackTop(
+  depth: ReadonlyMap<string, number>,
+  id: string,
+): number {
+  return nextDepths(depth, id).get(id) ?? PAINT_LAYER_MARK;
+}
+
+/**
+ * Drop order as ranks, for membership and order.
+ *
+ * One sort: the draw lane iterates it for the stacked marks in the frame,
+ * stamping the paint `paintDepths` holds for each, and the dense paths size
+ * from its count. `idsInFrameOrder` is the frame's node order — ties break
+ * on it, the way creation order breaks unstacked marks. A mark with no
+ * entry is unstacked and keeps the layer, which is the caller's to say, not
+ * this sort's.
+ */
+export function rankedDepths(
+  depth: ReadonlyMap<string, number>,
+  idsInFrameOrder: string[],
+): { id: string; rank: number; count: number }[] {
+  return idsInFrameOrder
+    .map((id, index) => ({ id, index }))
+    .filter(({ id }) => depth.has(id))
+    .sort(
+      (a, b) =>
+        (depth.get(a.id) ?? 0) - (depth.get(b.id) ?? 0) || a.index - b.index,
+    )
+    .map(({ id }, rank, all) => ({ id, rank, count: all.length }));
 }
 
 /**
@@ -310,10 +444,22 @@ function isClear(next: WorkingSet, at: Point, radius: number, ignore?: string): 
 }
 
 /**
+ * Whether a plate could open here without landing on a standing mark.
+ *
+ * The fold's seat is authored — the drawn label's station — so unlike a fresh
+ * placement it is never walked out to freedom: it either stands where the name
+ * stood or keeps the pushed seat `open` already gave it. Same bodies as
+ * `isClear`, so the canvas and the store agree about what "clear" means.
+ */
+export function plateSeatClear(set: WorkingSet, at: Point, ignore: string): boolean {
+  return isClear(set, at, PLATE_BODY, ignore);
+}
+
+/**
  * How far the search will go before it gives up and takes the last slot.
  *
- * Eight tiers, which at `RING_TIER` apart is further out than a field capped
- * at `MAX_FIELD_NODES` can fill.
+ * Eight tiers, which at `RING_TIER` apart reaches well past any field yet
+ * placed.
  */
 const PROBES = 64;
 
@@ -366,6 +512,67 @@ export type ExpansionInput = {
   labels: Map<string, string | null>;
 };
 
+/**
+ * How far the pre-settle spiral steps out per coincident mark.
+ *
+ * Only has to break exact coincidence — the solver does the separating — so
+ * it stays small enough that a fanned plate still reads as standing with its
+ * spokes.
+ */
+const STACK_SPIRAL_STEP = 14;
+
+/** Golden angle: successive offsets never line up behind each other. */
+const STACK_SPIRAL_TURN = 2.399963;
+
+/**
+ * Fan out arrived marks that landed on exactly the same point, before settle.
+ *
+ * Tuples sharing one spoke set compute one plate position; a bulk fold of
+ * fifty-odd stacks them all on it, the solver's quadtree degenerates, and
+ * the pass crawls (measured 1.2s for 53 where a healthy pass is
+ * milliseconds). A deterministic spiral by sorted id breaks the coincidence;
+ * the settle still decides where everything rests. Only arrived marks move —
+ * what was already standing is never touched.
+ */
+function spreadStacks(before: WorkingSet, next: WorkingSet): void {
+  const arrived = new Set<string>();
+  for (const id of next.referents.keys()) {
+    if (!before.referents.has(id)) arrived.add(id);
+  }
+  for (const id of next.assertions.keys()) {
+    if (!before.assertions.has(id)) arrived.add(id);
+  }
+  if (!arrived.size) return;
+  const used = new Set<string>();
+  for (const [id, at] of next.positions) {
+    if (!arrived.has(id)) used.add(`${at.x},${at.y}`);
+  }
+  for (const id of [...arrived].sort()) {
+    const at = next.positions.get(id);
+    if (!at) continue;
+    const key = `${at.x},${at.y}`;
+    if (!used.has(key)) {
+      used.add(key);
+      continue;
+    }
+    let k = 0;
+    let moved = at;
+    let movedKey = key;
+    do {
+      k += 1;
+      const radius = STACK_SPIRAL_STEP * Math.sqrt(k);
+      const angle = k * STACK_SPIRAL_TURN;
+      moved = {
+        x: at.x + radius * Math.cos(angle),
+        y: at.y + radius * Math.sin(angle),
+      };
+      movedKey = `${moved.x},${moved.y}`;
+    } while (used.has(movedKey) && k < 64);
+    next.positions.set(id, moved);
+    used.add(movedKey);
+  }
+}
+
 /** Fold every tuple of one relation, as read from one referent, into the field. */
 export function expand(set: WorkingSet, input: ExpansionInput): WorkingSet {
   const next = clone(set);
@@ -396,6 +603,7 @@ export function expand(set: WorkingSet, input: ExpansionInput): WorkingSet {
       labels: input.labels,
     }, taken, placed);
   }
+  spreadStacks(set, next);
   settle(set, next);
   return next;
 }
@@ -421,15 +629,58 @@ export type PlacementInput = {
  * canvas. With an empty field the first referent takes the middle and the rest
  * fan around it, exactly as a seed would.
  */
-export function place(set: WorkingSet, input: PlacementInput): WorkingSet {
-  const next = clone(set);
+/**
+ * Fold one tuple into an accumulating field, without settling.
+ *
+ * Shared by the single and bulk placements so they anchor identically: the
+ * anchor is read off the accumulating field, and the slots taken around it
+ * are counted there too — for one tuple that field is a clone of the field,
+ * so the count is the same count the single placement always took.
+ */
+function foldOne(next: WorkingSet, input: PlacementInput): boolean {
   const spokes = input.roles
     .filter((role) => role.referent)
     .map((role) => String(input.tuple.values[role.name]));
   const anchor = anchorFor(next, spokes, input.labels);
-  if (!anchor) return set;
+  if (!anchor) return false;
+  fold(next, { ...input, anchor }, countAround(next, anchor), 0);
+  return true;
+}
 
-  fold(next, { ...input, anchor }, countAround(set, anchor), 0);
+export function place(set: WorkingSet, input: PlacementInput): WorkingSet {
+  const next = clone(set);
+  if (!foldOne(next, input)) return set;
+  settle(set, next);
+  return next;
+}
+
+export type BulkPlacementInput = {
+  relation: string;
+  mode: string;
+  stale: boolean;
+  completeness: "COMPLETE" | "INCOMPLETE" | "UNKNOWN" | null;
+  roles: WorldRole[];
+  tuples: WorldTuple[];
+  labels: Map<string, string | null>;
+};
+
+/**
+ * Fold a page of tuples, settling once.
+ *
+ * What add-all places through: every tuple anchors the way a single placement
+ * would — beside the neighborhood it names — but the settle runs a single
+ * time over the whole fold rather than once per tuple, which is what made a
+ * 53-row run pay for 53 simulations. `spreadStacks` breaks the coincident
+ * stacks first, so the one pass stays millisecond-scale.
+ */
+export function placeAll(set: WorkingSet, input: BulkPlacementInput): WorkingSet {
+  const next = clone(set);
+  let placed = false;
+  for (const tuple of input.tuples) {
+    if (foldOne(next, { ...input, tuple })) placed = true;
+  }
+  if (!placed) return set;
+  spreadStacks(set, next);
   settle(set, next);
   return next;
 }
@@ -886,6 +1137,7 @@ export function collapse(set: WorkingSet, assertionId: string): WorkingSet {
   const next = clone(set);
   next.assertions.delete(assertionId);
   next.positions.delete(assertionId);
+  next.depth.delete(assertionId);
   next.bonds.push({
     assertion_id: assertion.assertion_id,
     relation: assertion.relation,
@@ -907,6 +1159,7 @@ export function drop(set: WorkingSet, id: string): WorkingSet {
   const next = clone(set);
   next.referents.delete(id);
   next.positions.delete(id);
+  next.depth.delete(id);
   next.bonds = next.bonds.filter(
     (bond) => bond.source !== id && bond.target !== id,
   );
@@ -914,12 +1167,14 @@ export function drop(set: WorkingSet, id: string): WorkingSet {
     if (assertion.spokes.some((spoke) => spoke.id === id)) {
       next.assertions.delete(assertionId);
       next.positions.delete(assertionId);
+      next.depth.delete(assertionId);
     }
   }
   for (const [key, demand] of next.demands) {
     if (demand.spokes.some((spoke) => spoke.id === id)) {
       next.demands.delete(key);
       next.positions.delete(key);
+      next.depth.delete(key);
     }
   }
   for (const key of [...next.expanded]) {
@@ -941,6 +1196,7 @@ export function dropMark(set: WorkingSet, id: string): WorkingSet {
   next.assertions.delete(id);
   next.demands.delete(id);
   next.positions.delete(id);
+  next.depth.delete(id);
   next.bonds = next.bonds.filter((bond) => bond.assertion_id !== id);
   return next;
 }

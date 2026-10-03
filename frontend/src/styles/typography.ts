@@ -1,16 +1,20 @@
 /**
- * App typography tokens — change once here (and matching CSS vars in base.css).
+ * App typography tokens — the single source for both surfaces.
  *
  * CSS:  font-family: var(--font-sans) | var(--font-mono)
  *  JS/G6: FONT_SANS_FAMILY | FONT_MONO_FAMILY
+ *
+ * The CSS vars are restated from these tokens at boot (see
+ * `applyTypographyToDocument`); base.css only holds first-paint defaults.
+ * Nothing else in the app names a face.
  *
  * Usage rule: Jost for controls, prose, names, statuses, and numeric counts
  * (use tabular-nums when numbers need alignment). Mono for code, raw technical
  * identifiers/paths, and diagrams whose characters must align. Small size or
  * secondary emphasis alone is never a reason to switch families.
  *
- * Mono is a trial against Jost. Flip `FONT_MONO` to another loaded id, or
- * pick one in Settings → This screen. Loaded faces: dm, plex, space.
+ * Mono is a trial against Jost. Flip `FONT_MONO` to another loaded id and
+ * rebuild; there is no runtime picker yet. Loaded faces: dm, plex, space.
  */
 export const FONT_SANS_FAMILY =
   'Jost, "Helvetica Neue", Helvetica, sans-serif';
@@ -45,3 +49,16 @@ export const FONT_MONO_FAMILY = fontMonoFamily(FONT_MONO);
 
 /** Default G6 node label face — keep in sync with FONT_SANS_FAMILY. */
 export const FONT_NODE_LABEL_FAMILY = FONT_SANS_FAMILY;
+
+/**
+ * Restate the CSS face vars from the tokens, once, at boot.
+ *
+ * The canvas reads the tokens directly; the DOM reads the vars. Without this
+ * a mono trial would move the canvas and leave every panel behind, because
+ * base.css can only hold one stack. Called from main before first render.
+ */
+export function applyTypographyToDocument(): void {
+  const root = document.documentElement;
+  root.style.setProperty("--font-sans", FONT_SANS_FAMILY);
+  root.style.setProperty("--font-mono", FONT_MONO_FAMILY);
+}

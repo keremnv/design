@@ -18,8 +18,8 @@
 
 import { GRAPH_DNA_CHIP, GRAPH_DNA_GEOMETRY, radixValue } from "../styles/graphDna";
 import type { GraphDnaTheme } from "../styles/graphDna";
-import { FONT_SANS_FAMILY } from "../styles/typography";
-import { WORLD_FILAMENT_EDGE } from "./filaments";
+import { FONT_MONO_FAMILY, FONT_SANS_FAMILY } from "../styles/typography";
+import { WORLD_FILAMENT_EDGE, type RoleEnds } from "./filaments";
 
 /**
  * The weight the product canvas draws node labels at.
@@ -28,6 +28,74 @@ import { WORLD_FILAMENT_EDGE } from "./filaments";
  * is already the sharp geometric face the map is built on.
  */
 export const DISC_LABEL_WEIGHT = 400;
+
+/**
+ * Paint layers: strokes under marks under names.
+ *
+ * G6 inserts each born batch after everything standing, so data order only
+ * ever layered one batch at a time — a stroke placed later painted over a
+ * name placed earlier, whatever the lanes prepended. Stated `zIndex` is what
+ * survives batching: G6 keeps an explicitly numbered element's layer on
+ * every path that recomputes the others, and the renderer paints the sorted
+ * list. Nodes are stated too, because a drag fronts its mark and the number
+ * would otherwise ratchet past the names; the drop's redraw restates depth
+ * from the set instead, so a dropped mark keeps the front its gesture gave
+ * it — see `restack`.
+ */
+export const PAINT_LAYER_STROKE = 0;
+export const PAINT_LAYER_MARK = 1;
+export const PAINT_LAYER_NAME = 2;
+/**
+ * How far into the gap above the mark layer restacks may rise.
+ *
+ * Strictly less than the full gap to the name layer, so ranked depth —
+ * marks, then the half-step their labels lift above them — can never reach
+ * the names no matter how many drops land.
+ */
+export const MARK_DEPTH_SPAN = 0.9;
+
+/**
+ * How much paint one drop spends.
+ *
+ * A drop appends its mark one step above the current top and touches nothing
+ * else — which is what keeps a release from renumbering the whole stack the
+ * way rank-over-count compression did. A hundredth of a layer: ninety drops
+ * to the ceiling, and the lift a label needs between two bands is half of
+ * one step, still four orders above float dust.
+ */
+export const MARK_DEPTH_STEP = 0.01;
+
+/**
+ * The highest paint a drop may append.
+ *
+ * One step of label air below the span's top, so the topmost mark's own
+ * labels still have a band to stand in. A drop that would land past it lays
+ * the stack dense first — the compression below, kept as the rare path — so
+ * the ceiling costs one reshuffle per ninety drops instead of one per drop.
+ */
+export const MARK_DEPTH_CEILING =
+  PAINT_LAYER_MARK + MARK_DEPTH_SPAN - MARK_DEPTH_STEP;
+
+/**
+ * A stacked mark's paint depth from its rank in a dense stack.
+ *
+ * The dense assignment: first paint, ceiling renormalization, and legacy
+ * migration all lay the stack out with this. Drops between ceilings do not
+ * call it — they append one step above the top and leave every stamped
+ * number standing, which is what makes a release silent past its own mark.
+ * Rank is 0-based and count is the stack's size.
+ */
+export function markDepthZ(rank: number, count: number): number {
+  return PAINT_LAYER_MARK + ((rank + 1) / (count + 1)) * MARK_DEPTH_SPAN;
+}
+/**
+ * How far above the name layer rank may rise on a pristine field.
+ *
+ * Nothing in G6 paints above the names, so the value is arbitrary room —
+ * what matters is that higher rank means higher paint. Mirrors the mark
+ * span below so the two stacked orders read as one scale.
+ */
+export const NAME_RANK_SPAN = 0.9;
 
 export type MarkParams = typeof GRAPH_DNA_CHIP & {
   discDiameter: number;
@@ -62,21 +130,29 @@ export type Paint = {
   field: string;
   chip: string;
   muted: string;
+  /** Which polarity room the paint was resolved for. */
+  dark: boolean;
 };
 
-export function paintOf(theme: GraphDnaTheme): Paint {
+export function paintOf(theme: GraphDnaTheme, dark = false): Paint {
   return {
     canvas: radixValue(theme.canvas),
     ink: radixValue(theme.node),
     field: radixValue(theme.nodeLabel),
     chip: radixValue(theme.chip),
     muted: radixValue(theme.lensLabel),
+    dark,
   };
 }
 
 let measurer: CanvasRenderingContext2D | null = null;
 
-function metricsOf(text: string, size: number, weight: number): TextMetrics | null {
+function metricsOf(
+  text: string,
+  size: number,
+  weight: number,
+  family: string = FONT_SANS_FAMILY,
+): TextMetrics | null {
   if (!measurer) {
     measurer = document.createElement("canvas").getContext("2d");
   }
@@ -84,7 +160,9 @@ function metricsOf(text: string, size: number, weight: number): TextMetrics | nu
   // The weight has to be the one that will be drawn. Measuring at one weight
   // and painting at another gives every plate a few pixels of padding it did
   // not ask for, on one side, which reads as a centring bug rather than a width.
-  measurer.font = `${weight} ${size}px ${FONT_SANS_FAMILY}`;
+  // Same for the face: a role measured in sans and painted in mono inherits
+  // the wrong width the same way.
+  measurer.font = `${weight} ${size}px ${family}`;
   return measurer.measureText(text);
 }
 
@@ -95,8 +173,13 @@ function metricsOf(text: string, size: number, weight: number): TextMetrics | nu
  * `used_in` to `acceptable_replacement`, and a fixed plate wide enough for the
  * second is a lie about the first.
  */
-export function textWidth(text: string, size: number, weight: number): number {
-  return metricsOf(text, size, weight)?.width ?? text.length * size * 0.6;
+export function textWidth(
+  text: string,
+  size: number,
+  weight: number,
+  family: string = FONT_SANS_FAMILY,
+): number {
+  return metricsOf(text, size, weight, family)?.width ?? text.length * size * 0.6;
 }
 
 /*
@@ -185,6 +268,7 @@ export function discNode(
     id,
     type: "circle",
     style: {
+      zIndex: PAINT_LAYER_MARK,
       x,
       y,
       size: p.discDiameter,
@@ -216,6 +300,11 @@ export function discNode(
       labelTransform: [["scale", 1, 1]] as [["scale", number, number]],
       labelTransformOrigin: "0px 0px",
       labelFill: paint.field,
+      // The ink's resting strength, stated so the visibility system can
+      // multiply it rather than guess it. This is G6's own node default
+      // (`labelFillOpacity: 0.85` in its base theme), written out so a theme
+      // change cannot silently re-ink every name — see `visibility.ts`.
+      labelFillOpacity: 0.85,
       labelFontFamily: FONT_SANS_FAMILY,
       labelFontSize: GRAPH_DNA_GEOMETRY.labelSize,
       labelFontWeight: DISC_LABEL_WEIGHT,
@@ -259,6 +348,48 @@ export function isAuthored(kind: ChipKind | undefined): boolean {
   return kind === "semantic" || kind === "adjudicated";
 }
 
+/*
+ * What a filled plate rests at: the disc's own paint, in both rooms.
+ *
+ * There was a wash here — ink at 0.32 in a dark room — and full ink on a
+ * bond's plate in a light one, and both were the mismatch: a filled plate
+ * quieter than its disc in one room and louder in the other. A disc rests
+ * at the albedo without reading as a slab, so a plate resting beside it
+ * does too, and the name reads in the field for the same reason the
+ * disc's does.
+ *
+ * A bond's plate wears that composite *opaque*, while a chip standing on
+ * the field wears it translucent. The plate's background is also the gap
+ * its line breaks in, and translucent ink over the stroke lets the line
+ * ghost through the name — measured at 13 levels on a light field. The
+ * chip has no line of its own to break, so it keeps the honest coat and
+ * the light law that owns it; the bond's opaque mix is the same numbers
+ * the disc composites to, just settled before they reach the renderer.
+ * Unlit either way — a name is not lit, it is read — so only selection
+ * light on the neighbouring discs can still part them, which is the law
+ * working, not the paint disagreeing.
+ */
+function premixedInk(ink: string, canvas: string, albedo: number): string {
+  const channels = (hex: string): [number, number, number] | null => {
+    const match = /^#([0-9a-f]{6})$/i.exec(hex);
+    if (!match) return null;
+    const v = match[1];
+    return [
+      parseInt(v.slice(0, 2), 16),
+      parseInt(v.slice(2, 4), 16),
+      parseInt(v.slice(4, 6), 16),
+    ];
+  };
+  const top = channels(ink);
+  const ground = channels(canvas);
+  if (!top || !ground) return ink;
+  const mixed = top.map((c, i) =>
+    Math.round(c * albedo + ground[i] * (1 - albedo)),
+  );
+  const hex = (n: number) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0");
+  return `#${hex(mixed[0])}${hex(mixed[1])}${hex(mixed[2])}`;
+}
+
 /** The plate. One tuple of one relation, standing on the field. */
 export function chipNode(
   id: string,
@@ -276,6 +407,7 @@ export function chipNode(
     id,
     type: "rect",
     style: {
+      zIndex: PAINT_LAYER_MARK,
       x,
       y,
       size: [chipWidth(text, p), p.chipHeight] as [number, number],
@@ -288,7 +420,7 @@ export function chipNode(
       // Hollow stays hollow; everything else rests at the albedo. Both
       // channels, because an outlined plate carries its meaning in the stroke
       // and lighting only the fill would leave it dark while its neighbours
-      // brightened.
+      // brightened. A filled plate is the disc's own paint — see above.
       fillOpacity: kind === "unresolved" ? 0 : p.nodeAlbedo,
       stroke: paint.ink,
       strokeOpacity: p.nodeAlbedo,
@@ -303,6 +435,9 @@ export function chipNode(
       labelTransform: [["scale", 1, 1]] as [["scale", number, number]],
       labelTransformOrigin: "0px 0px",
       labelFill: filled ? paint.field : paint.ink,
+      // The visibility system's base — G6's node default, stated — see
+      // `discNode`.
+      labelFillOpacity: 0.85,
       labelFontFamily: FONT_SANS_FAMILY,
       labelFontSize: p.chipLabelSize,
       labelFontWeight: p.chipLabelWeight,
@@ -364,6 +499,14 @@ export function shelfNode(
   paint: Paint,
   p: MarkParams,
   side: RuleSide = "under",
+  /**
+   * The rule withdraws with its chip's fill: a selected plate under the hollow
+   * treatment opens into its marching boundary, and a solid rule left standing
+   * under — or over — an opened plate is a second mark for one fact. Always
+   * stated, so the restyle lane reads the change as a fade rather than a key
+   * coming back.
+   */
+  opacity = 1,
 ) {
   const width =
     textWidth(text, p.chipLabelSize, p.chipLabelWeight) + p.shelfOverhang * 2;
@@ -372,11 +515,12 @@ export function shelfNode(
     id,
     type: "rect",
     style: {
+      zIndex: PAINT_LAYER_MARK,
       x,
       y: side === "under" ? y + offset : y - offset,
       size: [Math.max(4, Math.round(width)), p.shelfLine] as [number, number],
       radius: 0,
-      opacity: 1,
+      opacity,
       fill: paint.ink,
       lineWidth: 0,
       labelText: "",
@@ -389,7 +533,6 @@ export function shelfNode(
 
 export type SpokeOptions = {
   role?: string;
-  dotted?: boolean;
   showRole: boolean;
   /** Placement along the spoke, 0 at the referent. */
   labelPlacement?: number;
@@ -403,6 +546,15 @@ export type SpokeOptions = {
    */
   labelOffsetX?: number;
   labelOffsetY?: number;
+  /**
+   * How far along the spoke the plate stands, in pixels from its rim.
+   *
+   * Stated so the fan measures the draw's own station instead of a bond's:
+   * a role at 16px modelled at 52 is a pile the solver cannot see. Always
+   * the width rule before the midpoint guard — see `BondLabelLayout.along` —
+   * so the guard is the reader's, against the geometry in front of it.
+   */
+  bondAlong?: number;
 };
 
 /** A referent filling a role in an assertion. */
@@ -414,39 +566,37 @@ export function spokeEdge(
   p: MarkParams,
   options: SpokeOptions,
 ) {
+  // A role's own metrics, not the chip's: the mono face at the same size,
+  // and `chipWidth` misstates it — see `roleWidth`.
+  const plateWidth = options.role ? roleWidth(options.role, p) : 0;
   return {
     id,
     type: WORLD_FILAMENT_EDGE,
     source,
     target,
     style: {
+      zIndex: PAINT_LAYER_NAME,
+      // Lineless: the stroke lives on the spoke's filament edge, a layer
+      // below — see `spokeFilament`. A spoke that drew its own line painted
+      // it over the plates of the spokes drawn before it, which is the same
+      // fault `filamentEdge` already fixed for bonds.
       stroke: paint.ink,
-      lineWidth: p.roleSpokeWidth,
-      // Two channels, and the split is the point.
-      //
-      // `opacity` is presence: 0 while the spoke is being born or absorbed,
-      // 1 once it is here, and nothing else touches it. `strokeOpacity` is
-      // what the line is made of — quiet, because a role spoke is scaffolding
-      // — and it is the channel light reflects off.
-      //
-      // They were one channel until the light law had something to say. G6
-      // composites element opacity into the label group, so a spoke drawn at
-      // 0.5 drew its name at 0.5 too: grey on grey. The old fix was to send
-      // the whole spoke to full strength the moment it was named, which read
-      // well and cost the law its subject — the falloff had nothing left to
-      // act on, and a spoke you pointed at doubled instead of brightening.
-      // Dimming the stroke alone leaves the name at the strength stated below.
+      lineWidth: 0,
+      // Presence without material: the name states its own strength below,
+      // and there is no stroke left for light to reflect off.
       opacity: 1,
-      strokeOpacity: p.roleSpokeOpacity,
+      strokeOpacity: 0,
+      // G6's theme adds 2px of hit padding. A ghost spoke that still
+      // catches the pointer steals clicks from the plate sitting beside it.
+      increasedLineWidthForHitTesting: 0,
       lineCap: "round" as const,
-      lineDash: options.dotted ? ([0, p.dottedGap] as [number, number]) : undefined,
       // G6 draws edges after nodes, so a spoke through a disc sits on top of
-      // it. The stroke must not steal the drag; the role plate still takes
+      // it. The edge must not steal the drag; the role plate still takes
       // the pointer when it is named.
       pointerEvents: "none" as const,
       labelPointerEvents: options.showRole ? "auto" as const : "none" as const,
       labelText: options.role ?? "",
-      labelFontFamily: FONT_SANS_FAMILY,
+      labelFontFamily: FONT_MONO_FAMILY,
       labelFontSize: p.roleLabelSize,
       labelFontWeight: p.roleLabelWeight,
       labelFill: paint.ink,
@@ -455,11 +605,20 @@ export function spokeEdge(
       // which is backwards: the filament is quiet so the name can be read
       // over it.
       labelOpacity: options.showRole ? 1 : 0,
+      // The visibility system's channel: a losing name dims its ink while
+      // the ground stays opaque, so the whisper keeps its gap. See
+      // `visibility.ts`. Always stated — the lanes overwrite it per frame.
+      labelFillOpacity: 1,
       labelBackground: true,
       labelBackgroundOpacity: options.showRole ? 1 : 0,
       labelBackgroundFill: paint.chip,
       labelBackgroundLineWidth: 0,
       labelBackgroundRadius: p.chipRadius,
+      // Stated, like a bond's: grown from the glyph box, the ground is a
+      // sliver the ink fills edge to edge, which knocks nothing out and
+      // separates nothing. A role still gets a role-sized card.
+      labelBackgroundWidth: plateWidth,
+      labelBackgroundHeight: p.chipHeight,
       labelPadding: [p.chipPaddingY, p.chipPaddingX] as [number, number],
       labelAutoRotate: false,
       // Same as a bond: G6's BaseEdge default is 4px of unstated X, which
@@ -468,6 +627,52 @@ export function spokeEdge(
       labelOffsetX: options.labelOffsetX ?? 0,
       labelOffsetY: options.labelOffsetY ?? 0,
       labelPlacement: options.labelPlacement ?? p.roleLabelAt,
+      // A spoke's own base station when unstated — never a bond's 52, which
+      // is the pile the fan could not see. Every lane states the resolved
+      // one; this is the shape a readerless edge keeps.
+      bondAlong: options.bondAlong ?? SPOKE_LABEL_ALONG_PX,
+    },
+  };
+}
+
+/**
+ * A spoke's stroke, without its name.
+ *
+ * One per spoke, drawn before every plate alongside the bond filaments — see
+ * the `filaments` collection in the field lane and `strokes` in the schema
+ * lane. The name rides the lineless `spokeEdge` with the same ends, so the
+ * two share one path through every drag and fan; a stroke drawn under every
+ * plate can never sit on one.
+ */
+export function spokeFilament(
+  id: string,
+  source: string,
+  target: string,
+  paint: Paint,
+  p: MarkParams,
+  options: { dotted?: boolean },
+) {
+  return {
+    id,
+    type: WORLD_FILAMENT_EDGE,
+    source,
+    target,
+    style: {
+      zIndex: PAINT_LAYER_STROKE,
+      stroke: paint.ink,
+      lineWidth: p.roleSpokeWidth,
+      opacity: 1,
+      strokeOpacity: p.roleSpokeOpacity,
+      increasedLineWidthForHitTesting: 2,
+      lineCap: "round" as const,
+      lineDash: options.dotted ? ([0, p.dottedGap] as [number, number]) : undefined,
+      // Same create-order problem as a bond's filament: the spoke is drawn
+      // through the disc, on top of it. The line is not a grab target; the
+      // role plate is.
+      pointerEvents: "none" as const,
+      labelText: "",
+      labelOpacity: 0,
+      roleEnds: null,
     },
   };
 }
@@ -546,16 +751,17 @@ export const SPOKE_LABEL_RIM_GAP_PX = 4;
  */
 
 /**
- * A role plate's width. The same arithmetic as `chipWidth`, at role type size.
+ * A role plate's width. The same arithmetic as `chipWidth`, at role metrics.
  *
- * `chipWidth` reads `chipLabelSize`, and a spoke's name is set at
- * `roleLabelSize` — larger, and lighter. Measuring a role with the chip's
- * metrics understates it, and the whole point of a width-aware station is that
- * the width is the real one.
+ * A role is set in the mono face at the same size and weight as a relation —
+ * the family carries the kind distinction, nothing else. Measuring a role
+ * with the chip's (sans) metrics misstates it, and the whole point of a
+ * width-aware station is that the width is the real one.
  */
 export function roleWidth(text: string, p: MarkParams): number {
   return Math.round(
-    textWidth(text, p.roleLabelSize, p.roleLabelWeight) + p.chipPaddingX * 2,
+    textWidth(text, p.roleLabelSize, p.roleLabelWeight, FONT_MONO_FAMILY) +
+      p.chipPaddingX * 2,
   );
 }
 
@@ -581,11 +787,12 @@ export function spokeLabelStation(
 /**
  * Air between stacked plates that share a filament, in graph pixels.
  *
- * Two, not four. A plate is ten tall and carries seven-pixel text, so four
- * made the step 14 — twice the type size, which no one sets leading at. The
- * stack read as a list of separate things rather than one filament's names.
+ * Four: the marching outline spills two past the plate it traces, so two was
+ * no air at all once a member was selected — beads interleaved with the
+ * neighbours' rows. These are cards sharing a line, not lines of type, and
+ * cards want the air.
  */
-export const BOND_LABEL_STACK_GAP = 2;
+export const BOND_LABEL_STACK_GAP = 4;
 
 /**
  * How many of a group's plates the filament will carry.
@@ -627,6 +834,15 @@ export type BondLabelLayout = {
   placement: number;
   offsetX: number;
   offsetY: number;
+  /**
+   * The station in pixels from the near rim, before the midpoint guard.
+   *
+   * What `placement` was resolved from, unstated as a share so a reader can
+   * state it back: `spokeEdge` stores it as `bondAlong`, and the fan caps it
+   * against the filament it finds. When no end is named the plate stands
+   * mid-filament and this is the width rule alone, measured from nowhere.
+   */
+  along: number;
 };
 
 /**
@@ -752,8 +968,10 @@ export function rimStandoff(
   return Math.max(want, centre - rimDistance(rim, dx, dy));
 }
 
-/** The drawn stroke's length: centre to centre, less both rims. */
-function filamentLength(
+/**
+ * The drawn stroke's length: centre to centre, less both rims.
+ */
+export function filamentLength(
   source: { x: number; y: number },
   target: { x: number; y: number },
   fromRim: MarkRim,
@@ -793,6 +1011,37 @@ function filamentLength(
  */
 export type LabelAir = { rimGap?: number };
 
+/**
+ * What the width rule asks for, before the midpoint guard.
+ *
+ * The station the plate would hold on a filament long enough to hold it: the
+ * measured centre distance, or whatever this particular plate needs in order
+ * to clear the rim by its air, stood off the shape it stands on. The guard —
+ * no plate past the midpoint — stays with the consumers, which apply it to
+ * the geometry in front of them rather than to the geometry at draw time.
+ * Stored as `bondAlong` on edges whose station a bond's 52px does not
+ * describe, so the fan measures the draw's own answer — see `spokeEdge`.
+ */
+function labelStand(
+  source: { x: number; y: number },
+  target: { x: number; y: number },
+  station: number,
+  halfPlate: number,
+  /** The rim this station is measured from — see `rimStandoff`. */
+  nearRim: MarkRim | null,
+  air: LabelAir,
+): number {
+  // The plate's own width is part of where its centre has to be. Widening a
+  // name must move it out, not let it grow back over the mark it names.
+  const rimGap = air.rimGap ?? BOND_LABEL_RIM_GAP_PX;
+  const wanted = Math.max(station, rimGap + halfPlate);
+  // …and the shape of what it stands off is part of it too: past a rectangle,
+  // travelling `wanted` along the ray is not clearing `wanted` of rectangle.
+  return nearRim
+    ? rimStandoff(nearRim, target.x - source.x, target.y - source.y, wanted)
+    : wanted;
+}
+
 export function bondLabelAlong(
   source: { x: number; y: number },
   target: { x: number; y: number },
@@ -806,15 +1055,7 @@ export function bondLabelAlong(
   air: LabelAir = {},
 ): number {
   const filament = filamentLength(source, target, fromRim, toRim);
-  // The plate's own width is part of where its centre has to be. Widening a
-  // name must move it out, not let it grow back over the mark it names.
-  const rimGap = air.rimGap ?? BOND_LABEL_RIM_GAP_PX;
-  const wanted = Math.max(station, rimGap + halfPlate);
-  // …and the shape of what it stands off is part of it too: past a rectangle,
-  // travelling `wanted` along the ray is not clearing `wanted` of rectangle.
-  const along = nearRim
-    ? rimStandoff(nearRim, target.x - source.x, target.y - source.y, wanted)
-    : wanted;
+  const along = labelStand(source, target, station, halfPlate, nearRim, air);
   return filament > 1 ? Math.min(along, filament / 2) : 0;
 }
 
@@ -858,6 +1099,13 @@ export function bondLabelPlacement(
  * handed `discRim` — or its own height as a radius — puts its name somewhere
  * that depends on the angle the stroke arrives at.
  */
+/*
+ * There was an off-line escape here — endpoint-only, after the neighbour
+ * solver was cut — and it was the flinging rather than the cure for it. A
+ * plate stands on its line, always. What does not fit used to hide by a fit
+ * rule; now it dims by rank instead — see `visibility.ts`.
+ */
+
 export function bondLabelLayout(
   source: { x: number; y: number },
   target: { x: number; y: number },
@@ -883,7 +1131,60 @@ export function bondLabelLayout(
     air,
   );
   const nudge = p.chipLabelNudge;
-  return { placement, offsetX: stack.x, offsetY: stack.y + nudge };
+  return {
+    placement,
+    offsetX: stack.x,
+    offsetY: stack.y + nudge,
+    along: labelStand(
+      source,
+      target,
+      station,
+      halfPlate,
+      near === "source" ? fromRim : near === "target" ? toRim : null,
+      air,
+    ),
+  };
+}
+
+/**
+ * One physical filament for parallel claims sharing a pair of ends.
+ *
+ * Several claims between the same two referents are still one stroke — two
+ * wires would invent a geometry the tuples do not have. The stroke lives
+ * here, on its own edge, drawn before every plate: a member that drew its
+ * own line painted it over the plates of the members drawn before it, so
+ * the later of two names knocked its line out and the earlier one did not.
+ * Label-less on purpose — `labelText` stays empty so the fan reads no
+ * plate off it and the knockout stays off with the name.
+ */
+export function bondFilament(
+  id: string,
+  source: string,
+  target: string,
+  paint: Paint,
+  p: MarkParams,
+) {
+  return {
+    id,
+    type: WORLD_FILAMENT_EDGE,
+    source,
+    target,
+    style: {
+      zIndex: PAINT_LAYER_STROKE,
+      stroke: paint.ink,
+      lineWidth: p.edgeWidth,
+      opacity: 1,
+      strokeOpacity: p.edgeOpacity,
+      increasedLineWidthForHitTesting: 2,
+      lineCap: "round" as const,
+      // Same create-order problem as a spoke: the filament is drawn through
+      // the disc, on top of it. The line is not a grab target; the plate is.
+      pointerEvents: "none" as const,
+      labelText: "",
+      labelOpacity: 0,
+      roleEnds: null,
+    },
+  };
 }
 
 /** A plain filament, with or without its name showing. */
@@ -902,8 +1203,21 @@ export function filamentEdge(
     /** Graph-space shift of the plate, from `bondLabelLayout`. */
     labelOffsetX?: number;
     labelOffsetY?: number;
-    /** Parallel claims share one physical filament instead of darkening it. */
-    carriesFilament?: boolean;
+    /** The roles its ends fill, shown the way a named plate shows its spokes'. */
+    roles?: RoleEnds | null;
+    /**
+     * How far along the filament the plate stands, in pixels from its rim.
+     * Stated so the fan and the drag path can re-derive the same station
+     * without recomputing it — and always, so selection never moves it: the
+     * roles it clears are a property of the bond whether they are showing.
+     */
+    bondAlong?: number;
+    /**
+     * Half the plate the station was derived for — the member's own, or the
+     * widest member's when the filament is shared. Stored for the same
+     * reader as `bondAlong`, for the same reason.
+     */
+    bondHalf?: number;
   },
 ) {
   const named = options.named && Boolean(options.label);
@@ -913,23 +1227,26 @@ export function filamentEdge(
   // see `schemaGraph`, which takes exactly that exception.
   const filled = isAuthored(options.kind);
   const plateWidth = options.label ? chipWidth(options.label, p) : 0;
-  const carries = options.carriesFilament !== false;
   return {
     id,
     type: WORLD_FILAMENT_EDGE,
     source,
     target,
     style: {
+      zIndex: PAINT_LAYER_NAME,
+      // Lineless: the stroke lives on the pair's filament edge, a layer
+      // below — see `bondFilament`. A member that drew its own line painted
+      // it over the plates of the members drawn before it.
       stroke: paint.ink,
-      lineWidth: carries ? p.edgeWidth : 0,
+      lineWidth: 0,
       // See `spokeEdge` for why these are two channels: presence, then
       // material. A bond is quiet for the same reason a spoke is, and its
       // name is legible for the same reason.
       opacity: 1,
-      strokeOpacity: carries ? p.edgeOpacity : 0,
+      strokeOpacity: 0,
       // G6's theme adds 2px of hit padding. A ghost filament that still
       // catches the pointer steals clicks from the plate sitting beside it.
-      increasedLineWidthForHitTesting: carries ? 2 : 0,
+      increasedLineWidthForHitTesting: 0,
       lineCap: "round" as const,
       // Same create-order problem as a spoke: the filament is drawn through
       // the disc, on top of it. The line is not a grab target; the plate is.
@@ -944,9 +1261,16 @@ export function filamentEdge(
       labelOffsetX: options.labelOffsetX ?? 0,
       labelOffsetY: options.labelOffsetY ?? p.chipLabelNudge,
       labelOpacity: named ? 1 : 0,
+      // Visibility strength — see `spokeEdge`. Always stated.
+      labelFillOpacity: 1,
       labelBackground: true,
+      // The disc's composite, worn opaque so the line it breaks stays
+      // broken — see above. The knockout inherits both channels, so the
+      // notch and the plate are one coat with no seam between them.
       labelBackgroundOpacity: named ? 1 : 0,
-      labelBackgroundFill: filled ? paint.ink : paint.chip,
+      labelBackgroundFill: filled
+        ? premixedInk(paint.ink, paint.canvas, p.nodeAlbedo)
+        : paint.chip,
       labelBackgroundLineWidth: 0,
       labelBackgroundRadius: p.chipRadius,
       // Stated as the standing plate's size, not grown from the glyph box.
@@ -960,7 +1284,56 @@ export function filamentEdge(
       labelTextAlign: "center" as const,
       labelTextBaseline: "middle" as const,
       labelPlacement: options.labelPlacement ?? 0.5,
+      // Always stated, `null` when hidden: a key the last frame wrote and
+      // this one omits sends the restyle lane back to a full draw.
+      roleEnds: options.roles ?? null,
+      // Same rule: the station in pixels, for the fan and the drag path.
+      bondAlong: options.bondAlong ?? BOND_LABEL_ALONG_PX,
+      bondHalf: options.bondHalf ?? 0,
     },
+  };
+}
+
+/**
+ * Where a bond's plate stands, clear of the role names at its ends.
+ *
+ * Both roles, not the near one: the plate's station can change end on hover
+ * while the names stay put, and a plate that moved out only on one side would
+ * slide under the other name the moment it changed ends.
+ */
+export function bondPlateAlong(
+  relation: string,
+  roles: RoleEnds | null | undefined,
+  p: MarkParams,
+): number {
+  if (!roles) return BOND_LABEL_ALONG_PX;
+  const widest = Math.max(roles.source?.width ?? 0, roles.target?.width ?? 0);
+  if (!widest) return BOND_LABEL_ALONG_PX;
+  return Math.max(
+    BOND_LABEL_ALONG_PX,
+    roles.gap * 2 + widest + chipWidth(relation, p) / 2,
+  );
+}
+
+export function roleEnds(
+  roles: { source: string | null; target: string | null },
+  paint: Paint,
+  p: MarkParams,
+): RoleEnds {
+  const end = (text: string | null) =>
+    text ? { text, width: roleWidth(text, p) } : null;
+  return {
+    source: end(roles.source),
+    target: end(roles.target),
+    fontFamily: FONT_MONO_FAMILY,
+    fontSize: p.roleLabelSize,
+    fontWeight: p.roleLabelWeight,
+    fill: paint.ink,
+    ground: paint.chip,
+    height: p.chipHeight,
+    radius: p.chipRadius,
+    padding: [p.chipPaddingY, p.chipPaddingX],
+    gap: SPOKE_LABEL_RIM_GAP_PX,
   };
 }
 
@@ -1009,6 +1382,12 @@ export function summaryEdge(
     placement?: number;
     offsetX?: number;
     offsetY?: number;
+    /**
+     * The group's station and width rule, stored for the drag path — the
+     * count rides the same station as its claims, in both lanes.
+     */
+    bondAlong?: number;
+    bondHalf?: number;
   },
 ) {
   return {
@@ -1017,6 +1396,7 @@ export function summaryEdge(
     source,
     target,
     style: {
+      zIndex: PAINT_LAYER_NAME,
       // No filament of its own: the group's carrier already drew the one line
       // these claims share, and a second stroke would invent a second link.
       stroke: paint.ink,
@@ -1043,6 +1423,8 @@ export function summaryEdge(
       labelOffsetX: options.offsetX ?? 0,
       labelOffsetY: options.offsetY ?? p.chipLabelNudge,
       labelOpacity: options.shown ? 1 : 0,
+      // Visibility strength — see `spokeEdge`. Always stated.
+      labelFillOpacity: 1,
       labelBackground: true,
       labelBackgroundOpacity: options.shown ? 1 : 0,
       labelBackgroundFill: paint.chip,
@@ -1055,6 +1437,8 @@ export function summaryEdge(
       labelTextAlign: "center" as const,
       labelTextBaseline: "middle" as const,
       labelPlacement: options.placement ?? 0.5,
+      bondAlong: options.bondAlong ?? BOND_LABEL_ALONG_PX,
+      bondHalf: options.bondHalf ?? 0,
     },
   };
 }

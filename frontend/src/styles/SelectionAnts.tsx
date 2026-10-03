@@ -46,7 +46,8 @@ import { useEffect, useRef, useState } from "react";
 import type { Graph } from "@antv/g6";
 import { motionPoseKeyframes, type MotionPlans } from "./motion";
 import { useMotion } from "./useMotion";
-import { chipWidth, MARK_DEFAULTS } from "../world/marks";
+import { MARK_DEFAULTS } from "../world/marks";
+import { SPREAD_FRAME_EVENT } from "../world/spread";
 import "./selectionAnts.css";
 
 /**
@@ -104,6 +105,26 @@ function isBorder(
 
 /** Solid, expressed in the same two-number form the dotted pattern uses. */
 const SOLID_DASH = "100 0";
+
+/**
+ * Temporarily off: the selection ring's scale-in on arrival and scale-out on
+ * absorb. The plays stay below so the effect comes back by flipping this to
+ * `true`; while off, rings arrive and leave at full size. Borders never scaled
+ * — they morph dashes — so they are untouched either way.
+ */
+const SCALE_ARRIVAL = false;
+
+/**
+ * Experiment: the march never pauses while a mark is in hand.
+ *
+ * The hold pause below stays so the old answer comes back by flipping this to
+ * `false`: the grip listeners reattach, the `held` prop takes hold again, and
+ * beads stop under the pointer. While on, both paths are cut and the ants
+ * march through hold and drag. The still DNA (`speed <= 0`) and reduced-motion
+ * users are untouched — this is only about the app's own pause, not a request
+ * to be still.
+ */
+const MARCH_THROUGH_HOLD = true;
 
 function trace(
   graph: Graph,
@@ -184,9 +205,7 @@ function trace(
   if (target.shape === "edge-label") {
     const edge = graph.getEdgeData(target.id);
     if (!edge) return null;
-    const from = at(String(edge.source));
-    const to = at(String(edge.target));
-    if (!from || !to) return null;
+    if (!at(String(edge.source)) || !at(String(edge.target))) return null;
     const text =
       target.text ||
       (typeof edge.style?.labelText === "string" ? edge.style.labelText : "") ||
@@ -213,39 +232,18 @@ function trace(
         label?.getShape?.("background")?.getBounds?.() ?? label?.getBounds?.();
       const a = painted ? graph.getViewportByCanvas(painted.min) : null;
       const b = painted ? graph.getViewportByCanvas(painted.max) : null;
-      if (a && b) {
-        const x0 = Math.min(a[0], b[0]);
-        const x1 = Math.max(a[0], b[0]);
-        const y0 = Math.min(a[1], b[1]);
-        const y1 = Math.max(a[1], b[1]);
-        const d = `M ${x0} ${y0} H ${x1} V ${y1} H ${x0} Z`;
-        const screenLength = 2 * (x1 - x0 + (y1 - y0));
-        return { d, screenLength, graphLength: screenLength / zoom };
+      if (!a || !b) {
+        /**
+         * No painted plate yet: trace nothing and let the retry find it.
+         * Re-deriving the placement here duplicated G6's minus the fan and
+         * the stack, so it drew a confident box where the name was not.
+         */
+        return null;
       }
-      /**
-       * Fallback: the same numbers the mark was authored from. G6 places
-       * the label along the rim-to-rim path, not centre-to-centre, and
-       * `labelOffsetX/Y` are graph-space.
-       */
-      const placement = Number(edge.style?.labelPlacement);
-      const ratio = Number.isFinite(placement) ? placement : 0.5;
-      const offsetX = Number(edge.style?.labelOffsetX) || 0;
-      const offsetY = Number(edge.style?.labelOffsetY) || 0;
-      const span = Math.hypot(to.x - from.x, to.y - from.y);
-      const trim = (MARK_DEFAULTS.discDiameter / 2) * zoom;
-      const usable = Math.max(1, span - trim * 2);
-      const ux = span > 0 ? (to.x - from.x) / span : 1;
-      const uy = span > 0 ? (to.y - from.y) / span : 0;
-      const rimX = from.x + ux * trim;
-      const rimY = from.y + uy * trim;
-      const centreX = rimX + ux * usable * ratio + offsetX * zoom;
-      const centreY = rimY + uy * usable * ratio + offsetY * zoom;
-      const plateWidth = chipWidth(text, MARK_DEFAULTS) * zoom;
-      const plateHeight = MARK_DEFAULTS.chipHeight * zoom;
-      const x0 = centreX - plateWidth / 2;
-      const x1 = centreX + plateWidth / 2;
-      const y0 = centreY - plateHeight / 2;
-      const y1 = centreY + plateHeight / 2;
+      const x0 = Math.min(a[0], b[0]);
+      const x1 = Math.max(a[0], b[0]);
+      const y0 = Math.min(a[1], b[1]);
+      const y1 = Math.max(a[1], b[1]);
       const d = `M ${x0} ${y0} H ${x1} V ${y1} H ${x0} Z`;
       const screenLength = 2 * (x1 - x0 + (y1 - y0));
       return { d, screenLength, graphLength: screenLength / zoom };
@@ -293,6 +291,8 @@ export function SelectionAnts({
   arrivalDelay = 0,
   animated = true,
   held: contactHeld = false,
+  traceToken,
+  gone,
 }: {
   graph: Graph | null;
   target: AntTarget | null;
@@ -310,6 +310,24 @@ export function SelectionAnts({
   animated?: boolean;
   /** Pointer contact pauses a selected field before drag threshold is crossed. */
   held?: boolean;
+  /**
+   * Retrace when this changes, without replaying the arrival.
+   *
+   * Restations write straight into the renderer (`element.update` in the
+   * restyle path) and emit nothing this overlay hears — no draw, no
+   * transform — so a selected bond's label could cross to the far end while
+   * its box stayed behind. The field passes its station subjects: their
+   * identity changes exactly when a label may have moved, and the retrace
+   * only re-reads where the plate now stands.
+   */
+  traceToken?: unknown;
+  /**
+   * True when the named mark has left the field rather than merely lost the
+   * selection. A dying mark takes its ants with it at once: the leave below
+   * hands the border back to a stroke that is about to redraw, and a removed
+   * mark redraws nothing. Omitted, every leave hands off as before.
+   */
+  gone?: (id: string) => boolean;
 }) {
   const [drawn, setDrawn] = useState<AntTarget | null>(target);
   const [arrival, setArrival] = useState(0);
@@ -325,6 +343,11 @@ export function SelectionAnts({
   /** So the tracing effect can reach the spine without depending on it. */
   const motionRef = useRef(motion);
   motionRef.current = motion;
+  /** So the leave can ask whether its mark died without refiring on the set. */
+  const goneRef = useRef(gone);
+  goneRef.current = gone;
+  /** The live tracer's coalesced retrace, for `traceToken` to call. */
+  const retrace = useRef<(() => void) | null>(null);
   const lifecycle = useMotion<SVGPathElement>();
   // The identity of what is selected, so the effects below fire when the
   // selection changes and not on every render of the canvas around them.
@@ -339,14 +362,20 @@ export function SelectionAnts({
       return;
     }
     if (!held.current) return;
-    if (!animated) {
+    if (!animated || goneRef.current?.(held.current.id)) {
       held.current = null;
       setDrawn(null);
       return;
     }
     // A border leaves by going back to being one: the beads close up into the
     // solid rect the plate's own stroke is about to redraw, and the mark is
-    // never seen without an edge. A ring has no such destination and absorbs.
+    // never seen without an edge. A ring has no such destination and absorbs —
+    // while its scale is off, it simply goes.
+    if (!SCALE_ARRIVAL && held.current && !isBorder(held.current)) {
+      held.current = null;
+      setDrawn(null);
+      return;
+    }
     const leaving = lifecycle.play(
       isBorder(held.current)
         ? [{ strokeDasharray: dash.current }, { strokeDasharray: SOLID_DASH, opacity: 0 }]
@@ -371,6 +400,7 @@ export function SelectionAnts({
   useEffect(() => {
     if (!animated || !arrival || !key || !drawn) return;
     if (!isBorder(drawn)) {
+      if (!SCALE_ARRIVAL) return;
       lifecycle.play(
         motionPoseKeyframes({ scale: 0.86, opacity: 0 }, { scale: 1, opacity: 1 }),
         motion.emit,
@@ -491,9 +521,16 @@ export function SelectionAnts({
       });
     };
 
-    // Marching pauses while a mark is in hand. A selection ring travelling on
-    // something the pointer is already moving is two motions describing one
-    // event, and the drag is the one the person is causing.
+    // Marching pauses while a mark is in hand — held, not dragged — unless
+    // the march-through experiment is on; see `MARCH_THROUGH_HOLD`.
+    //
+    // A drag cannot happen without a hold, so hanging this off `dragstart`
+    // only meant the march survived the part of the gesture where the mark
+    // was already under the pointer and already about to move. Held is the
+    // thing a person did; the drag is what they may or may not go on to do
+    // with it — the same move the fan made in WorldCanvas, off the same
+    // `node:pointerdown`. The release is the window's, because a hold can
+    // end anywhere: off the mark, off the canvas, or cancelled outright.
     const grip = (grabbed: boolean) => () => {
       path.classList.toggle("is-held", grabbed);
     };
@@ -503,8 +540,19 @@ export function SelectionAnts({
     const observer = new ResizeObserver(schedule);
     const container = graph.getCanvas().getContainer();
     if (container) observer.observe(container);
-    graph.on("node:dragstart", grab);
-    graph.on("node:dragend", release);
+    // The spread field's own announcement. Fan frames write straight into
+    // the renderer and emit nothing G6 hears — no draw, no transform — so
+    // without this a label the fan moved kept the box from where it stood.
+    // `schedule` coalesces the frames to one retrace each.
+    if (container) container.addEventListener(SPREAD_FRAME_EVENT, schedule);
+    if (!MARCH_THROUGH_HOLD) {
+      graph.on("node:pointerdown", grab);
+      window.addEventListener("pointerup", release);
+      window.addEventListener("pointercancel", release);
+      // Switching away mid-hold delivers no pointerup.
+      window.addEventListener("blur", release);
+    }
+    retrace.current = schedule;
     graph.on("node:drag", schedule);
     graph.on("aftertransform", schedule);
     graph.on("afterdraw", schedule);
@@ -519,18 +567,38 @@ export function SelectionAnts({
       attributeFilter: ["class"],
     });
     update();
+    /**
+     * And once more after the paint, for what the canvas applies late.
+     *
+     * This overlay's effects run before its canvas's: a restyle the same
+     * commit authored — a restationed label above all — lands after the trace
+     * above read. The scheduled pass re-reads once the frame has settled, so
+     * the box ends where the plate now stands rather than where it stood. The
+     * first trace still lands pre-paint, so nothing flickers between them.
+     */
+    schedule();
 
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
+      if (container) container.removeEventListener(SPREAD_FRAME_EVENT, schedule);
       classes.disconnect();
-      graph.off("node:dragstart", grab);
-      graph.off("node:dragend", release);
+      graph.off("node:pointerdown", grab);
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", release);
+      window.removeEventListener("blur", release);
+      if (retrace.current === schedule) retrace.current = null;
       graph.off("node:drag", schedule);
       graph.off("aftertransform", schedule);
       graph.off("afterdraw", schedule);
     };
   }, [clearance, dotGap, drawn, graph, lifecycle, lineWidth, speed]);
+
+  // Only a retrace, scheduled past the canvas's own commit — the token
+  // changes on every hover, so it must not rebuild the tracer.
+  useEffect(() => {
+    retrace.current?.();
+  }, [traceToken]);
 
   if (!drawn) return null;
 
@@ -542,7 +610,7 @@ export function SelectionAnts({
           lifecycle.ref.current = element;
         }}
         className={`ants__mark${speed <= 0 ? " is-still" : ""}${
-          contactHeld ? " is-held" : ""
+          contactHeld && !MARCH_THROUGH_HOLD ? " is-held" : ""
         }`}
         d=""
         pathLength={100}

@@ -94,10 +94,26 @@ export async function panToElement(
   const visibleBottom = height - insets.bottom;
   if (visibleRight - visibleLeft < 48 || visibleBottom - visibleTop < 48) return;
 
-  const destX = (visibleLeft + visibleRight) / 2;
-  const destY = (visibleTop + visibleBottom) / 2;
+  // Reveal, not recenter. The mark comes inside the margin by the shortest
+  // path, and a mark already showing holds the camera still — centering here
+  // slid the whole field on every table click, which read as the labels
+  // moving rather than the camera. The margin shrinks with the view so a
+  // small window still has somewhere to bring things.
+  const margin = Math.min(
+    80,
+    (visibleRight - visibleLeft) / 4,
+    (visibleBottom - visibleTop) / 4,
+  );
   const start = graph.getViewportByCanvas(target);
-  const travelled = Math.hypot(destX - start[0], destY - start[1]);
+  let dx = 0;
+  let dy = 0;
+  if (start[0] < visibleLeft + margin) dx = visibleLeft + margin - start[0];
+  else if (start[0] > visibleRight - margin) dx = visibleRight - margin - start[0];
+  if (start[1] < visibleTop + margin) dy = visibleTop + margin - start[1];
+  else if (start[1] > visibleBottom - margin) dy = visibleBottom - margin - start[1];
+  const destX = start[0] + dx;
+  const destY = start[1] + dy;
+  const travelled = Math.hypot(dx, dy);
   if (travelled < 2) return;
 
   cancelPan(graph);
@@ -159,6 +175,13 @@ export function useFocusPan(
   focusId: string | null | undefined,
   focusToken: number,
   insetsRef: RefObject<CameraInsets>,
+  /**
+   * Hold the room's camera recorder across the flight, when the room keeps
+   * one. A flight ends at a mark the next visit will not have selected, so
+   * its endpoint must not spend the framing the person left — see
+   * `cameraMemory`.
+   */
+  holdCamera?: () => () => void,
 ) {
   const tokenRef = useRef(focusToken);
   useEffect(() => {
@@ -206,12 +229,17 @@ export function useFocusPan(
         });
       }
       if (cancelled || !id || tokenRef.current !== focusToken) return;
-      await panToElement(graph, id, insetsRef.current);
+      const release = holdCamera?.();
+      try {
+        await panToElement(graph, id, insetsRef.current);
+      } finally {
+        release?.();
+      }
     };
 
     void run();
     return () => {
       cancelled = true;
     };
-  }, [focusId, focusToken, graphRef, insetsRef, ready]);
+  }, [focusId, focusToken, graphRef, insetsRef, ready, holdCamera]);
 }

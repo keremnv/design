@@ -33,8 +33,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Graph } from "@antv/g6";
 import {
-  BOND_LABEL_ALONG_PX,
+  bondFilament,
+  bondPlateAlong,
+  roleEnds,
   spokeLabelStation,
+  BOND_LABEL_ALONG_PX,
   BOND_LABEL_STACK_MAX,
   SPOKE_LABEL_ALONG_PX,
   bondLabelLayout,
@@ -52,8 +55,14 @@ import {
   plateRim,
   shelfNode,
   spokeEdge,
+  spokeFilament,
   summaryEdge,
+  MARK_DEPTH_STEP,
+  NAME_RANK_SPAN,
+  PAINT_LAYER_MARK,
+  PAINT_LAYER_NAME,
   type MarkParams,
+  type Paint,
 } from "./marks";
 import {
   GRAPH_DNA_INTERACTION,
@@ -85,13 +94,38 @@ import {
   reflected,
   type LightField,
 } from "../styles/light";
-import { ensureWorldFilamentRegistered } from "./filaments";
+import {
+  ensureWorldFilamentRegistered,
+  filamentLabelAnchor,
+  type RoleEnds,
+} from "./filaments";
 import { labelUnderPointer } from "./labelPick";
-import { createSpreadField, type SpreadField } from "./spread";
+import {
+  createSpreadField,
+  SPREAD_FRAME_EVENT,
+  spreadOwnerForSelection,
+  spreadYieldsToHold,
+  type SpreadField,
+  type SpreadYieldScope,
+} from "./spread";
+import {
+  compareRanks,
+  paintedLabelBox,
+  paintedMarkBox,
+  resolveVisibility,
+  stampLabelStrength,
+  visibilityKindOf,
+  VISIBILITY_STRENGTHS_ON,
+  type VisibilityBox,
+  type VisibilityOccluder,
+  type VisibilityRank,
+} from "./visibility";
 import { hopsFrom } from "./hops";
 import { SelectionAnts, type AntTarget } from "../styles/SelectionAnts";
 import { observeHostSize } from "./canvasHost";
 import {
+  convergeStrandedToFrame,
+  paintLabelStrength,
   restyleCanvasData,
   transitionCanvasData,
   type CanvasData,
@@ -103,6 +137,13 @@ import {
   type CameraInsets,
 } from "./canvasFocus";
 import type { FieldBond, WorkingSet } from "./workingSet";
+import {
+  paintDepths,
+  plateSeatClear,
+  rankedDepths,
+  restackTop,
+} from "./workingSet";
+import { createCameraRecorder, type CameraRecorder } from "./cameraMemory";
 import {
   assertionShown,
   unsettled,
@@ -145,21 +186,59 @@ function subjectOfBundle(elementId: string): string | null {
  * The mark an element belongs to.
  *
  * Three suffixes and prefixes this surface adds on its own: a spoke carries
- * its index (`demand#0:1`), a filament is namespaced (`bond:…`), and furniture
- * hangs off its chip (`shelf:…`, `crown:…`). None of them are marks a reader
- * deals in, so anything asking *what is this part of* — a click, a hover, or
- * how much light falls on it — goes through here.
+ * its index (`demand#0:1`), a filament is namespaced (`bond:…`, with the
+ * shared stroke under `filament:…`), and furniture hangs off its chip
+ * (`shelf:…`, `crown:…`). None of them are marks a reader deals in, so
+ * anything asking *what is this part of* — a click, a hover, or how much
+ * light falls on it — goes through here.
  */
 export function markOfElement(elementId: string): string {
   const withoutIndex = elementId.replace(/:\d+$/, "");
   const withoutBond = subjectOfBond(withoutIndex);
-  return isDecoration(withoutBond)
-    ? withoutBond.slice(withoutBond.indexOf(":") + 1)
+  const withoutFilament = withoutBond.startsWith("filament:")
+    ? withoutBond.slice(9)
     : withoutBond;
+  return isDecoration(withoutFilament)
+    ? withoutFilament.slice(withoutFilament.indexOf(":") + 1)
+    : withoutFilament;
 }
 
 function subjectOfBond(elementId: string): string {
   return elementId.startsWith("bond:") ? elementId.slice(5) : elementId;
+}
+
+/**
+ * One label's visibility rank from the attention subjects.
+ *
+ * The single place the field rank is computed: the strength pass settles ink
+ * from it and the frame author stamps paint order from it, so the two systems
+ * cannot disagree on who outranks whom. Lane-local, because the mapping from
+ * element id to mark is this lane's own — the schema lane maps its own ids
+ * to the same `VisibilityRank` shape.
+ */
+export function rankOfLabel(
+  elementId: string,
+  labelFontFamily: unknown,
+  subjects: {
+    selection: string | null;
+    hover: string | null;
+    named: Set<string> | null;
+  },
+): VisibilityRank {
+  const owner = subjectOfBundle(elementId) ?? subjectOfBond(elementId);
+  // A mark may itself end in a number. Match attention against its whole
+  // address before interpreting a trailing number as a spoke index.
+  const directlyNamed =
+    owner === subjects.selection ||
+    owner === subjects.hover ||
+    subjects.named?.has(owner);
+  const mark = directlyNamed ? owner : markOfElement(elementId);
+  return {
+    selection: mark === subjects.selection,
+    hover: mark === subjects.hover,
+    named: subjects.named?.has(mark) ?? false,
+    kind: visibilityKindOf(labelFontFamily),
+  };
 }
 
 /** Press and drag are node-local; edges and labels stay at rest until release. */
@@ -280,13 +359,29 @@ export type MaterialTuning = {
 };
 
 export const MATERIAL_DEFAULTS: MaterialTuning = {
-  contact: true,
+  // Temporarily off: no press compression on nodes or their labels. The
+  // mechanics stay (`animateContact`, `pressScale`) so this comes back by
+  // flipping this to `true`; the lab can still opt a surface back in.
+  contact: false,
   pressScale: 0.96,
 };
 
 function reducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
+
+/**
+ * Which presses put the fan down while the pointer owns the field.
+ *
+ * The fan's own mark and its immediate neighbours: pressing the selected
+ * mark to move it drops the fan for the gesture, the way it always did,
+ * and so does pressing the other endpoint of one of its strokes, whose
+ * drag pulls the geometry the elbows were solved for — see the note on the
+ * `node:pointerdown` handler. `"owner"` keeps the fan up under a
+ * neighbour's drag; `"any"` restores the old answer for every mark;
+ * `"none"` switches the behaviour off entirely.
+ */
+const SPREAD_YIELDS_TO_HOLD: SpreadYieldScope = "neighbourhood";
 
 type MaterialAnimation = {
   currentTime: number | null;
@@ -313,6 +408,7 @@ type CanvasFrame = {
   nodes: CanvasDatum[];
   edges: CanvasDatum[];
   animateInitial: boolean;
+  still: boolean;
   fieldIds: Set<string>;
   /**
    * This frame re-places matter that was already standing, because a person
@@ -340,7 +436,9 @@ export function WorldCanvas({
   focusId = null,
   focusToken = 0,
   arrangeToken = 0,
+  foldSeed = null,
   animateInitial = false,
+  still = false,
   insets,
   ants,
   motion = DEFAULT_MOTION_PLANS,
@@ -348,11 +446,12 @@ export function WorldCanvas({
   selectionTreatment = SELECTION_TREATMENT_DEFAULT,
   spreadOnSelect = true,
   light,
+  world = null,
+  revision = null,
   onHover,
   onSelect,
   onPositions,
   onRemove,
-  onCrowded,
 }: {
   set: WorkingSet;
   mode: ThemeMode;
@@ -371,8 +470,24 @@ export function WorldCanvas({
    * have to be unset by whoever set it.
    */
   arrangeToken?: number;
+  /**
+   * The claim whose fold this frame answers, if the last act was an opening.
+   *
+   * The store seats the plate on the line's midpoint; the canvas reseats it
+   * once where the bond's name actually stood, which a fan may have carried
+   * elsewhere. Newborn-gated on the drawn ids rather than consumed, so a
+   * rebuilt frame reseats the same way and a stale seed is a no-op.
+   */
+  foldSeed?: { id: string } | null;
   /** The first mark was just requested, rather than restored from memory. */
   animateInitial?: boolean;
+  /**
+   * Draw arrivals in this render without their lifecycle — a bulk add's pages
+   * land as data, and the loading state lives on the control that asked for
+   * them. Read where the frame is built, like `arranged`: the pump coalesces,
+   * so a ref read at draw time could only say what the latest render wants.
+   */
+  still?: boolean;
   insets: CameraInsets;
   /**
    * The selection ring's tuning, for a surface that exists to tune it.
@@ -415,20 +530,24 @@ export function WorldCanvas({
    * much of the world remains readable where it does not.
    */
   light?: Partial<LightField>;
+  /** World identity for the camera store; null until the overview lands. */
+  world?: string | null;
+  revision?: number | null;
   onHover: (id: string | null) => void;
   onSelect: (selection: CanvasSelection) => void;
-  onPositions: (positions: Map<string, { x: number; y: number }>) => void;
-  /** Right-click takes a mark off the field. */
-  onRemove: (selection: NonNullable<CanvasSelection>) => void;
+  onPositions: (
+    positions: Map<string, { x: number; y: number }>,
+    droppedId?: string,
+  ) => void;
   /**
-   * The fan could not clear every name on the mark being held.
+   * A right-button press landed on a mark: take it off the field, at once.
    *
-   * A reading condition, not a fact about the world: it belongs to this
-   * drawing at this moment and it goes away when the reading does. Handed up
-   * as a boolean rather than as prose, because what to say about it is the
-   * page's business, not the canvas's.
+   * Removal begins on the hold, not the release — a tap, a click and a long
+   * hold all remove, because the press is the decision and there is nothing
+   * to stage for. The collapse plays from the set change; the release after
+   * it has nothing further to do.
    */
-  onCrowded?: (crowded: boolean) => void;
+  onRemove: (selection: NonNullable<CanvasSelection>) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<Graph | null>(null);
@@ -555,6 +674,29 @@ export function WorldCanvas({
    * has dropped keys it never wrote.
    */
   const authoredRef = useRef<CanvasData | null>(null);
+  /**
+   * What the visibility pass remembers per label.
+   *
+   * The strength it settled on last, and the authored base it multiplies —
+   * the builder's own `labelFillOpacity`, recorded at build time, because a
+   * base re-derived from a value the pass already dimmed would compound the
+   * whisper every frame. The builder stamps `base × strength` onto each new
+   * frame so a transition paints strengths directly instead of flashing full
+   * and yielding after; the pass owns everything between draws.
+   */
+  const labelStrengthsRef = useRef(new Map<string, { strength: number; base: number }>());
+  /**
+   * Who the names are ranked from, for passes that run outside a render.
+   *
+   * The pass runs after the pump draws and under the fan — neither is a
+   * render — so it reads the lit subjects through here rather than closing
+   * over them. Mirrored below, beside `namedMarks`.
+   */
+  const visibilitySubjectsRef = useRef<{
+    hover: string | null;
+    selection: string | null;
+    named: Set<string> | null;
+  }>({ hover: null, selection: null, named: null });
   /** The arrangement this canvas has already drawn. */
   const drawnArrangeToken = useRef(0);
   const drawLaneRef = useRef<Promise<void>>(Promise.resolve());
@@ -581,14 +723,27 @@ export function WorldCanvas({
    * the draw it started from. The draw decides; the drag reads.
    */
   const stationsRef = useRef<ReadonlyMap<string, Station>>(new Map());
+  /**
+   * The role names each bond clears, by assertion.
+   *
+   * `roleEnds` builds a fresh object every call, and the restyle lane
+   * compares style values by identity — so an uncached call would read as
+   * changed on every frame and re-render every bond's roles on every hover.
+   * The names depend on the set, the paint, and the params, so the cache
+   * lives exactly as long as all three stand still.
+   */
+  const roleEndsCacheRef = useRef(new Map<string, RoleEnds>());
+  const roleEndsScopeRef = useRef<{
+    set: WorkingSet;
+    paint: Paint;
+    params: MarkParams;
+  } | null>(null);
   const onHoverRef = useRef(onHover);
   const onSelectRef = useRef(onSelect);
   const onRemoveRef = useRef(onRemove);
-  const onCrowdedRef = useRef(onCrowded);
   onHoverRef.current = onHover;
   onSelectRef.current = onSelect;
   onRemoveRef.current = onRemove;
-  onCrowdedRef.current = onCrowded;
   /**
    * Positions the renderer currently has, including a drag in flight.
    *
@@ -617,27 +772,69 @@ export function WorldCanvas({
    * answers one question, asked only while the pointer is on a name.
    */
   const stationMemory = useRef<StationMemory>(new Map());
+  /**
+   * This room's camera, kept level with the store — see `cameraMemory`. Null
+   * until the world identity lands; the draw lane and listeners below read it
+   * through the ref so they never hold a stale recorder.
+   */
+  const recorder = useMemo(
+    () =>
+      world != null && revision != null
+        ? createCameraRecorder("field", world, revision)
+        : null,
+    [world, revision],
+  );
+  const recorderRef = useRef<CameraRecorder | null>(null);
+  recorderRef.current = recorder;
+  useEffect(() => () => recorder?.dispose(), [recorder]);
+  const holdCamera = useCallback(
+    () => recorderRef.current?.hold() ?? (() => {}),
+    [],
+  );
   const draggingRef = useRef(false);
   const spreadFieldRef = useRef<SpreadField | null>(null);
   const spreadOnSelectRef = useRef(spreadOnSelect);
   spreadOnSelectRef.current = spreadOnSelect;
   /**
    * The node that owns the current fan. It can differ from `selection` when a
-   * person selects one of the binary labels revealed by that fan: the label is
-   * the selected assertion, but the node is still what keeps the fan open.
+   * person picks one of the binary labels revealed by that fan on the canvas:
+   * the label is the selected assertion, but the node is still what keeps
+   * the fan open. Travel — a roster row, a table row, the finder — takes
+   * ownership itself instead: arriving somewhere new must not leave the old
+   * mark's fan bent behind it.
    */
   const spreadOwnerRef = useRef<string | null>(null);
-  /** Set only by a label click, so other assertion selections close the fan. */
-  const preserveSpreadOwnerRef = useRef<string | null>(null);
+  /**
+   * The mark the canvas itself just picked, consumed by the selection effect
+   * below. A canvas label pick keeps the fan that revealed it, so the name
+   * stays put under its own outline and the pointer that just landed on it;
+   * anything that reaches the selection without passing through here is
+   * travel, and travel closes what it leaves. Set beside the two pick sites
+   * and nowhere else, cleared on every consume, so it can never go stale.
+   */
+  const labelPickRef = useRef<string | null>(null);
+  /**
+   * The selection the fan was last settled for. A re-run with the same key —
+   * a lab-switch flip, StrictMode's second pass, a re-select of what is
+   * already selected — re-asserts the standing owner instead of re-deciding
+   * it, so the fan never moves for a selection that did not.
+   */
+  const settledFanRef = useRef<string | null>(null);
+  /**
+   * Whether a press has put the fan down. Only the press ending picks it back
+   * up; until then nothing else may re-open it — not the draw a press's own
+   * hover change triggers, which re-committed the fan under the hand.
+   */
+  const spreadSuspendedRef = useRef(false);
   /** Whether the renderer exists yet, so the ants can be handed a live graph. */
   const [ready, setReady] = useState(false);
-  const paint = useMemo(() => paintOf(GRAPH_DNA_THEME[mode]), [mode]);
+  const paint = useMemo(() => paintOf(GRAPH_DNA_THEME[mode], mode === "dark"), [mode]);
   const tuning = useMemo<AntTuning>(
     () => ({ ...ANT_DEFAULTS, ...ants }),
     [ants],
   );
   const provisional = useMemo(
-    () => paintOf(GRAPH_DNA_PROVISIONAL_THEME[mode]),
+    () => paintOf(GRAPH_DNA_PROVISIONAL_THEME[mode], mode === "dark"),
     [mode],
   );
 
@@ -725,6 +922,11 @@ export function WorldCanvas({
     }
     return named;
   }, [hops, litHover, litSelection, set]);
+  visibilitySubjectsRef.current = {
+    hover: litHover,
+    selection: litSelection?.id ?? null,
+    named: namedMarks,
+  };
 
   /**
    * What the ants trace: the geometry the selected mark already has.
@@ -766,6 +968,25 @@ export function WorldCanvas({
     return null;
   }, [params.discDiameter, selection, selectionTreatment, set, show]);
 
+  /**
+   * Whether the ants' mark left the field with the selection, so the leave
+   * can stand down at once instead of handing a border back to a stroke that
+   * is never redrawn. Element ids arrive namespaced — a bond's plate most of
+   * all — so they go through the same mapping a click does.
+   */
+  const antsGone = useCallback(
+    (id: string): boolean => {
+      const mark = markOfElement(id);
+      return !(
+        set.referents.has(mark) ||
+        set.assertions.has(mark) ||
+        set.demands.has(mark) ||
+        set.bonds.some((bond) => bond.assertion_id === mark)
+      );
+    },
+    [set],
+  );
+
   const selectionArrivalDelay = useMemo(() => {
     const graph = graphRef.current;
     if (!ready || !selection || !graph || graph.destroyed) return 0;
@@ -802,6 +1023,39 @@ export function WorldCanvas({
     const edges: unknown[] = [];
     const paintFor = (_id: string, overlay = false) =>
       overlay ? provisional : paint;
+    const roleScope = roleEndsScopeRef.current;
+    if (
+      !roleScope ||
+      roleScope.set !== set ||
+      roleScope.paint !== paint ||
+      roleScope.params !== params
+    ) {
+      roleEndsScopeRef.current = { set, paint, params };
+      roleEndsCacheRef.current.clear();
+    }
+    /**
+     * The role names a bond clears — every bond, selected or not.
+     *
+     * The plate stands clear of its ends' names whether they are showing, so
+     * selecting a bond fades names in at room already kept for them instead
+     * of shoving the plate along the line. Cached: the builder hands back a
+     * fresh object every call, and the restyle lane reads a fresh identity
+     * as a change.
+     */
+    const rolesFor = (bond: FieldBond, bondPaint: Paint): RoleEnds => {
+      const cached = roleEndsCacheRef.current.get(bond.assertion_id);
+      if (cached) return cached;
+      const built = roleEnds(
+        {
+          source: bond.spokes.find((spoke) => spoke.id === bond.source)?.role ?? null,
+          target: bond.spokes.find((spoke) => spoke.id === bond.target)?.role ?? null,
+        },
+        bondPaint,
+        params,
+      );
+      roleEndsCacheRef.current.set(bond.assertion_id, built);
+      return built;
+    };
     const named = (id: string) => Boolean(namedMarks?.has(id));
     /**
      * Stations, not light — see `stationSubjects` above. A frame authored
@@ -874,7 +1128,37 @@ export function WorldCanvas({
       byEndpoints.set(key, group);
     }
     const stackByAssertion = new Map<string, { x: number; y: number }>();
-    const filamentCarrier = new Set<string>();
+    /**
+     * One station for a shared filament, by member assertion.
+     *
+     * Siblings resolving separately could split ends or stand at different
+     * distances out — a ragged stack whose members answered the same question
+     * differently, with the selected one jutting out to clear names only it
+     * shows. The group resolves once, off its first member, and the distance
+     * is the widest any member needs, roles included.
+     */
+    const groupLayoutByAssertion = new Map<
+      string,
+      {
+        near: Station;
+        station: number;
+        half: number;
+      }
+    >();
+    /**
+     * One stroke per pair of ends, on the layer below every plate — see
+     * `bondFilament` and `PAINT_LAYER_STROKE`. Collected here, prepended at
+     * the return, so the born order stays strokes-first within the layer;
+     * the layering itself is what keeps a later stroke off an earlier name.
+     */
+    const filaments: {
+      id: string;
+      source: string;
+      target: string;
+      paint: Paint;
+      /** Present on a spoke's stroke, which dots like its obligation. */
+      spoke?: { dotted: boolean };
+    }[] = [];
     /** Grouped claims are named by their group, not one at a time. */
     const namedBond = new Map<string, boolean>();
     /** Per endpoint-pair, the pose the drawn frame settled on. See below. */
@@ -895,6 +1179,8 @@ export function WorldCanvas({
       interactive: boolean;
       stack: { x: number; y: number };
       near: Station;
+      station: number;
+      half: number;
     }[] = [];
     for (const unsorted of byEndpoints.values()) {
       const group = [...unsorted].sort((a, b) =>
@@ -902,7 +1188,18 @@ export function WorldCanvas({
           `${b.relation}\u0000${b.assertion_id}`,
         ),
       );
-      if (group[0]) filamentCarrier.add(group[0].assertion_id);
+      if (group[0]) {
+        const first = group[0];
+        filaments.push({
+          id: `filament:${first.assertion_id}`,
+          source: first.source,
+          target: first.target,
+          paint: paintFor(
+            first.assertion_id,
+            unsettled(first.stale, first.completeness),
+          ),
+        });
+      }
       /**
        * Three states, not two, and selection is what crosses the second.
        *
@@ -926,6 +1223,49 @@ export function WorldCanvas({
        */
       const first = group[0];
       const grouped = group.length > 1 && Boolean(first);
+      // No fit test here: every intended name is laid out, and where boxes
+      // overlap the visibility pass dims the loser instead of hiding it — see
+      // `visibility.ts`. There is nothing to hold a seat against.
+      if (grouped && first) {
+        const near = stationOfBond(first);
+        let station = BOND_LABEL_ALONG_PX;
+        let half = 0;
+        for (const bond of group) {
+          const overlay = unsettled(bond.stale, bond.completeness);
+          station = Math.max(
+            station,
+            bondPlateAlong(
+              bond.relation,
+              rolesFor(bond, paintFor(bond.assertion_id, overlay)),
+              params,
+            ),
+          );
+          half = Math.max(half, chipWidth(bond.relation, params) / 2);
+        }
+        for (const bond of group) {
+          // The filament's memory, not each member's own.
+          stationMemory.current.set(bond.assertion_id, near);
+          stations.set(bondElementId(bond.assertion_id), near);
+          groupLayoutByAssertion.set(bond.assertion_id, { near, station, half });
+        }
+      } else if (first) {
+        // Alone on its filament, a bond is still laid out here: one record
+        // per filament, decided once, whether it carries one name or several.
+        // Its seat is trivially the station, so its fit settles now.
+        const bond = first;
+        const near = stationOfBond(bond);
+        const overlay = unsettled(bond.stale, bond.completeness);
+        const station = Math.max(
+          BOND_LABEL_ALONG_PX,
+          bondPlateAlong(
+            bond.relation,
+            rolesFor(bond, paintFor(bond.assertion_id, overlay)),
+            params,
+          ),
+        );
+        const half = chipWidth(bond.relation, params) / 2;
+        groupLayoutByAssertion.set(bond.assertion_id, { near, station, half });
+      }
       const isOpenBundle =
         first !== undefined && openedBundle === bundleElementId(first.assertion_id);
       /** The group hangs off the mark a person has chosen to work on. */
@@ -944,23 +1284,31 @@ export function WorldCanvas({
        */
       const groupNamed =
         group.some((bond) => named(bond.assertion_id)) || isOpenBundle;
-      const focus = litHover ?? litSelection?.id ?? null;
+      /**
+       * A selected claim holds its group open; hover can open one too but
+       * never closes what selection opened, or the selected plate folds away
+       * under its own outline as the pointer passes any other mark.
+       */
+      const selectedBond =
+        group.find((bond) => bond.assertion_id === selection?.id) ?? null;
       const opened =
         !grouped ||
         isOpenBundle ||
         onSelectedMark ||
-        group.some((bond) => bond.assertion_id === focus);
-      const shown = grouped && opened
-        ? group.slice(0, BOND_LABEL_STACK_MAX)
-        : group;
-      for (const bond of group) {
-        namedBond.set(
-          bond.assertion_id,
-          grouped
-            ? groupNamed && opened && shown.includes(bond)
-            : named(bond.assertion_id),
-        );
-      }
+        selectedBond !== null ||
+        (litHover !== null &&
+          group.some((bond) => bond.assertion_id === litHover));
+      /**
+       * The selected claim is always one of the plates drawn. Past the cap it
+       * takes the last seat, so a claim chosen from a table or roster is never
+       * outlined on a plate the stack is not showing.
+       */
+      const capped = group.slice(0, BOND_LABEL_STACK_MAX);
+      const seated =
+        selectedBond && !capped.includes(selectedBond)
+          ? [...capped.slice(0, -1), selectedBond]
+          : capped;
+      const shown = grouped && opened ? seated : group;
       // How far apart two plates on one filament stand: `bondLabelStep`.
       const step = bondLabelStep(params);
       // The stack centres on what is actually drawn, so a capped group is not
@@ -976,6 +1324,14 @@ export function WorldCanvas({
       shown.forEach((bond, index) => {
         stackByAssertion.set(bond.assertion_id, stepped(index - middle));
       });
+      for (const bond of group) {
+        namedBond.set(
+          bond.assertion_id,
+          grouped
+            ? groupNamed && opened && shown.includes(bond)
+            : named(bond.assertion_id),
+        );
+      }
       /**
        * What the drag path needs to restate this group, and could not derive.
        *
@@ -997,8 +1353,17 @@ export function WorldCanvas({
         },
       );
       if (grouped && first) {
-        const remainder = group.length - shown.length;
+        // Past the cap the stack is not showing the claim, and the count is
+        // what says so.
+        const remainder = group.filter(
+          (bond) => !shown.includes(bond),
+        ).length;
         const bundleNear = stationOfBond(first);
+        const label = opened
+          ? `+${remainder} more`
+          : `${group.length} assertions`;
+        const stack =
+          opened ? stepped(shown.length - middle) : { x: 0, y: 0 };
 
         bundles.push({
           id: bundleElementId(first.assertion_id),
@@ -1006,18 +1371,23 @@ export function WorldCanvas({
           target: first.target,
           // Opened, the count stops being a stand-in and becomes the one thing
           // the stack cannot say for itself: that it is not all of them.
-          label: opened
-            ? `+${remainder} more`
-            : `${group.length} assertions`,
+          label,
           shown: groupNamed && (!opened || remainder > 0),
           // Reachable whenever it is legible. Requiring a selection meant a
           // count that had appeared under the pointer, said how many claims it
           // stood for, and then would not answer being pointed at.
           interactive: !opened && groupNamed,
-          stack: opened ? stepped(shown.length - middle) : { x: 0, y: 0 },
+          stack,
           // The count stands where its claims stand, which means it asks the
           // same filament the same question rather than a global one.
           near: bundleNear,
+          // The count stands where its claims stand: same station, so the two
+          // halves of the fade happen in one place — but its own width, so a
+          // short count is not pushed out by the claims it stands in for.
+          station:
+            groupLayoutByAssertion.get(first.assertion_id)?.station ??
+            BOND_LABEL_ALONG_PX,
+          half: chipWidth(label, params) / 2,
         });
         stations.set(bundleElementId(first.assertion_id), bundleNear);
       }
@@ -1079,6 +1449,16 @@ export function WorldCanvas({
       // above says a person put it there. Both can be true of one chip — a
       // human verdict is still maintained by whatever derives from it — so
       // these are independent tests rather than a chain.
+      //
+      // Both withdraw with a hollowed plate: the one above just opened into
+      // its marching boundary, and a rule left standing beside an opened
+      // plate is the fill refusing to have gone. The restyle lane fades the
+      // withdrawal rather than cutting it — see `restyleCanvasData`.
+      const furnitureOpacity =
+        selectionTreatment === "hollow" &&
+        selection?.id === assertion.assertion_id
+          ? 0
+          : 1;
       if (assertion.mode === "DERIVED") {
         nodes.push(
           shelfNode(
@@ -1088,6 +1468,8 @@ export function WorldCanvas({
             assertion.relation,
             chipPaint,
             params,
+            "under",
+            furnitureOpacity,
           ),
         );
       }
@@ -1101,6 +1483,7 @@ export function WorldCanvas({
             chipPaint,
             params,
             "over",
+            furnitureOpacity,
           ),
         );
       }
@@ -1110,6 +1493,29 @@ export function WorldCanvas({
           `${assertion.assertion_id}:${index}`,
           spoke.id,
           assertion.assertion_id,
+        );
+        filaments.push({
+          id: `filament:${assertion.assertion_id}:${index}`,
+          source: spoke.id,
+          target: assertion.assertion_id,
+          paint: paintFor(assertion.assertion_id, overlay),
+          spoke: { dotted: false },
+        });
+        // Half the role's own plate, and the air it may spend to keep
+        // clear of the disc — past the middle if the name is wide
+        // enough to need it. See `spokeLabelStation`.
+        const { halfPlate, air } = spokeLabelStation(spoke.role, params);
+        const layout = bondLabelLayout(
+          at(spoke.id),
+          at(assertion.assertion_id),
+          near,
+          { x: 0, y: 0 },
+          params,
+          discRim(params),
+          plateRim(assertion.relation, params),
+          SPOKE_LABEL_ALONG_PX,
+          halfPlate,
+          air,
         );
         edges.push(
           spokeEdge(
@@ -1121,21 +1527,8 @@ export function WorldCanvas({
             {
               role: spoke.role,
               showRole: named(assertion.assertion_id),
-              labelPlacement: bondLabelLayout(
-                at(spoke.id),
-                at(assertion.assertion_id),
-                near,
-                { x: 0, y: 0 },
-                params,
-                discRim(params),
-                plateRim(assertion.relation, params),
-                SPOKE_LABEL_ALONG_PX,
-                // Half the role's own plate, and the air it may spend to keep
-                // clear of the disc — past the middle if the name is wide
-                // enough to need it. See `spokeLabelStation`.
-                spokeLabelStation(spoke.role, params).halfPlate,
-                spokeLabelStation(spoke.role, params).air,
-              ).placement,
+              labelPlacement: layout.placement,
+              bondAlong: layout.along,
             },
           ),
         );
@@ -1168,6 +1561,26 @@ export function WorldCanvas({
           spoke.id,
           demand.key,
         );
+        filaments.push({
+          id: `filament:${demand.key}:${index}`,
+          source: spoke.id,
+          target: demand.key,
+          paint: paintFor(demand.key),
+          spoke: { dotted: true },
+        });
+        const { halfPlate, air } = spokeLabelStation(spoke.role, params);
+        const layout = bondLabelLayout(
+          at(spoke.id),
+          at(demand.key),
+          near,
+          { x: 0, y: 0 },
+          params,
+          discRim(params),
+          plateRim(demand.relation, params),
+          SPOKE_LABEL_ALONG_PX,
+          halfPlate,
+          air,
+        );
         edges.push(
           spokeEdge(
             `${demand.key}:${index}`,
@@ -1178,19 +1591,8 @@ export function WorldCanvas({
             {
               role: spoke.role,
               showRole: named(demand.key),
-              dotted: true,
-              labelPlacement: bondLabelLayout(
-                at(spoke.id),
-                at(demand.key),
-                near,
-                { x: 0, y: 0 },
-                params,
-                discRim(params),
-                plateRim(demand.relation, params),
-                SPOKE_LABEL_ALONG_PX,
-                spokeLabelStation(spoke.role, params).halfPlate,
-                spokeLabelStation(spoke.role, params).air,
-              ).placement,
+              labelPlacement: layout.placement,
+              bondAlong: layout.along,
             },
           ),
         );
@@ -1201,7 +1603,13 @@ export function WorldCanvas({
       if (!set.referents.has(bond.source) || !set.referents.has(bond.target)) continue;
       if (!assertionShown(bond.origins ?? bond.origin, bond.mode, show)) continue;
       const overlay = unsettled(bond.stale, bond.completeness);
-      const near = stationOfBond(bond);
+      // A grouped bond stands where its filament stands — see the group loop.
+      // Resolving here as well would let siblings split ends again.
+      const shared = groupLayoutByAssertion.get(bond.assertion_id);
+      const near = shared?.near ?? stationOfBond(bond);
+      const bondPaint = paintFor(bond.assertion_id, overlay);
+      const roles = rolesFor(bond, bondPaint);
+      const along = shared?.station ?? bondPlateAlong(bond.relation, roles, params);
       const layout = bondLabelLayout(
         at(bond.source),
         at(bond.target),
@@ -1210,12 +1618,12 @@ export function WorldCanvas({
         params,
         discRim(params),
         discRim(params),
-        BOND_LABEL_ALONG_PX,
+        along,
         // Half its own plate, so a long relation name stands off the rim by
         // the same air a short one does instead of overlapping the disc.
-        chipWidth(bond.relation, params) / 2,
+        // Grouped, the widest member's: one stack, one station.
+        shared?.half ?? chipWidth(bond.relation, params) / 2,
       );
-      const bondPaint = paintFor(bond.assertion_id, overlay);
       const filament = filamentEdge(
         bondElementId(bond.assertion_id),
         bond.source,
@@ -1229,7 +1637,10 @@ export function WorldCanvas({
           labelPlacement: layout.placement,
           labelOffsetX: layout.offsetX,
           labelOffsetY: layout.offsetY,
-          carriesFilament: filamentCarrier.has(bond.assertion_id),
+          // Shown on selection; cleared always — see `rolesFor`.
+          roles: selection?.id === bond.assertion_id ? roles : null,
+          bondAlong: along,
+          bondHalf: shared?.half ?? chipWidth(bond.relation, params) / 2,
         },
       );
       /**
@@ -1278,6 +1689,10 @@ export function WorldCanvas({
         bundle.near,
         bundle.stack,
         params,
+        discRim(params),
+        discRim(params),
+        bundle.station,
+        bundle.half,
       );
       edges.push(
         summaryEdge(bundle.id, bundle.source, bundle.target, paint, params, {
@@ -1287,6 +1702,8 @@ export function WorldCanvas({
           placement: station.placement,
           offsetX: station.offsetX,
           offsetY: station.offsetY,
+          bondAlong: bundle.station,
+          bondHalf: bundle.half,
         }),
       );
     }
@@ -1352,8 +1769,166 @@ export function WorldCanvas({
       );
       if (plate?.style) plate.style.lineWidth = 0;
     }
+    /**
+     * A bond's plate opens the same way. Its box is the edge label's
+     * background rect, so the withdrawal is restated in label channels: the
+     * fill goes to the canvas and the name reads in ink, whatever origin
+     * filled it — the marching boundary is then the plate's only border.
+     */
+    if (antTarget && antTarget.shape === "edge-label") {
+      const edge = (
+        edges as { id: string; style?: Record<string, unknown> }[]
+      ).find((item) => item.id === antTarget.id);
+      if (edge?.style) {
+        edge.style.labelBackgroundFill = paint.canvas;
+        edge.style.labelBackgroundOpacity = 1;
+        edge.style.labelFill = paint.ink;
+      }
+    }
     groupPosesRef.current = groupPoses;
     stationsRef.current = stations;
+    edges.unshift(
+      ...filaments.map((stroke) =>
+        stroke.spoke
+          ? spokeFilament(
+              stroke.id,
+              stroke.source,
+              stroke.target,
+              stroke.paint,
+              params,
+              { dotted: stroke.spoke.dotted },
+            )
+          : bondFilament(stroke.id, stroke.source, stroke.target, stroke.paint, params),
+      ),
+    );
+    // Strengths, stated, so a draw paints what the pass settled rather
+    // than flashing full and yielding after — see `stampLabelStrength`.
+    for (const datum of [...nodes, ...edges] as {
+      id: string;
+      style?: Record<string, unknown>;
+    }[]) {
+      stampLabelStrength(datum, labelStrengthsRef.current);
+    }
+    /**
+     * Depth, stated: drops restack within the mark layer — see `restack`.
+     *
+     * G6 fronts the held mark for the gesture and the drop's redraw would
+     * otherwise sink it back to its creation slot, behind whatever it now
+     * overlaps. Ranked, not sequenced: the fractions always land strictly
+     * between the mark layer and the name layer however many drops land, so
+     * no normalization pass ever owes anyone a visit. Marks with no entry
+     * keep the layer's own `zIndex` and paint in creation order behind every
+     * restacked mark — an empty stack is exactly today's drawing.
+     */
+    const nodeById = new Map(
+      (nodes as { id: string; style?: Record<string, unknown> }[]).map(
+        (datum) => [datum.id, datum] as const,
+      ),
+    );
+    const stackedDepths = rankedDepths(
+      set.depth,
+      (nodes as { id: string }[]).map((datum) => datum.id),
+    );
+    // Stamped verbatim: these numbers are the drops' own record, and
+    // restating anything else's is the reshuffle step two killed.
+    const depthPaint = paintDepths(set.depth);
+    for (const { id } of stackedDepths) {
+      const style = nodeById.get(id)?.style;
+      const z = depthPaint.get(id);
+      if (!style || z === undefined) continue;
+      style.zIndex = z;
+    }
+    const stackedCount = stackedDepths.length;
+    /**
+     * Labels sink with occluded owners, and rise with rank.
+     *
+     * A label at the name layer paints over every mark, including one
+     * stacked above the mark it names — a hidden plate impersonating the
+     * disc hiding it. So a labeled edge lifts half a drop step above its
+     * fronter endpoint: over its own marks, under any mark stacked above
+     * them, because the next band up is always at least a step away. A
+     * fixed lift, not half the band it stands in — a new top landing
+     * overhead must not move it, and half the band would halve with every
+     * ceiling the stack climbs toward. Past eighty-nine stacked marks the
+     * dense bands narrow below a step, and the lift takes half the band
+     * instead: the same floor the marks stand on. Strictly between the
+     * bands by construction, and the span cap keeps the topmost label below
+     * the names. Unlabeled strokes keep the stroke layer — they never
+     * needed to beat a mark.
+     *
+     * Within the lift, rank decides: the labels sort strongest-first by the
+     * same `rankOfLabel` the strength pass settles, so the brighter of two
+     * overlapping names is also the one on top. Endpoint depth still
+     * dominates — rank only orders labels that share a base — because a
+     * bright plate over the disc hiding its endpoint would be the same
+     * impersonation. With no restack every label shares the name layer as
+     * its base, and rank orders the whole field instead of creation order.
+     */
+    const rankSubjects = visibilitySubjectsRef.current;
+    const rankShare = new Map(
+      (
+        edges as {
+          id: string;
+          style?: Record<string, unknown>;
+        }[]
+      )
+        .filter(
+          (edge) =>
+            typeof edge.style?.labelText === "string" && edge.style.labelText,
+        )
+        .map((edge) => ({
+          id: edge.id,
+          rank: rankOfLabel(edge.id, edge.style?.labelFontFamily, rankSubjects),
+        }))
+        .sort(
+          (a, b) =>
+            compareRanks(a.rank, b.rank) ||
+            (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+        )
+        .map(
+          (entry, index, all) =>
+            [entry.id, (all.length - index) / all.length] as const,
+        ),
+    );
+    const markZ = new Map<string, number>();
+    for (const datum of nodes as {
+      id: string;
+      style?: Record<string, unknown>;
+    }[]) {
+      const z = datum.style?.zIndex;
+      markZ.set(datum.id, typeof z === "number" ? z : PAINT_LAYER_MARK);
+    }
+    // Half the room above the base, capped at half a drop step — the cap
+    // is what keeps a new top from moving every label standing under it.
+    const liftOver = (over: number): number => {
+      let next = PAINT_LAYER_NAME;
+      for (const z of markZ.values()) {
+        if (z > over && z < next) next = z;
+      }
+      return Math.min(MARK_DEPTH_STEP / 2, (next - over) / 2);
+    };
+    for (const edge of edges as {
+      id: string;
+      source?: unknown;
+      target?: unknown;
+      style?: Record<string, unknown>;
+    }[]) {
+      const style = edge.style;
+      if (!style) continue;
+      if (typeof style.labelText !== "string" || !style.labelText) continue;
+      const over = stackedCount
+        ? Math.max(
+            typeof edge.source === "string"
+              ? (markZ.get(edge.source) ?? PAINT_LAYER_MARK)
+              : PAINT_LAYER_MARK,
+            typeof edge.target === "string"
+              ? (markZ.get(edge.target) ?? PAINT_LAYER_MARK)
+              : PAINT_LAYER_MARK,
+          )
+        : PAINT_LAYER_NAME;
+      const lift = stackedCount ? liftOver(over) : NAME_RANK_SPAN;
+      style.zIndex = over + lift * (rankShare.get(edge.id) ?? 1);
+    }
     return { nodes, edges };
   }, [
     set,
@@ -1399,7 +1974,15 @@ export function WorldCanvas({
   }, [openedBundle, set]);
 
   /** Dragged positions belong to the person, so they are read back before use. */
-  const harvest = useCallback(() => {
+  /**
+   * Read the renderer's places back into the store, naming what was dropped.
+   *
+   * The dropped id travels with the positions so the page can restack it in
+   * the same set — positions and depth land in one frame, and the drop's own
+   * transition paints both. Whether the drop moved anything is the page's
+   * call: it holds the stored places to compare against.
+   */
+  const harvest = useCallback((droppedId?: string) => {
     const graph = graphRef.current;
     if (!graph) return;
     const out = new Map<string, { x: number; y: number }>();
@@ -1422,8 +2005,25 @@ export function WorldCanvas({
     }
     if (!out.size) return;
     liveRef.current = new Map([...liveRef.current, ...out]);
-    onPositions(out);
+    onPositions(out, droppedId);
   }, [onPositions]);
+
+  /**
+   * Whether a drag actually moved its mark, read after `harvest`.
+   *
+   * The harvest has just written where the renderer put everything, and the
+   * store still says where it was — the acknowledgement has not rendered yet.
+   * Equal means the gesture drew nothing, so whatever the release owes the
+   * field has to happen now; different means a draw is coming for it.
+   */
+  const dragMoved = (id: string | null): boolean => {
+    if (!id) return false;
+    const live = liveRef.current.get(id);
+    const stored = setRef.current.positions.get(id);
+    return (
+      !!live && !!stored && (live.x !== stored.x || live.y !== stored.y)
+    );
+  };
 
   /**
    * Bring a frame that waited out a drag up to where the drag actually ended.
@@ -1481,6 +2081,121 @@ export function WorldCanvas({
   const contactHoldsLane = (phase: ContactState["phase"]) =>
     phase === "pressed" || phase === "dragging";
 
+  /**
+   * Settle which names read at full strength, off the drawing in front of
+   * the reader.
+   *
+   * The boxes are painted ones — fans, fonts and stations already accounted
+   * for — so this runs after a draw lands and under the fan (see
+   * `SPREAD_FRAME_EVENT` below), never from a render. Only changed strengths
+   * are written, and they go three places at once: the live text (through
+   * `paintLabelStrength`, on the strength channel naming never touches), the
+   * G6 store (so it keeps telling the truth), and the authored baseline (so
+   * the next restyle diffs against what is actually painted rather than
+   * restating yesterday's strengths as a change).
+   *
+   * A label whose box cannot be read keeps its last strength: an unlaid name
+   * is not a lost contest. Strengths for elements that left the frame are
+   * dropped, so a returning name re-contests rather than inheriting a
+   * whisper from a crowd that is gone.
+   */
+  const applyVisibility = useCallback((graph: Graph) => {
+    const frame = authoredRef.current;
+    if (!frame || graph.destroyed) return;
+    const remembered = labelStrengthsRef.current;
+    const standing = new Set([...frame.nodes, ...frame.edges].map((datum) => datum.id));
+    for (const id of [...remembered.keys()]) {
+      if (!standing.has(id)) remembered.delete(id);
+    }
+    let settled: Map<string, number>;
+    if (VISIBILITY_STRENGTHS_ON) {
+      const subjects = visibilitySubjectsRef.current;
+      const boxes: VisibilityBox[] = [];
+      const ranks = new Map<string, VisibilityRank>();
+      const depths = new Map<string, number>();
+      for (const datum of [...frame.nodes, ...frame.edges]) {
+        const style = datum.style as Record<string, unknown> | undefined;
+        if (!style) continue;
+        if (typeof style.labelText !== "string" || !style.labelText) continue;
+        const shown = (style.labelOpacity as number | undefined) ?? 1;
+        if (!(shown > 0)) continue;
+        const box = paintedLabelBox(graph, datum.id);
+        if (!box) continue;
+        boxes.push({ id: datum.id, ...box });
+        ranks.set(datum.id, rankOfLabel(datum.id, style.labelFontFamily, subjects));
+        if (typeof style.zIndex === "number") depths.set(datum.id, style.zIndex);
+      }
+      // What the names are under: a label fully covered by a mark standing
+      // above it leaves the fight — see `resolveVisibility`. Bodies only, and
+      // authored depth, the same numbers the frame stamped.
+      const occluders: VisibilityOccluder[] = [];
+      for (const datum of frame.nodes) {
+        const style = datum.style as Record<string, unknown> | undefined;
+        const z = typeof style?.zIndex === "number" ? style.zIndex : PAINT_LAYER_MARK;
+        const mark = paintedMarkBox(graph, datum.id);
+        if (mark) occluders.push({ ...mark, z });
+      }
+      const prev = new Map(
+        [...remembered].map(([id, record]) => [id, record.strength] as const),
+      );
+      settled = resolveVisibility(boxes, ranks, prev, {
+        occluders,
+        depths,
+      });
+    } else {
+      // Strengths off: every standing name reads at its full authored
+      // strength. Anything still dimmed from before the switch restores
+      // through the normal paint below; afterwards this settles nothing.
+      settled = new Map(
+        [...remembered.keys()].map((id) => [id, 1] as const),
+      );
+    }
+    const byId = new Map<string, { datum: CanvasDatum; node: boolean }>();
+    for (const datum of frame.nodes) byId.set(datum.id, { datum, node: true });
+    for (const datum of frame.edges) byId.set(datum.id, { datum, node: false });
+    const nodePatches: CanvasDatum[] = [];
+    const edgePatches: CanvasDatum[] = [];
+    const paint: { id: string; from: number; to: number }[] = [];
+    for (const [id, strength] of settled) {
+      const record = remembered.get(id);
+      if ((record?.strength ?? 1) === strength) continue;
+      const entry = byId.get(id);
+      const style = entry?.datum.style as Record<string, unknown> | undefined;
+      if (!entry || !style) continue;
+      const base =
+        record?.base ??
+        (typeof style.labelFillOpacity === "number" ? style.labelFillOpacity : 1);
+      remembered.set(id, { strength, base });
+      // The baseline carries what is painted — see above.
+      style.labelFillOpacity = base * strength;
+      // A drag owns the live position. Writing the whole authored datum here
+      // would put its old coordinates back into G6's store between moves.
+      // But an edge patch without a numeric zIndex makes G6 rewrite the
+      // edge's depth from its endpoints (`runtime/data.js` sets it to the
+      // fronter end minus one), sinking the name to the stroke layer — so
+      // the authored depth rides along. Nodes skip that rewrite on update.
+      const patchStyle: Record<string, unknown> = {
+        labelFillOpacity: base * strength,
+      };
+      if (!entry.node && typeof style.zIndex === "number") {
+        patchStyle.zIndex = style.zIndex;
+      }
+      (entry.node ? nodePatches : edgePatches).push({ id, style: patchStyle });
+      paint.push({ id, from: base * (record?.strength ?? 1), to: base * strength });
+    }
+    if (!paint.length) return;
+    if (nodePatches.length) graph.updateNodeData(nodePatches as never);
+    if (edgePatches.length) graph.updateEdgeData(edgePatches as never);
+    const plans = motionRef.current;
+    // Pointer travel already supplies the motion. Restarting a fade at each
+    // position makes strength trail the hand and settle only after release.
+    const tracking = draggingRef.current || reducedMotion();
+    paintLabelStrength(graph, paint, {
+      weakenPlan: tracking ? undefined : plans.absorb,
+      restorePlan: tracking ? undefined : plans.emit,
+    });
+  }, []);
+
   const queueCanvasDraw = useCallback(() => {
     const scheduledGraph = graphRef.current;
     if (
@@ -1495,6 +2210,9 @@ export function WorldCanvas({
         const graph = graphRef.current;
         if (!graph || graph !== scheduledGraph || graph.destroyed) return;
 
+        // Whether any frame landed this run, for the visibility pass below:
+        // strengths settle off the drawing, so only a run that drew owes one.
+        let drew = false;
         while (
           pendingFrameRef.current &&
           !draggingRef.current &&
@@ -1510,22 +2228,37 @@ export function WorldCanvas({
              * completes that camera-affecting frame after the draw promise and
              * used to undo the vertical half of the centre operation.
              */
-            if (
+            const restoring =
               !next.animateInitial &&
               drawnRef.current === 0 &&
-              next.nodes.length
-            ) {
+              next.nodes.length > 0;
+            /**
+             * Only if the constructor really held it. The stored field is put
+             * back once the world's overview arrives, which can be after the
+             * graph was built empty — then nothing was rendered, centring
+             * asks for positions of elements that do not exist, and the field
+             * stays blank until something else changes.
+             */
+            if (restoring && authoredRef.current?.nodes.length) {
               drawnRef.current = next.nodes.length;
-              if (next.nodes.length === 1) {
-                await graph.zoomTo(1, { duration: 0 });
+              /**
+               * A stored camera is the establishment: the person framed this
+               * field last visit, and centring over it would spend their
+               * framing on the default. Nothing stored, centre as always.
+               */
+              if (!(await recorderRef.current?.restore(graph))) {
+                if (next.nodes.length === 1) {
+                  await graph.zoomTo(1, { duration: 0 });
+                }
+                await centreStandingField(
+                  graph,
+                  next.nodes
+                    .map((node) => node.id)
+                    .filter((id) => !isDecoration(id)),
+                  insetsRef.current,
+                );
               }
-              await centreStandingField(
-                graph,
-                next.nodes
-                  .map((node) => node.id)
-                  .filter((id) => !isDecoration(id)),
-                insetsRef.current,
-              );
+              drew = true;
               continue;
             }
 
@@ -1547,13 +2280,37 @@ export function WorldCanvas({
               restyleCanvasData(graph, authoredRef.current, next, {
                 // The one channel a restyle is not allowed to cut. A name
                 // arriving is a body leaving its home, on this lane as on the
-                // draw's — see `fadeLabel`.
+                // draw's — see `fadeShape`. Furniture withdrawing with its
+                // plate takes the lifecycle's own release and reveal.
                 labelPlan: reducedMotion() ? undefined : motionRef.current.emit,
+                revealPlan: reducedMotion() ? undefined : motionRef.current.emit,
+                releasePlan: reducedMotion()
+                  ? undefined
+                  : motionRef.current.absorb,
               })
             ) {
               authoredRef.current = next;
               drawnFieldIds.current = next.fieldIds;
               drawnRef.current = next.nodes.length;
+              /**
+               * Debts a cancelled lifecycle owed — see
+               * `convergeStrandedToFrame`. The schema lane converges
+               * asynchronously behind its flight; this lane is serial, so the
+               * guard runs inline: a restyle that patched stranded poses
+               * redraws before the loop continues, and the visibility pass
+               * below reads the healed boxes. Positions are never converged —
+               * a draw that re-applied stored positions mid-gesture would snap
+               * the mark out from under the pointer, and the lane holds all
+               * draws while one is held anyway.
+               */
+              if (convergeStrandedToFrame(graph, next)) {
+                try {
+                  await graph.draw();
+                } catch {
+                  // Healing is best-effort; the lane continues settled.
+                }
+              }
+              drew = true;
               continue;
             }
 
@@ -1566,6 +2323,8 @@ export function WorldCanvas({
               next,
               () => graphRef.current !== graph || graph.destroyed,
               {
+                // A restored field was standing when this person left it.
+                still: next.still || restoring,
                 birthPlan: lifecycleMotionRef.current.birth,
                 collapsePlan: lifecycleMotionRef.current.collapse,
                 releasePlan: motionRef.current.absorb,
@@ -1594,6 +2353,7 @@ export function WorldCanvas({
             );
             drawnFieldIds.current = next.fieldIds;
             if (graphRef.current !== graph || graph.destroyed) return;
+            drew = true;
 
             const count = next.nodes.length;
             const grew = count > drawnRef.current;
@@ -1601,14 +2361,34 @@ export function WorldCanvas({
             if (grew && count === 1) {
               await graph.zoomTo(1, { duration: 0 });
             }
+            if (restoring && !(await recorderRef.current?.restore(graph))) {
+              await centreStandingField(
+                graph,
+                next.nodes
+                  .map((node) => node.id)
+                  .filter((id) => !isDecoration(id)),
+                insetsRef.current,
+              );
+            }
           } catch (problem: unknown) {
             if (graphRef.current === graph) console.error(problem);
           }
         }
+        // The drawing changed, so which names overlap is a different answer
+        // than it was before the draw. Before the fan commits: the fan moves
+        // names without drawing, and follows frame by frame off its own
+        // event below — this settles the strengths the fan starts from.
+        if (drew && graphRef.current === graph && !graph.destroyed) {
+          applyVisibility(graph);
+        }
         // Matter arrived, left or was re-placed, so which strokes the held
         // mark carries — and where they point — is a different answer than it
         // was before the draw.
-        if (graphRef.current === graph && !graph.destroyed) {
+        if (
+          graphRef.current === graph &&
+          !graph.destroyed &&
+          !spreadSuspendedRef.current
+        ) {
           spreadFieldRef.current?.commit(spreadOwnerRef.current);
         }
       });
@@ -1671,8 +2451,31 @@ export function WorldCanvas({
       motion: () => motionRef.current,
       enabled: () => spreadOnSelectRef.current,
       reduced: reducedMotion,
-      crowded: (crowded) => onCrowdedRef.current?.(crowded),
     });
+    /**
+     * Strengths under the fan and the pointer, frame by frame.
+     *
+     * The fan moves names without drawing — spread writes the strokes
+     * directly — so a pass that only ran after draws would freeze strengths
+     * at their pre-fan values: names the fan just cleared would keep the
+     * whisper they no longer owe. The field announces every frame it moves
+     * something on, and the outline already follows it the same way — see
+     * `SelectionAnts`. Coalesced to one pass per frame; at rest nothing is
+     * announced and nothing runs.
+     */
+    let visibilityFrame = 0;
+    const scheduleVisibility = () => {
+      if (visibilityFrame) return;
+      visibilityFrame = window.requestAnimationFrame(() => {
+        visibilityFrame = 0;
+        if (graphRef.current === graph && !graph.destroyed) {
+          applyVisibility(graph);
+        }
+      });
+    };
+    // Resolved once the first render lands: the canvas does not exist until
+    // then, and the fan cannot move names before it either.
+    let spreadContainer: HTMLElement | null = null;
 
     const idOf = (event: unknown): string | null => {
       const target = (event as { target?: { id?: unknown } } | undefined)?.target;
@@ -1725,6 +2528,49 @@ export function WorldCanvas({
         void graph.translateElementTo(moved, false);
       }
       relayoutIncidentLabels(id, { [id]: [position[0], position[1]] }, present);
+    };
+
+    /**
+     * The gesture shows the settled state: the grab carries the depth the
+     * drop will stamp.
+     *
+     * G6 fronts the held mark once, at `dragstart` — `frontElement` in its
+     * drag behavior, above even the names — and the drop's redraw would sink
+     * it back to the restack top: the release speaking for the gesture. The
+     * prediction is the drop's own call — `restackTop`, the number `restack`
+     * records — so the grab rides what the release restates by construction,
+     * not by agreeing on a formula. Written through `setElementZIndex`, the
+     * renderer's own z channel: a targeted re-sort, not a draw, so the mark
+     * stays under the pointer.
+     *
+     * A microtask behind the event, because the behavior's own listener runs
+     * behind this one: behaviors bind when the graph initializes, after these
+     * listeners attached, so a synchronous write lands under the fronting
+     * rather than on top of it. The microtask drains before paint, so the
+     * front never shows — the gesture's first frame is already the settled
+     * one. The moves after need nothing: the behavior only translates from
+     * there.
+     */
+    const rideSettledDepth = (id: string) => {
+      const settled = restackTop(setRef.current.depth, id);
+      queueMicrotask(() => {
+        if (graph.destroyed) return;
+        void graph.setElementZIndex(id, settled);
+      });
+    };
+    /**
+     * A press that went nowhere restacks nothing — so neither does its depth.
+     *
+     * The grab rode the settled depth on the assumption of a drop, and the
+     * release owes the mark its rest back: without this the predicted number
+     * sticks in the store, because a draw that changed nothing restyles
+     * nothing. The rest is the stamped paint, not a recomputation — same
+     * readers, same answer.
+     */
+    const restoreRestDepth = (id: string) => {
+      const rest =
+        paintDepths(setRef.current.depth).get(id) ?? PAINT_LAYER_MARK;
+      void graph.setElementZIndex(id, rest);
     };
 
     const relayoutIncidentLabels = (
@@ -1801,6 +2647,20 @@ export function WorldCanvas({
        * `bondLabelStep`; what this pass still cannot derive is which plates a
        * group is showing, which is why the draw records a pose.
        */
+      /**
+       * The draw's own station, read back — see the fan's reader.
+       *
+       * Both numbers, not just the distance: a grouped bond is drawn at the
+       * widest member's width rule, and this pass recomputing its own half is
+       * a name that jumps on first drag.
+       */
+      const stored = (elementId: string): { along: number; half: number } => {
+        const attrs = liveEdge(graph, elementId)?.parsedAttributes;
+        return {
+          along: Number(attrs?.bondAlong) || BOND_LABEL_ALONG_PX,
+          half: Number(attrs?.bondHalf) || 0,
+        };
+      };
       const stackByAssertion = new Map<string, { x: number; y: number }>();
       for (const [key, unsorted] of byEndpoints) {
         const group = [...unsorted].sort((a, b) =>
@@ -1826,6 +2686,9 @@ export function WorldCanvas({
         shown.forEach((assertionId, index) => {
           stackByAssertion.set(assertionId, stepped(index - middle));
         });
+        // Fit is the draw's to decide: a drag re-seats plates on the moving
+        // filament but never hides or shows one mid-gesture, or names would
+        // blink as the line shortened past them and back.
         /**
          * The count rides the station its claims ride.
          *
@@ -1836,38 +2699,39 @@ export function WorldCanvas({
          * was the one that moved.
          */
         if (pose?.bundleId) {
-          station(
-            pose.bundleId,
-            bondLabelLayout(
-              at(first.source),
-              at(first.target),
-              nearEnd(pose.bundleId),
-              // Closed, the count stands on the filament itself; open, one step
-              // past the last plate it is standing in for. Which of the two is
-              // the draw's to say; how wide a step is, is this pass's.
-              stepped(pose.bundleSteps),
-              p,
-            ),
-          );
-        }
-      }
-      for (const bond of visibleBonds) {
-        station(
-          bondElementId(bond.assertion_id),
-          bondLabelLayout(
-            at(bond.source),
-            at(bond.target),
-            nearEnd(bondElementId(bond.assertion_id)),
-            stackByAssertion.get(bond.assertion_id) ?? { x: 0, y: 0 },
+          const { along, half } = stored(pose.bundleId);
+          const layout = bondLabelLayout(
+            at(first.source),
+            at(first.target),
+            nearEnd(pose.bundleId),
+            // Closed, the count stands on the filament itself; open, one step
+            // past the last plate it is standing in for. Which of the two is
+            // the draw's to say; how wide a step is, is this pass's.
+            stepped(pose.bundleSteps),
             p,
             discRim(p),
             discRim(p),
-            BOND_LABEL_ALONG_PX,
-            // The same half-plate the draw used. A width-aware station that
-            // this pass did not know about is a name that jumps on first drag.
-            chipWidth(bond.relation, p) / 2,
-          ),
+            along,
+            half,
+          );
+          station(pose.bundleId, { ...layout });
+        }
+      }
+      for (const bond of visibleBonds) {
+        const elementId = bondElementId(bond.assertion_id);
+        const { along, half } = stored(elementId);
+        const layout = bondLabelLayout(
+          at(bond.source),
+          at(bond.target),
+          nearEnd(elementId),
+          stackByAssertion.get(bond.assertion_id) ?? { x: 0, y: 0 },
+          p,
+          discRim(p),
+          discRim(p),
+          along,
+          half,
         );
+        station(elementId, { ...layout });
       }
       const stationSpoke = (
         elementId: string,
@@ -1880,6 +2744,11 @@ export function WorldCanvas({
         // The same station the draw used, from the same helper. A width-aware
         // station this pass computed differently is a name that jumps the
         // first time its mark is picked up.
+        //
+        // Recomputed, not read back like a bond's: past a plate the station
+        // depends on the angle the spoke arrives at, so the draw's number is
+        // stale the moment the filament turns — and standing it off again
+        // would stand the standoff off, moving the name twice.
         const { halfPlate, air } = spokeLabelStation(role, p);
         station(
           elementId,
@@ -2235,6 +3104,15 @@ export function WorldCanvas({
       if (!hit) return;
       event.stopPropagation();
       event.preventDefault();
+      // A bond's name is its only drawing, and G6 delivers no events for it —
+      // so the host hit test above is also the removal path. A right press on
+      // one removes what it names, exactly like a right press on a mark; a
+      // left press selects, as below. Counts keep their toggle on any button.
+      if (event.button === 2 && !subjectOfBundle(hit)) {
+        const id = markOf(hit);
+        if (id) removeAtPress(pickEdge(id));
+        return;
+      }
       window.clearTimeout(hoverStandDown.current);
       hoverStandDown.current = undefined;
       if (subjectOfBundle(hit)) {
@@ -2243,15 +3121,11 @@ export function WorldCanvas({
       }
       const id = markOf(hit);
       if (!id) return;
-      // A binary label is selected from the fan owned by the node that
-      // revealed it. Keep that owner through the selection change; otherwise
-      // the effect below sees an assertion id, retracts the fan, and leaves
-      // the selection outline behind at the old label position.
-      const owner = spreadOwnerRef.current;
-      if (owner) preserveSpreadOwnerRef.current = owner;
       // Same as `node:click`: a count opened elsewhere was a question about a
       // mark this person has now stopped asking about.
       setOpenedBundle(null);
+      // A canvas pick, not travel: the fan that revealed this label stays.
+      labelPickRef.current = id;
       onSelectRef.current(pickEdge(id));
     };
     host.addEventListener("pointerdown", clickLabel, true);
@@ -2305,19 +3179,56 @@ export function WorldCanvas({
     /** The mark keeping the live field awake, whether or not it becomes a drag. */
     let physicsHeld: string | null = null;
     /**
-     * Whether *this* press is the one that put the fan down.
+     * Which mouse button a G6 pointer event arrived on, if it says.
      *
-     * Only that press may pick it back up. Pressing some other mark changes
-     * the selection, and the selection effect owns the fan from there — a
-     * release that committed regardless would re-open the outgoing mark's fan
-     * for a frame on its way out.
+     * G6 hands through the renderer's federated event, which mirrors the DOM
+     * button — but the only use here is telling a right press from a left one,
+     * so both nestings are read and anything unreadable is not a right press.
      */
-    let suspendedSpread = false;
+    const pressButton = (event: unknown): number | null => {
+      // G6 spreads the renderer's button onto the forwarded event top level
+      // (`behavior.js` forwards `{...event, button}`); the nestings are the
+      // DOM event underneath, for a forwarder that does not spread.
+      const outer = event as
+        | { button?: unknown; nativeEvent?: unknown }
+        | undefined;
+      const native = outer?.nativeEvent as
+        | { button?: unknown; nativeEvent?: { button?: unknown } }
+        | undefined;
+      const button =
+        outer?.button ?? native?.button ?? native?.nativeEvent?.button;
+      return typeof button === "number" ? button : null;
+    };
+    /**
+     * The last mark a right press removed, so its menu can stand down.
+     *
+     * G6 synthesizes `contextmenu` from the right press itself (`behavior.js`
+     * emits it inside the `pointerdown` forward), so the menu arrives in the
+     * same tick as the removal it would repeat. Only a menu with no press
+     * behind it at all — a keyboard-emitted one — falls through.
+     */
+    let lastRemoved: { id: string; at: number } | null = null;
+    const recentlyRemoved = (id: string): boolean =>
+      lastRemoved?.id === id && performance.now() - lastRemoved.at < 500;
+    const removeAtPress = (mark: NonNullable<CanvasSelection>) => {
+      lastRemoved = { id: mark.id, at: performance.now() };
+      // A removal is the decision, so the press it arrived on has no claim on
+      // the frame that answers it: the draw lane is released before the set
+      // changes, and the collapse plays from there.
+      releaseContact();
+      onRemoveRef.current(mark);
+    };
     graph.on("node:pointerdown", (event) => {
-      const id = subject(idOf(event));
+      const raw = idOf(event);
+      const id = subject(raw);
       if (id) {
         physicsHeld = id;
         engageContact(id);
+        // A bundle label is not a mark — pressing one must not remove the
+        // bundle's subject, which the press never named.
+        if (pressButton(event) === 2 && raw && !subjectOfBundle(raw)) {
+          removeAtPress(pickNode(id));
+        }
         /**
          * The fan drops on being *held*, not on becoming a drag.
          *
@@ -2328,15 +3239,49 @@ export function WorldCanvas({
          * the thing a person did; the drag is what they may or may not go on
          * to do with it.
          *
-         * Still only the spread mark's own fan: reaching for a different mark
-         * is not a statement about this one. That was true of `dragstart` and
-         * is the one thing about it worth keeping.
+         * The fan's own mark and its immediate neighbours. Moving the mark
+         * the fan is solved for pulls every stroke it stands on, and moving
+         * the other endpoint of one of those strokes pulls the elbows off
+         * the geometry they were solved for — so the fan comes down for the
+         * gesture either way, and the draw after the drop re-solves it
+         * fresh. A stranger's drag touches none of those strokes, so the fan
+         * stands through it. `SPREAD_YIELDS_TO_HOLD` carries the scope.
          */
-        if (id === spreadOwnerRef.current) {
+        /**
+         * The owner's strokes, when it has any drawn. The owner can be a
+         * bond — an edge, which this call refuses — or a mark not on the
+         * field, and either way there is no neighbourhood to yield to: the
+         * press falls back to owner-only scope rather than failing it.
+         */
+        let ownerStrokes: { source: unknown; target: unknown }[] = [];
+        if (spreadOwnerRef.current) {
+          try {
+            ownerStrokes = graph.getRelatedEdgesData(spreadOwnerRef.current);
+          } catch {
+            ownerStrokes = [];
+          }
+        }
+        if (
+          spreadOwnerRef.current &&
+          pressButton(event) !== 2 &&
+          spreadYieldsToHold(
+            SPREAD_YIELDS_TO_HOLD,
+            spreadOwnerRef.current,
+            id,
+            ownerStrokes,
+          )
+        ) {
           spreadFieldRef.current?.suspend();
-          suspendedSpread = true;
+          spreadSuspendedRef.current = true;
         }
       }
+    });
+    graph.on("edge:pointerdown", (event) => {
+      // Bonds carry no contact and no fan — a right press on one only removes
+      // it. The label resolves to its mark the way the menu path reads it.
+      if (pressButton(event) !== 2) return;
+      const id = markOf(idOf(event));
+      if (id) removeAtPress(pickEdge(id));
     });
     graph.on("node:click", (event) => {
       if (swallowReleaseClick()) return;
@@ -2345,6 +3290,13 @@ export function WorldCanvas({
       // Selecting opens this mark's own groups. A count opened somewhere else
       // was a question about a mark the person has now stopped asking about.
       setOpenedBundle(null);
+      // The fan this press put down comes back as the new mark's, whichever
+      // of this click and the window's release lands first — never the old
+      // owner's for a frame.
+      if (spreadOwnerRef.current && spreadOwnerRef.current !== id) {
+        spreadOwnerRef.current = id;
+        spreadFieldRef.current?.commit(id);
+      }
       onSelectRef.current(pickNode(id));
     });
     graph.on("edge:click", (event) => {
@@ -2359,6 +3311,9 @@ export function WorldCanvas({
       }
       const id = markOf(raw);
       if (!id) return;
+      // Same flag as `clickLabel`: on the occasions G6's picker does deliver
+      // a label click itself, it is still a canvas pick, not travel.
+      labelPickRef.current = id;
       onSelectRef.current(pickEdge(id));
     });
     graph.on("canvas:click", () => {
@@ -2370,16 +3325,12 @@ export function WorldCanvas({
     graph.on("node:contextmenu", (event) => {
       swallowMenu(event);
       const id = subject(idOf(event));
-      if (!id) return;
+      if (!id || recentlyRemoved(id)) return;
       /**
-       * Let go of the mark before taking it off the field.
-       *
-       * A press holds the draw lane, which is right while a person is still
-       * deciding — nothing should redraw under a finger. A removal is the
-       * decision, so the press it arrived on has no claim on the frame that
-       * answers it. Left in, the withdrawal did not begin until the button
-       * came back up, which on a trackpad's two-finger click is long enough
-       * to read as the surface ignoring you.
+       * A menu with no press behind it — keyboard-emitted — removes at once,
+       * the way a press does. Let go of the mark first: a press holds the draw
+       * lane, which is right while a person is still deciding, and a removal
+       * is the decision, so it has no claim on the frame that answers it.
        */
       releaseContact();
       onRemoveRef.current(pickNode(id));
@@ -2387,7 +3338,9 @@ export function WorldCanvas({
     graph.on("edge:contextmenu", (event) => {
       swallowMenu(event);
       const id = markOf(idOf(event));
-      if (id) onRemoveRef.current(pickEdge(id));
+      if (!id || recentlyRemoved(id)) return;
+      releaseContact();
+      onRemoveRef.current(pickEdge(id));
     });
     /** The mark under the pointer, kept because a lost release has no event. */
     let dragged: string | null = null;
@@ -2403,12 +3356,27 @@ export function WorldCanvas({
         physicsHeld = id;
         updateContact({ type: "drag", id });
         followFurniture(id);
+        rideSettledDepth(id);
       }
+      scheduleVisibility();
     });
     graph.on("node:drag", (event) => {
       const id = subject(idOf(event));
       if (!id) return;
-      followFurniture(id);
+      /**
+       * A microtask behind the event, for the same reason the depth rides
+       * one: the behavior translates after this listener runs — behaviors
+       * bind when the graph initializes, after these listeners attached — so
+       * a synchronous follow reads where the mark was, not where this move
+       * put it, and the labels it lays out lag the line by a whole event.
+       * The microtask drains before paint, so nothing ever shows the stale
+       * frame. `dragstart` needs none of this: nothing has moved yet.
+       */
+      queueMicrotask(() => {
+        if (graph.destroyed) return;
+        followFurniture(id);
+      });
+      scheduleVisibility();
     });
     // Dragging is the one interaction that changes state the model owns, so it
     // is written back rather than left in the renderer to be lost on the next
@@ -2420,14 +3388,30 @@ export function WorldCanvas({
       draggingRef.current = false;
       dragged = null;
       markReleaseClick();
-      harvest();
+      harvest(id ?? undefined);
       if (id) restatePendingDrag(id);
+      // A press that went nowhere restacks nothing — see `restoreRestDepth`.
+      // A moved mark's draw restates the depth the grab already rode.
+      if (id && !dragMoved(id)) restoreRestDepth(id);
       releaseContact();
       physicsHeld = null;
-      suspendedSpread = false;
-      spreadFieldRef.current?.commit(spreadOwnerRef.current);
+      spreadSuspendedRef.current = false;
+      /**
+       * A drag that moved matter draws for it, and the draw's own commit
+       * opens the fan fresh once the strokes have settled. Committing here
+       * as well starts the reopen under that draw, which retargets it
+       * mid-flight — the reopen's roughness against the collapse's ease. A
+       * drag that went nowhere draws nothing, so it commits now.
+       */
+      if (!dragMoved(id)) {
+        spreadFieldRef.current?.commit(spreadOwnerRef.current);
+      }
       queueCanvasDraw();
+      scheduleVisibility();
     });
+    // Every camera move settles here; the recorder keeps only the settled,
+    // person-moved camera — see `cameraMemory`.
+    graph.on("aftertransform", () => recorderRef.current?.capture(graph));
 
     // G6 owns picking, but release belongs to the pointer even when it leaves
     // the canvas. A lost release would leave matter compressed indefinitely.
@@ -2438,14 +3422,19 @@ export function WorldCanvas({
       draggingRef.current = false;
       dragged = null;
       physicsHeld = null;
-      suspendedSpread = false;
+      spreadSuspendedRef.current = false;
       if (wasDragging) {
-        harvest();
+        harvest(id ?? undefined);
         if (id) restatePendingDrag(id);
-        spreadFieldRef.current?.commit(spreadOwnerRef.current);
+        if (id && !dragMoved(id)) restoreRestDepth(id);
+        // Same as `dragend`: a moved mark's draw reopens the fan.
+        if (!dragMoved(id)) {
+          spreadFieldRef.current?.commit(spreadOwnerRef.current);
+        }
       }
       releaseContact();
       queueCanvasDraw();
+      scheduleVisibility();
     };
     const releasePointer = () => {
       physicsHeld = null;
@@ -2454,8 +3443,8 @@ export function WorldCanvas({
       // drag. A press that went nowhere put the fan down, so the same press
       // ending has to pick it back up — `dragend` cannot, because for a plain
       // click it never fires.
-      if (suspendedSpread) {
-        suspendedSpread = false;
+      if (spreadSuspendedRef.current) {
+        spreadSuspendedRef.current = false;
         spreadFieldRef.current?.commit(spreadOwnerRef.current);
       }
     };
@@ -2470,6 +3459,11 @@ export function WorldCanvas({
         if (!animateInitial && data.nodes.length) {
           if (data.nodes.length === 1) await graph.zoomTo(1, { duration: 0 });
         }
+        // The canvas exists now, so the fan's frames have somewhere to be
+        // announced on. Subscribed here rather than above — see
+        // `spreadContainer`.
+        spreadContainer = graph.getCanvas()?.getContainer() ?? null;
+        spreadContainer?.addEventListener(SPREAD_FRAME_EVENT, scheduleVisibility);
         if (graphRef.current === graph) setReady(true);
       })
       .catch((problem: unknown) => {
@@ -2496,6 +3490,9 @@ export function WorldCanvas({
       runningContact.clear();
       window.clearTimeout(hoverStandDown.current);
       hoverStandDown.current = undefined;
+      window.cancelAnimationFrame(visibilityFrame);
+      visibilityFrame = 0;
+      spreadContainer?.removeEventListener(SPREAD_FRAME_EVENT, scheduleVisibility);
       pendingFrameRef.current = null;
       authoredRef.current = null;
       spreadFieldRef.current?.dispose();
@@ -2525,20 +3522,53 @@ export function WorldCanvas({
     ) return;
     const arranged = arrangeToken !== drawnArrangeToken.current;
     drawnArrangeToken.current = arrangeToken;
+    /**
+     * A plate opens where its name stood.
+     *
+     * The store seats the fold on the line's midpoint, which is where the
+     * name is until a fan carries it elsewhere — and the fan is renderer
+     * state the store cannot see. So the canvas asks the bond still on the
+     * graph where its name stands and seats the newborn plate there, once:
+     * the plate is new to this frame and the last draw had no such mark.
+     * An unreadable anchor, an occupied seat, or a plate that is not new
+     * all keep the stored seat, which is the midpoint the fold always had.
+     */
+    let nodes = data.nodes as CanvasDatum[];
+    const seed = foldSeed?.id ?? null;
+    if (seed && !drawnFieldIds.current.has(seed)) {
+      const plate = nodes.find((node) => node.id === seed);
+      const graph = graphRef.current;
+      const anchor = graph ? filamentLabelAnchor(graph, bondElementId(seed)) : null;
+      if (anchor && plate?.style && plateSeatClear(set, anchor, seed)) {
+        const x = Math.round(anchor.x);
+        const y = Math.round(anchor.y);
+        if (plate.style.x !== x || plate.style.y !== y) {
+          nodes = nodes.map((node) =>
+            node.id === seed ? { ...node, style: { ...node.style, x, y } } : node,
+          );
+        }
+      }
+    }
     pendingFrameRef.current = {
-      nodes: data.nodes as CanvasDatum[],
+      nodes,
       edges: data.edges as CanvasDatum[],
       animateInitial,
+      still,
       fieldIds: new Set([
         ...set.referents.keys(), ...set.assertions.keys(), ...set.demands.keys(),
       ]),
       arranged,
     };
     queueCanvasDraw();
+    // `still` is read but not depended on: the release render carries no new
+    // data, and a frame for it would overwrite the still bulk frame the pump
+    // has not drawn yet — coalescing would un-still the run it ends.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     animateInitial,
     arrangeToken,
     data,
+    foldSeed,
     queueCanvasDraw,
     ready,
     set,
@@ -2575,21 +3605,41 @@ export function WorldCanvas({
     if (!ready) return;
     if (!selection) {
       spreadOwnerRef.current = null;
-      preserveSpreadOwnerRef.current = null;
+      settledFanRef.current = null;
+      labelPickRef.current = null;
       spreadFieldRef.current?.commit(null);
       return;
     }
-
-    const preserved = preserveSpreadOwnerRef.current;
-    preserveSpreadOwnerRef.current = null;
-    // Plate selections can own a fan too. A binary assertion has no node,
-    // so the spread controller naturally closes it unless a label click
-    // explicitly carried its previous owner across.
-    spreadOwnerRef.current = preserved ?? selection.id;
+    const settled = `${selection.kind}:${selection.id}`;
+    if (settledFanRef.current === settled) {
+      // Decided already: re-assert the standing owner so the lab switch
+      // still takes — `commit` snaps shut or re-solves on its own — but
+      // never re-decide for a selection that did not move.
+      spreadFieldRef.current?.commit(spreadOwnerRef.current);
+      return;
+    }
+    settledFanRef.current = settled;
+    // Consumed, whatever it holds: a canvas label pick keeps the fan that
+    // revealed it — see `spreadOwnerForSelection` — and anything else is
+    // travel and takes ownership itself. A bond names an owner that stands
+    // nowhere, which is already what closing looks like, and the outline
+    // follows the retraction frame by frame off `SPREAD_FRAME_EVENT`, so
+    // nothing strands.
+    const canvasPick = labelPickRef.current;
+    labelPickRef.current = null;
+    // The set is read through the ref so a placement does not re-decide what
+    // a selection already settled.
+    const bond =
+      setRef.current.bonds.find((item) => item.assertion_id === selection.id) ??
+      null;
+    spreadOwnerRef.current =
+      canvasPick === selection.id
+        ? spreadOwnerForSelection(selection.id, bond, spreadOwnerRef.current)
+        : selection.id;
     spreadFieldRef.current?.commit(spreadOwnerRef.current);
   }, [ready, selection, spreadOnSelect]);
 
-  useFocusPan(graphRef, ready, focusId, focusToken, insetsRef);
+  useFocusPan(graphRef, ready, focusId, focusToken, insetsRef, holdCamera);
 
   return (
     <div
@@ -2615,6 +3665,8 @@ export function WorldCanvas({
         arrivalDelay={selectionArrivalDelay}
         animated={tuning.animated}
         held={contactId(contact) === selection?.id}
+        traceToken={stationSubjects}
+        gone={antsGone}
       />
     </div>
   );

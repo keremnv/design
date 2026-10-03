@@ -12,6 +12,9 @@ import "@fontsource/jost/latin-500.css";
 import "@fontsource/jost/latin-600.css";
 import App from "./App";
 import "./styles/base.css";
+import { applyTypographyToDocument } from "./styles/typography";
+
+applyTypographyToDocument();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

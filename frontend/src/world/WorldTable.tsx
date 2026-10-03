@@ -82,13 +82,28 @@ function say(word: string, width: TableWidth): string {
 export function WorldTable({
   overview,
   relations,
+  complete,
   chrome,
   onOpen,
+  onClearField,
+  clearable,
+  onField,
+  onTakeOffRelation,
 }: {
   overview: WorldOverview | null;
   relations: WorldRelation[];
+  /** Relations standing on the field in full — every tuple placed. */
+  complete: Set<string>;
   chrome: TableChrome;
   onOpen: (name: string) => void;
+  /** The whole field, emptied — the top level's only bulk action. */
+  onClearField: () => void;
+  /** Whether the field holds anything for clear to take off. */
+  clearable: boolean;
+  /** Relations with anything standing on the field — the rows that can take off. */
+  onField: Set<string>;
+  /** Everything of the named relation, off the field. */
+  onTakeOffRelation: (name: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const [placement, setPlacement] = useState("all");
@@ -134,7 +149,7 @@ export function WorldTable({
         </select></label>
         <span role="status">{rows.length} of {relations.length}</span>
       </div>}
-      {!rows.length ? <p className="table__empty">No relations match this search.</p> : null}
+      {query && !rows.length ? <p className="table__empty">No relations match this search.</p> : null}
       <div className="table__head" style={{ gridTemplateColumns: columns }}>
         <span>relation</span>
         <span title="tuples">{heading.count}</span>
@@ -165,6 +180,7 @@ export function WorldTable({
                 className="table__row"
                 {...still("rowsNeverFly")}
                 data-loaded
+                data-present={complete.has(item.name) || undefined}
                 style={{
                   top: index * ROW_HEIGHT,
                   height: ROW_HEIGHT,
@@ -172,6 +188,11 @@ export function WorldTable({
                 }}
                 role="button"
                 tabIndex={0}
+                title={
+                  onField.has(item.name)
+                    ? `Right-click takes every row of ${item.name} off the field`
+                    : undefined
+                }
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
@@ -179,6 +200,18 @@ export function WorldTable({
                   }
                 }}
                 onClick={() => onOpen(item.name)}
+                // The canvas idiom, in the catalogue: a right-button press on
+                // a mark takes it off the field at once. Only where there is
+                // something to take off — otherwise the native menu is left
+                // alone, so copy and inspect keep working on quiet rows.
+                onContextMenu={
+                  onField.has(item.name)
+                    ? (event) => {
+                        event.preventDefault();
+                        onTakeOffRelation(item.name);
+                      }
+                    : undefined
+                }
               >
                 <span title={item.name}>{item.name}</span>
                 <span title={`${item.count}`}>{item.count}</span>
@@ -201,6 +234,16 @@ export function WorldTable({
             );
           })}
         </div>
+      </div>
+      <div className="table__foot">
+        <button
+          type="button"
+          onClick={onClearField}
+          disabled={!clearable}
+          title="Clear the field"
+        >
+          clear
+        </button>
       </div>
     </section>
   );

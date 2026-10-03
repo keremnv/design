@@ -14,6 +14,7 @@
  */
 
 import type { WorldRelation } from "../api/world";
+import type { WorkingSet } from "./workingSet";
 
 export type ShowLayer =
   | "semantic"
@@ -113,6 +114,36 @@ export function assertionShown(
 export function reveal(relation: WorldRelation, show: ShowState): ShowState {
   const next = { ...show };
   for (const layer of layersOfRelation(relation)) next[layer] = true;
+  return next;
+}
+
+/**
+ * Turn on every layer a restored field stands on.
+ *
+ * A restore re-places marks the person asked for last visit, and placing a
+ * mark reveals its layer — see `reveal` — so a restore that skipped this
+ * brought the discs back standing and left their filaments filtered out.
+ * Only ever turns on; what is already showing stays showing. Demands ride
+ * `unresolved`, the same layer their plates read.
+ */
+export function revealSet(set: WorkingSet, show: ShowState): ShowState {
+  const next = { ...show };
+  const revealOrigins = (
+    origin: string | string[] | undefined,
+    mode: string,
+  ): void => {
+    const origins = Array.isArray(origin) ? origin : [origin];
+    for (const item of origins) {
+      if (typeof item === "string") next[layerOf(item, mode)] = true;
+    }
+  };
+  for (const bond of set.bonds) {
+    revealOrigins(bond.origins ?? bond.origin, bond.mode);
+  }
+  for (const assertion of set.assertions.values()) {
+    revealOrigins(assertion.origins ?? assertion.origin, assertion.mode);
+  }
+  if (set.demands.size) next.unresolved = true;
   return next;
 }
 

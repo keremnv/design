@@ -51,6 +51,7 @@ import {
   BOND_LABEL_STACK_GAP,
   chipWidth,
   rimDistance,
+  roleWidth,
   type MarkParams,
   type MarkRim,
 } from "./marks";
@@ -60,6 +61,8 @@ import {
   type FilamentFanPatch,
 } from "./filaments";
 import type { MotionPlan, MotionPlans } from "../styles/motion";
+import { scaleMotionPlan } from "../styles/motion";
+import { FONT_MONO_FAMILY } from "../styles/typography";
 
 type Point = { x: number; y: number };
 
@@ -83,6 +86,16 @@ const SPREAD_REACH_SEATS = 6;
  */
 const SPREAD_PUSH_STEP = 1.25;
 const SPREAD_PUSH_ROUNDS = 6;
+
+/**
+ * How much faster than the spine the fan runs, as a speed.
+ *
+ * The strokes answer a hold directly, so at spine pace (210ms out, 142ms
+ * back) they lag the pointer; at 1.5× they land in ~140ms out and ~95ms
+ * back. A speed, not a duration, so the lab slowing the spine slows the fan
+ * with it — see `scaleMotionPlan`.
+ */
+const SPREAD_PACE = 1.5;
 
 /**
  * Never more than this, whatever the plates ask: past it the fan is a fiction.
@@ -511,7 +524,14 @@ function plateWidth(
   params: MarkParams,
 ): number {
   const text = style?.labelText;
-  return typeof text === "string" && text ? chipWidth(text, params) : 0;
+  if (typeof text !== "string" || !text) return 0;
+  // A role is set in the mono face at the same size as chip type, so the
+  // face — not the size — says which metrics to measure with. See
+  // `roleWidth`. Fanning a role at chip width misstates every spoke on the
+  // field.
+  return style?.labelFontFamily === FONT_MONO_FAMILY
+    ? roleWidth(text, params)
+    : chipWidth(text, params);
 }
 
 /**
@@ -564,11 +584,26 @@ export function planSpread(
     const fromSource = String(edge.source) === heldId;
     const otherId = fromSource ? String(edge.target) : String(edge.source);
     const member = { id: String(edge.id), fromSource };
-    const plate = plateWidth(edge.style as Record<string, unknown> | undefined, params);
+    const style = edge.style as Record<string, unknown> | undefined;
+    const plate = plateWidth(style, params);
+    // The draw's own station, read back: recomputing it here from the
+    // display state would move the fan's plates on selection.
+    const want =
+      typeof style?.bondAlong === "number" && Number.isFinite(style.bondAlong)
+        ? (style.bondAlong as number)
+        : BOND_LABEL_ALONG_PX;
     const standing = groups.get(otherId);
     if (standing) {
       standing.members.push(member);
       standing.plate = Math.max(standing.plate, plate);
+      // Only a member carrying a name stations the group. A bare stroke —
+      // the filament a name rides — states no station of its own, so the
+      // default it would bring must not raise the one a name stated: a
+      // role at 16px merged under its own stroke's 52 is a pile the
+      // solver is then told is not there. It still rides, as a member.
+      if (plate > 0) {
+        standing.along = Math.min(Math.max(standing.along, want), standing.ceiling);
+      }
       continue;
     }
     const other = positionOf(graph, otherId);
@@ -586,8 +621,10 @@ export function planSpread(
       members: [member],
       angle: Math.atan2(dy, dx),
       // The same station `bondLabelAlong` gives the resting plate, so the
-      // spread moves a name sideways and never outward.
-      along: Math.min(BOND_LABEL_ALONG_PX, filament / 2),
+      // spread moves a name sideways and never outward. A bare stroke seeds
+      // none: the name that rides it states it when it arrives, whatever
+      // order the two stand in — see the merge above.
+      along: plate > 0 ? Math.min(want, filament / 2) : 0,
       heldRadius,
       plate,
       ceiling: filament / 2,
@@ -698,6 +735,99 @@ export function planSpread(
  * The field
  * ------------------------------------------------------------------ */
 
+/**
+ * Announced on the graph's container whenever the field writes fan state.
+ *
+ * Every commit and every animation frame that moves a stroke ends in `apply`,
+ * and `apply` writes straight into the renderer, where nothing G6 hears is
+ * emitted — no draw, no transform. A selection outline traced before the
+ * write would otherwise keep the box from where the label stood, so the
+ * field says when it moved something and the outline re-reads. The listener
+ * coalesces frames to one retrace each; at rest nothing is announced.
+ */
+export const SPREAD_FRAME_EVENT = "world:spreadframe";
+
+/**
+ * Who owns the fan after a canvas pick lands.
+ *
+ * A bond picked from an open fan on the canvas keeps its owner: the label
+ * the fan revealed must not move under its own selection outline and the
+ * pointer that just landed on it. Travel — a roster row, a table row, the
+ * finder — does not come through here: arriving somewhere new takes
+ * ownership itself, so the old mark's fan closes behind it instead of
+ * staying bent. The outline follows the retraction frame by frame off
+ * `SPREAD_FRAME_EVENT`, which is what lets travel close what a canvas pick
+ * keeps.
+ *
+ * Only a fan the bond is in: its owner must be one of the bond's ends. A
+ * bond off that fan closes it, as it always did.
+ *
+ * Anything else takes ownership itself: a node opens its own fan, a plate
+ * owns one too, and a bond with no fan open names an owner that stands
+ * nowhere, which is already what closing looks like.
+ */
+export function spreadOwnerForSelection(
+  selectionId: string,
+  bond: { source: string; target: string } | null,
+  currentOwner: string | null,
+): string {
+  if (bond && currentOwner && (bond.source === currentOwner || bond.target === currentOwner)) {
+    return currentOwner;
+  }
+  return selectionId;
+}
+
+/**
+ * Which presses put the fan down while the pointer owns the field.
+ *
+ * The fan is solved for the strokes standing on its owner's geometry, so a
+ * press that moves that geometry — the owner's own, or a neighbour's, the
+ * other endpoint of one of its strokes — retracts it for the gesture and
+ * the draw after the drop re-solves it fresh. A stranger's drag touches
+ * none of those strokes, so the fan stands through it.
+ */
+export type SpreadYieldScope = "none" | "owner" | "neighbourhood" | "any";
+
+/** The other endpoints of the owner's strokes — the fan's own neighbourhood. */
+function fanNeighbourIds(
+  relatedEdges: { source: unknown; target: unknown }[],
+  owner: string,
+): Set<string> {
+  const out = new Set<string>();
+  for (const edge of relatedEdges) {
+    const source = typeof edge.source === "string" ? edge.source : null;
+    const target = typeof edge.target === "string" ? edge.target : null;
+    if (source === owner && target !== null && target !== owner) {
+      out.add(target);
+    } else if (target === owner && source !== null && source !== owner) {
+      out.add(source);
+    }
+  }
+  return out;
+}
+
+/**
+ * Whether this press puts the fan down, under this scope.
+ *
+ * `relatedEdges` is the owner's related edges — the same strokes the solver
+ * fans over, so a neighbour here is exactly a mark the fan stands on. Read
+ * off the renderer at press time, because the set on the field is what the
+ * gesture is about to move.
+ */
+export function spreadYieldsToHold(
+  scope: SpreadYieldScope,
+  owner: string | null,
+  pressedId: string,
+  relatedEdges: { source: unknown; target: unknown }[],
+): boolean {
+  if (owner === null) return false;
+  if (scope === "any") return true;
+  if (pressedId === owner) return scope === "owner" || scope === "neighbourhood";
+  return (
+    scope === "neighbourhood" && fanNeighbourIds(relatedEdges, owner).has(pressedId)
+  );
+}
+
 export type SpreadField = {
   /** State what is held. `null` puts every stroke back on its chord. */
   commit: (heldId: string | null) => void;
@@ -717,18 +847,6 @@ export function createSpreadField(options: {
   motion: () => MotionPlans;
   enabled: () => boolean;
   reduced: () => boolean;
-  /**
-   * Said when the fan could not clear every name on the mark being held.
-   *
-   * The solver already knows — it counts what is left overlapping — and until
-   * this the answer was computed and dropped, which meant a mark with nine
-   * bonds put two names on top of each other and nothing accounted for it.
-   * Reported rather than drawn: it is a fact about the drawing in front of
-   * this person right now, not a property of any claim, so it takes no mark
-   * and no colour. Called on every commit, `false` included, so the condition
-   * leaves when the reading does.
-   */
-  crowded?: (crowded: boolean) => void;
 }): SpreadField {
   const { graph } = options;
   let frame = 0;
@@ -766,6 +884,7 @@ export function createSpreadField(options: {
       });
     }
     updateFilamentFans(graph, patches);
+    graph.getCanvas().getContainer()?.dispatchEvent(new Event(SPREAD_FRAME_EVENT));
   };
 
   const forget = () => {
@@ -837,6 +956,11 @@ export function createSpreadField(options: {
       else amounts.set(id, to);
       return;
     }
+    // A stroke already flying at this destination keeps its clock. Re-aiming
+    // it restarts the easing mid-flight, and the fresh curve's opening
+    // velocity lands as a kick — which is what a commit landing on top of an
+    // unfinished reopen looked like. Only a changed destination re-aims.
+    if (anims.get(id)?.to === to) return;
     const plans = options.motion();
     anims.set(id, {
       from,
@@ -844,8 +968,14 @@ export function createSpreadField(options: {
       started: performance.now(),
       // A stroke opening out is matter leaving its rest and returning to it,
       // so it takes the same two curves everything else on this canvas does —
-      // and the lab slowing the spine slows this with it.
-      plan: to > from ? plans.emit : plans.absorb,
+      // and the lab slowing the spine slows this with it. Run half again as
+      // fast as the spine: the fan answers a hold directly, and at spine pace
+      // it lags the pointer. Both directions scale together, so the close
+      // stays the time reverse of the open.
+      plan: scaleMotionPlan(
+        to > from ? plans.emit : plans.absorb,
+        SPREAD_PACE,
+      ),
     });
   };
 
@@ -855,12 +985,13 @@ export function createSpreadField(options: {
       if (amounts.size || targets.size || standing.size) snapOff();
       return;
     }
-    const report = { crowded: false };
+    // What is left overlapping is the visibility pass's to settle now — it
+    // reads the drawn boxes and dims the losers — so the solver's count is
+    // not reported up. `planSpread` keeps its out-param for checkers.
     const next =
       heldId && standingNode(graph, heldId)
-        ? planSpread(graph, heldId, options.params(), report)
+        ? planSpread(graph, heldId, options.params())
         : new Map<string, FanWaypoint>();
-    options.crowded?.(report.crowded);
     standing.clear();
     for (const [id, waypoint] of next) {
       standing.add(id);

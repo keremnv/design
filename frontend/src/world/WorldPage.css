@@ -41,14 +41,28 @@
   display: none;
   justify-content: center;
   /* A pad, not a gap: the pointer has to be able to travel from the cell
-     onto the keys without leaving the hover target. */
-  padding-bottom: 0.4rem;
+     onto the keys without leaving the hover target. 0.55rem is the notice's
+     own step (`.world__notice`), one rung up from the 0.4rem that sat the
+     menu on the cell — a little air, from a value already on this page. */
+  padding-bottom: 0.55rem;
   transform: translateX(-50%);
   pointer-events: auto;
 }
 
 .world-filter.is-open .world-filter__menu {
   display: flex;
+}
+
+/* Keys parked: the options read as names alone until the symbols earn their
+   place back. Nothing is deleted — the spans stay in the markup and every
+   rule below stays written; this one line hides them, and the pressed dim
+   moves to the name (the key's own 0.28) so on and off still read. */
+.world-show__filter .world-show__key {
+  display: none;
+}
+
+.world-show__filter[aria-pressed="false"] .world-show__name {
+  opacity: 0.28;
 }
 
 .world-show__key {
@@ -238,17 +252,28 @@
 
 /* The name and its type share one visual centre. The chip is a compact box and
    the name is a larger line of type; centring their boxes keeps the type from
-   floating above or below the title when metadata and close join the row. */
+   floating above or below the title when metadata and close join the row.
+   Contained, because this box shrinks under a long id and what is inside it
+   must shrink with it: with visible overflow the chip kept its width, spilled
+   past the title's edge, and the id painted over both — `mail.ts` unreadable
+   behind `program` at the reader's own minimum width. */
 .world-reader__title {
   display: flex;
   align-items: center;
   gap: 0.45rem;
   min-width: 0;
   flex: 0 1 auto;
+  overflow: hidden;
 }
 
+/* The name does not shrink: it keeps its width and the chip spends the
+   deficit first, which is the point of the chip being allowed to shrink. A
+   name longer than the title's whole box is capped at it instead, so it cuts
+   with an ellipsis inside its own box rather than mid-glyph at the title's. */
 .world-reader__title h2 {
+  flex: 0 0 auto;
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -283,9 +308,26 @@
   line-height: 1.25;
 }
 
+/* The id yields to the name. A ninety-character id claims most of the row by
+   content size, and proportional shrink then crushes the title to a stub —
+   the subject unreadable in favour of a prefix every id in the world shares.
+   So the id's *basis* is capped, not its box: shrink shares derive from the
+   unclamped basis, which a `max-width` does not touch — measured, `mail.ts`
+   still crushed to `m…` with the cap on. From a 40% basis the id keeps a stub
+   and the name keeps what it needs; with room to spare the id grows into it.
+   The full id is one hover away on `title`. The same priority
+   `.node-reader__link-rel` states with its own 42%. */
 .world-reader__heading p {
-  flex: 0 1 auto;
-  min-width: 0;
+  /* The id spends first, fivefold: in a deficit the chip would otherwise pay
+     it all — the name does not shrink, so every pixel the title gives comes
+     off the chip, and at default width an eighteen-character relation already
+     crushed `base` to a sliver. Across all four panels the chip carries the
+     less redundant fact — mode, origin, status, namespace — while the id
+     repeats the row's subject or a sentence the body says again. */
+  flex: 1 5 40%;
+  /* Never nothing: a zero-width id cannot be hovered, and the hover is the
+     only place the full id is readable. Five characters still say "cut id". */
+  min-width: 5ch;
   margin: 0;
   color: var(--ink-muted);
   font-size: var(--type-body);
@@ -300,9 +342,9 @@
    product, and the reader used to size its pair off `--reader-size` — two
    controls whose geometry depended on how large the subject's name was set. */
 .world-reader__header .node-reader__kind,
-.world-reader__header .panel__close {
+.world-reader__header .panel__close,
+.world-reader__header .panel__back {
   display: inline-flex;
-  flex: 0 0 auto;
   align-items: center;
   box-sizing: border-box;
   /* `auto`, against the base chip's `calc(1.25 * var(--reader-size))`. An
@@ -322,8 +364,18 @@
   text-transform: lowercase;
 }
 
-/* The title, type, metadata and close control are one sentence-sized row. */
-.world-reader__header .panel__close {
+/* The title, type, metadata and close control are one sentence-sized row,
+   and this is their give-way order. The id yields first (capped above), then
+   the type chip — it already ellipsizes, so letting it shrink spends a few of
+   its characters before the name loses any of its own. Close never yields: it
+   is the way out of the panel. */
+.world-reader__header .node-reader__kind {
+  flex: 0 1 auto;
+}
+
+.world-reader__header .panel__close,
+.world-reader__header .panel__back {
+  flex: 0 0 auto;
   align-self: center;
 }
 
@@ -486,14 +538,50 @@
 }
 
 .world__roles li b {
+  min-width: 0;
   font-weight: var(--weight-regular);
   color: var(--ink-muted);
+  /* Names break like values. Relation and role names are underscored — no
+     break opportunities — so without this a long one holds its track open
+     and prints over the value beside it. */
+  overflow-wrap: anywhere;
 }
 
 .world__roles li span {
   min-width: 0;
   overflow-wrap: anywhere;
   text-align: right;
+}
+
+/* A role value naming a disc on the field: the value cell keeps the span's
+   layout, and the name carries the demand rows' "this goes somewhere"
+   signal at rest — dotted and muted, a whisper rather than a hyperlink,
+   because in a grid of identical values a hover-only signal reads as no
+   signal while a full-ink underline outshouts the row rules. The list rows'
+   hover wash stays for the press. */
+.world__roles li button {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-decoration-color: var(--ink-muted);
+  text-underline-offset: 0.18em;
+}
+
+.world__roles li button:hover {
+  background: color-mix(in srgb, var(--ink) 5%, var(--panel));
+}
+
+.world__roles li button:focus-visible {
+  background: color-mix(in srgb, var(--ink) 5%, var(--panel));
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
 }
 
 .world__inputs li {
@@ -518,11 +606,17 @@
 }
 
 .world__grounding li b {
+  min-width: 0;
   font-weight: var(--weight-regular);
+  /* Handles carry hashes — `policy.md@sha256:` plus sixty-four hex digits —
+     which would otherwise print past the panel's edge over the canvas. */
+  overflow-wrap: anywhere;
 }
 
 .world__grounding li span {
+  min-width: 0;
   color: var(--ink-muted);
+  overflow-wrap: anywhere;
 }
 
 .world__notice {
@@ -568,37 +662,91 @@
   text-underline-offset: 0.18em;
 }
 
+/* A readout, not a control: the count sits in the header and answers nothing.
+   Clearing moved to the relation table that owns what it clears. */
 .product-shell__local.world__occupancy {
-  position: relative;
   text-transform: none;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/*
+ * The frame a framed field holds in, as its own cell. Hover says what a
+ * press does in the name's place: the name crossfades to `open` on the
+ * hold plan — the spine's shortest, borrowed from the reader and finder
+ * hovers, which is what a swap tracking the pointer wants. The full label
+ * stays one hover away on `title`, and the swap collapses under reduced
+ * motion like every other borrowed duration.
+ */
+.product-shell__local.world__frame {
+  position: relative;
+  max-width: 12rem;
+  /* The bar cells are grid without a template, so the implicit column sizes
+     to content and overflows the cap above — the track, not the name, held
+     271px. One capped track and the ellipsis below engages. */
+  grid-template-columns: minmax(0, 1fr);
+  text-transform: none;
+  letter-spacing: 0.02em;
   cursor: pointer;
+  /* The hover also lifts the ink: without this the color snaps in one frame
+     while the opacities fade, which reads as the swap glitching. Same
+     borrowed hold as the crossfade below. */
+  transition: color var(--motion-hold-duration, 90ms)
+    var(--motion-hold-curve, linear);
 }
 
-.product-shell__local.world__occupancy:hover,
-.product-shell__local.world__occupancy:focus-visible {
-  color: var(--ink);
+.world__frame-name {
+  display: block;
+  /* A grid item like its cell: the bar centers its cells' contents, which
+     sizes this to content and overflows the track — measured spilling
+     271px from a 192px chip. Stretch into the capped track and the
+     ellipsis below engages. Composited, so the fade below does not repaint
+     thin text every frame — the shimmer that read as the swap flaking. */
+  min-width: 0;
+  justify-self: stretch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  will-change: opacity;
+  transition: opacity var(--motion-hold-duration, 90ms)
+    var(--motion-hold-curve, linear);
 }
 
-.world__occupancy-clear {
+.world__frame-open {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
   opacity: 0;
-  text-transform: none;
   letter-spacing: 0.01em;
-  font-variant-numeric: normal;
+  will-change: opacity;
+  transition: opacity var(--motion-hold-duration, 90ms)
+    var(--motion-hold-curve, linear);
 }
 
-.world__occupancy:hover .world__occupancy-count,
-.world__occupancy:focus-visible .world__occupancy-count {
+@media (prefers-reduced-motion: reduce) {
+  .world__frame-name,
+  .world__frame-open {
+    transition-duration: 1ms;
+  }
+  .product-shell__local.world__frame {
+    transition-duration: 1ms;
+  }
+}
+
+.world__frame:hover,
+.world__frame:focus-visible {
+  color: var(--ink);
+}
+
+.world__frame:hover .world__frame-name,
+.world__frame:focus-visible .world__frame-name {
   opacity: 0;
 }
 
-.world__occupancy:hover .world__occupancy-clear,
-.world__occupancy:focus-visible .world__occupancy-clear {
+.world__frame:hover .world__frame-open,
+.world__frame:focus-visible .world__frame-open {
   opacity: 1;
 }
 
@@ -733,8 +881,6 @@
   padding: 0 12px;
   border-bottom: 1px solid var(--rule);
   font-size: var(--type-label);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   color: var(--ink-muted);
 }
 
@@ -742,8 +888,6 @@
 .table__head > span {
   padding: 6px 8px 6px 0;
   font: inherit;
-  letter-spacing: inherit;
-  text-transform: inherit;
   text-align: left;
   color: inherit;
   background: none;
@@ -766,6 +910,37 @@
   /* The scroller owns the scrollbar and nothing inside it moves horizontally,
      so a windowed row can be positioned against the spacer alone. */
   overflow-x: hidden;
+}
+
+/* The foot holds the bulk actions — add all and clear on an extension, clear
+   alone on the catalogue — under the same rule the rows sit on. The buttons
+   speak the bar-button language: same padding, same size, same muted ink that
+   darkens on hover, same 0.42 fade when disabled. */
+.table__foot {
+  display: flex;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--rule);
+}
+
+.table__foot button {
+  padding: 3px 9px;
+  font: inherit;
+  font-size: var(--type-label);
+  color: var(--ink-muted);
+  background: var(--canvas);
+  border: 1px solid var(--rule);
+  cursor: pointer;
+}
+
+.table__foot button:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.table__foot button:disabled {
+  opacity: 0.42;
+  cursor: default;
 }
 
 .table__spacer {
@@ -1261,7 +1436,8 @@
    a different control in each dock — 21px beside the tables and 15px beside
    the reader, because those two contexts set that variable differently and the
    chip inherited the difference. The same act is the same size. */
-.panel__close {
+.panel__close,
+.panel__back {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -1281,7 +1457,9 @@
 }
 
 .panel__close:hover,
-.panel__close:focus-visible {
+.panel__close:focus-visible,
+.panel__back:hover,
+.panel__back:focus-visible {
   color: var(--ink);
   border-color: var(--ink);
 }

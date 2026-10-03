@@ -79,6 +79,15 @@
   z-index: 1;
   overflow: hidden;
   pointer-events: none;
+  /* A parked copy keeps its live geometry while it fades. The wrapper fills
+     the slot by inset, but a block parent strands a flex child: the outgoing
+     article's `flex: 1` stops meaning anything, the column collapses to its
+     natural height, and the footer's pinned bottom jumps up by the slack —
+     so every subject change showed the old "take off" floating high while
+     the new one stood at the bottom, reading as one link travelling down a
+     half-loaded panel. A column restores the chain the live slot had. */
+  display: flex;
+  flex-direction: column;
 }
 
 .motion-swap__is {

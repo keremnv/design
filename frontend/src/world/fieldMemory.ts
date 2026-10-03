@@ -12,14 +12,35 @@
  * tuple in here was read out of the compiled world and is re-read from it on
  * the next visit; nothing restored from this store is evidence of anything, and
  * the world is still the only thing that says what is true. That is also why it
- * lives in the browser rather than on the host, on the same argument as
- * `product/graphPrefs.ts`: this describes one screen, not one operator.
+ * lives in the browser rather than on the host: this describes one screen, not
+ * one operator — the same argument the panel sizes in `WorldResize` and the
+ * sibling `worldir.*` stores keep.
  *
  * Keyed by world **and revision**. A field is a set of assertion ids, and an
  * assertion id means something only within the revision it was read from — a
  * rebuild can retire a tuple, and restoring a mark for one would be the surface
  * asserting something the world no longer does. A new revision therefore starts
  * from an empty field rather than from a plausible-looking old one.
+ *
+ * Key scheme — everything this surface keeps in the browser:
+ *
+ * - `worldir.field:<world>:<revision>` — this store: the field's marks and
+ *   where they stand.
+ * - `worldir.show:<world>` — `showMemory`: the filter menu. No revision:
+ *   layers are stable concepts, so filters survive a rebuild.
+ * - `worldir.schema:<world>:<revision>` — `schemaMemory`: the vocabulary
+ *   arrangement.
+ * - `worldir.camera:<room>:<world>:<revision>` — `cameraMemory`: each room's
+ *   camera, which frames a revision-scoped arrangement.
+ * - `worldir.frames:<world>:<revision>` — `frameAnswers`: frame answers,
+ *   facts about the revision, so a framed field comes back framed.
+ * - `ontology-author.worldReaderWidth`, `ontology-author.worldFrontierWidth`
+ *   — `WorldResize`: panel sizes. Global: chrome, not content.
+ *
+ * The scoping rule: state that addresses content ids carries the revision,
+ * and a rebuild retires it. State that addresses stable concepts (layers) or
+ * chrome does not. Every store is versioned and fails to nothing — anything
+ * unreadable restores as if it were never kept.
  */
 
 import {
@@ -44,6 +65,14 @@ type StoredField = {
   demands: [string, FieldDemand][];
   bonds: FieldBond[];
   positions: [string, Point][];
+  /**
+   * Paint depth, newest writer only. Optional so a field put away before
+   * depth existed still comes back — with an empty stack, which paints
+   * exactly the creation order it always did. Values put away as bare drop
+   * counts come back verbatim and are re-homed to dense ranks on first
+   * paint — see `paintDepths` — so the order survives the format.
+   */
+  depth?: [string, number][];
   expanded: string[];
 };
 
@@ -78,6 +107,7 @@ export function writeField(
       demands: [...set.demands],
       bonds: set.bonds,
       positions: [...set.positions],
+      depth: [...set.depth],
       expanded: [...set.expanded],
     };
     window.localStorage.setItem(key, JSON.stringify(stored));
@@ -130,6 +160,15 @@ export function readField(world: string, revision: number): WorkingSet | null {
      */
     for (const [id, at] of stored.positions) {
       if (Number.isFinite(at?.x) && Number.isFinite(at?.y)) set.positions.set(id, at);
+    }
+    // A finite number or it is not one; anything else is dropped and the
+    // mark paints in creation order, the recoverable outcome. Legacy drop
+    // counts pass through untouched — order is order, whatever the scale,
+    // and paint re-homes them.
+    if (Array.isArray(stored.depth)) {
+      for (const [id, depth] of stored.depth) {
+        if (typeof id === "string" && Number.isFinite(depth)) set.depth.set(id, depth);
+      }
     }
     for (const key of stored.expanded) set.expanded.add(key);
     return set.referents.size ? set : null;

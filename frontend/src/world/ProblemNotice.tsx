@@ -1,10 +1,15 @@
 import "./ProblemNotice.css";
 
-/** A local interruption, using the same ruled surface as the reader. */
-export function ProblemNotice({ message, title = "Unable to load data", onRetry }: {
+/**
+ * A local interruption, using the same ruled surface as the reader.
+ *
+ * Message only, deliberately: recovery happens outside the page — reopen the
+ * world and use the new inspector link — so a retry button would promise what
+ * this page cannot do. A refresh re-runs the load for the transient cases.
+ */
+export function ProblemNotice({ message, title = "Unable to load data" }: {
   message: string;
   title?: string;
-  onRetry?: () => void;
 }) {
   const separator = message.indexOf("\n");
   const heading = separator < 0 ? title : message.slice(0, separator);
@@ -15,7 +20,6 @@ export function ProblemNotice({ message, title = "Unable to load data", onRetry 
     <div className="problem-notice" role="alert">
       <strong className="problem-notice__title">{heading}</strong>
       <p>{parts.map((part, index) => <span key={index}>{index > 0 ? <code>{command}</code> : null}{part}</span>)}</p>
-      {onRetry ? <button className="problem-notice__retry" onClick={onRetry}>Try again</button> : null}
     </div>
   );
 }

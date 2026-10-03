@@ -63,6 +63,14 @@ export type CanvasMotionOptions = {
   bindingDelayMs?: number;
   /** Lab-scaled window across an expansion's distance waves. */
   staggerWindowMs?: number;
+  /**
+   * Draw this frame the way reduced motion draws every frame: data in, no
+   * lifecycle. A bulk arrival — dozens of births in one frame — is the case
+   * this is for: fifty staggered nucleations are not fifty announcements, they
+   * are one laggy one, and the loading state lives on the control that asked
+   * for them rather than on each mark.
+   */
+  still?: boolean;
 };
 
 const LIFECYCLE_SCALE = 0.04;
@@ -254,6 +262,8 @@ type LiveElement = {
   update: (attributes: Record<string, unknown>) => void;
   /** The label's own drawn parts: its text, and the plate behind it. */
   labelParts: () => LiveShape[];
+  /** The mark itself, for the one presence the restyle lane owns. */
+  keyShape: () => LiveShape | null;
 };
 
 function liveElement(graph: Graph, id: string): LiveElement | null {
@@ -273,18 +283,20 @@ function liveElement(graph: Graph, id: string): LiveElement | null {
   // `update` reaches other element methods through `this`; handing back the
   // bare method detaches it and a filament throws while an isolated disc
   // appears to work. Preserve the receiver at this one boundary.
+  const shapeOf = (name: string): unknown | null => {
+    if (typeof live.getShape !== "function") return null;
+    try {
+      return live.getShape.call(element, name);
+    } catch {
+      return null;
+    }
+  };
   return {
     update: live.update.bind(element),
     labelParts: () => {
-      if (typeof live.getShape !== "function") return [];
-      let shape: unknown = null;
       // A label G6 has not built yet — an element whose name has never been
       // shown — is not an error, it is a shape that does not exist to fade.
-      try {
-        shape = live.getShape.call(element, "label");
-      } catch {
-        return [];
-      }
+      const shape = shapeOf("label");
       const children = (shape as { children?: unknown[] } | null)?.children;
       if (!Array.isArray(children)) return [];
       return children.filter(
@@ -293,11 +305,15 @@ function liveElement(graph: Graph, id: string): LiveElement | null {
           typeof (child as LiveShape).animate === "function",
       );
     },
+    keyShape: () => {
+      const shape = shapeOf("key") as LiveShape | null;
+      return shape && typeof shape.animate === "function" ? shape : null;
+    },
   };
 }
 
 /**
- * One drawn part of a label, faded, interrupting whatever it was doing.
+ * One drawn part, faded, interrupting whatever it was doing.
  *
  * The restyle lane exists because `graph.draw()` builds an update animation
  * for every element on the field in order to express a change on one, and a
@@ -314,21 +330,26 @@ function liveElement(graph: Graph, id: string): LiveElement | null {
  * stroke that was still whole underneath, which only the next full draw
  * cleared. Driving each part explicitly is what makes an interruption total.
  *
- * It is `emit` for the same reason it was `emit` on the draw path: a name is a
- * body leaving its home, and the reader's pointer is what spent the impulse.
+ * A label's arrival is `emit` for the same reason it was `emit` on the draw
+ * path: a name is a body leaving its home, and the reader's pointer is what
+ * spent the impulse. A furniture key withdrawing with its selected plate is
+ * the same question in the other direction, so it takes `absorb` — the
+ * lifecycle's own release — and returns on `emit`. One interlock for both:
+ * the shapes are distinct objects, so a name and a rule never cancel each
+ * other.
  */
-const fadingLabels = new WeakMap<object, { cancel: () => void }>();
+const fadingShapes = new WeakMap<object, { cancel: () => void }>();
 
-function fadeLabel(shape: LiveShape, from: number, to: number, plan: MotionPlan) {
-  fadingLabels.get(shape)?.cancel();
-  fadingLabels.delete(shape);
+function fadeShape(shape: LiveShape, from: number, to: number, plan: MotionPlan) {
+  fadingShapes.get(shape)?.cancel();
+  fadingShapes.delete(shape);
   if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) return;
   try {
     const running = shape.animate(
       [{ opacity: from }, { opacity: to }],
       g6KeyframeMotion(plan),
     );
-    if (running) fadingLabels.set(shape, running);
+    if (running) fadingShapes.set(shape, running);
   } catch {
     // The nucleation race the stations and contact both hit: a shape whose
     // layout has not happened cannot be animated. `update` has already written
@@ -354,6 +375,19 @@ function partDestination(
   return key in delta ? Number(delta[key]) : Number.NaN;
 }
 
+/**
+ * Equal as style, not as object. The builders mint `size`, `labelPadding` and
+ * `labelTransform` as fresh arrays every frame, and identity alone reported
+ * every element on the field as changed on every hover.
+ */
+function sameStyleValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
+    return false;
+  }
+  return a.every((item, index) => sameStyleValue(item, b[index]));
+}
+
 /** Style keys that changed, or null when this frame is not a pure restyle. */
 function styleDelta(
   before: Record<string, unknown> | undefined,
@@ -370,7 +404,7 @@ function styleDelta(
   }
   const delta: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(next)) {
-    if (!Object.is(previous[key], value)) delta[key] = value;
+    if (!sameStyleValue(previous[key], value)) delta[key] = value;
   }
   return delta;
 }
@@ -406,6 +440,15 @@ export function restyleCanvasData(
   options: {
     /** Absent means land on the new opacity outright — reduced motion. */
     labelPlan?: MotionPlan;
+    /**
+     * The one presence the restyle lane owns: a node's own `opacity`, which
+     * today only furniture writes — a shelf or crown withdrawing with its
+     * selected plate. `releasePlan` takes it out, `revealPlan` brings it
+     * back, the lifecycle's own pair. Absent means land outright, same rule
+     * as the label.
+     */
+    revealPlan?: MotionPlan;
+    releasePlan?: MotionPlan;
   } = {},
 ): boolean {
   if (!authored) return false;
@@ -422,8 +465,10 @@ export function restyleCanvasData(
   const edgePatches: CanvasDatum[] = [];
   const paint: {
     id: string;
+    kind: "node" | "edge";
     delta: Record<string, unknown>;
     labelWas: unknown;
+    opacityWas: unknown;
   }[] = [];
 
   for (const node of next.nodes) {
@@ -444,8 +489,10 @@ export function restyleCanvasData(
     nodePatches.push(node);
     paint.push({
       id: node.id,
+      kind: "node",
       delta,
       labelWas: standing.style?.labelOpacity,
+      opacityWas: standing.style?.opacity,
     });
   }
 
@@ -464,8 +511,10 @@ export function restyleCanvasData(
     edgePatches.push(edge);
     paint.push({
       id: edge.id,
+      kind: "edge",
       delta,
       labelWas: standing.style?.labelOpacity,
+      opacityWas: standing.style?.opacity,
     });
   }
 
@@ -475,7 +524,7 @@ export function restyleCanvasData(
 
   if (nodePatches.length) graph.updateNodeData(nodePatches as never);
   if (edgePatches.length) graph.updateEdgeData(edgePatches as never);
-  for (const { id, delta, labelWas } of paint) {
+  for (const { id, kind, delta, labelWas, opacityWas } of paint) {
     const element = liveElement(graph, id);
     // The store is already correct; an element G6 has not built yet will be
     // built from it. Nothing to repaint, nothing to fall back for.
@@ -491,11 +540,82 @@ export function restyleCanvasData(
       from: liveOpacity(part, labelWas),
       to: partDestination(part, delta),
     }));
+    // A node coming or going on its own channel — furniture withdrawing with
+    // its plate. Edges never write `opacity` here; light writes the stroke's.
+    const keyTo =
+      kind === "node" && "opacity" in delta ? Number(delta.opacity) : NaN;
+    const key = Number.isFinite(keyTo) ? element.keyShape() : null;
+    const keyTravel = key
+      ? { part: key, from: liveOpacity(key, opacityWas), to: keyTo }
+      : null;
+    // The direction the eye is travelling, not the frame's: an interrupted
+    // withdrawal returning home is an arrival, whatever the last settled
+    // frame claimed it was.
+    const keyPlan =
+      keyTravel === null
+        ? undefined
+        : keyTravel.to > keyTravel.from
+          ? options.revealPlan
+          : options.releasePlan;
     element.update(delta);
-    if (plan === undefined) continue;
-    for (const { part, from, to } of travel) fadeLabel(part, from, to, plan);
+    if (plan !== undefined) {
+      for (const { part, from, to } of travel) fadeShape(part, from, to, plan);
+    }
+    if (keyTravel && keyPlan !== undefined) {
+      fadeShape(keyTravel.part, keyTravel.from, keyTravel.to, keyPlan);
+    }
   }
   return true;
+}
+
+/**
+ * Converge stranded transient poses to the settled frame.
+ *
+ * A lifecycle run cancelled mid-arrival leaves births frozen in the model —
+ * measured, a disc at opacity 0 and size 3.6 against a laid 90 — while the
+ * authored frames all say the end state, so restyle never patches them: it
+ * diffs authored against authored, and both agree. Nothing afterwards
+ * rebirths them either, so they stay invisible for the life of the page.
+ * Nodes converge opacity and size, edges opacity; positions are never
+ * touched — converging those would snap a live gesture. Returns whether
+ * anything was patched, so the caller can redraw before reading bounds.
+ *
+ * Both lanes share the one guard: the schema lane grew it first, the field
+ * lane heals naturally most of the time but shares the hazard.
+ */
+export function convergeStrandedToFrame(graph: Graph, frame: CanvasData): boolean {
+  const nodes = new Map(
+    graph
+      .getNodeData()
+      .map((node) => [String(node.id), node.style as Record<string, unknown> | undefined]),
+  );
+  const nodePatches: CanvasDatum[] = [];
+  for (const node of frame.nodes) {
+    const at = nodes.get(node.id);
+    if (!at) continue;
+    if (
+      !Object.is(at.opacity, node.style?.opacity) ||
+      JSON.stringify(at.size) !== JSON.stringify(node.style?.size)
+    ) {
+      nodePatches.push(node);
+    }
+  }
+  const edges = new Map(
+    graph
+      .getEdgeData()
+      .map((edge) => [String(edge.id), edge.style as Record<string, unknown> | undefined]),
+  );
+  const edgePatches: CanvasDatum[] = [];
+  for (const edge of frame.edges) {
+    const at = edges.get(edge.id);
+    if (!at) continue;
+    if (!Object.is(at.opacity, edge.style?.opacity)) {
+      edgePatches.push(edge);
+    }
+  }
+  if (nodePatches.length) graph.updateNodeData(nodePatches as never);
+  if (edgePatches.length) graph.updateEdgeData(edgePatches as never);
+  return nodePatches.length > 0 || edgePatches.length > 0;
 }
 
 /** What the eye is seeing now, falling back to the last settled frame. */
@@ -504,6 +624,104 @@ function liveOpacity(shape: LiveShape, standing: unknown): number {
   if (Number.isFinite(live)) return live;
   const last = Number(standing ?? 0);
   return Number.isFinite(last) ? last : 0;
+}
+
+/**
+ * Strength travels on its own interlock, because it travels on its own
+ * attribute.
+ *
+ * Naming fades `opacity`; strength fades `fillOpacity`. Sharing
+ * `fadingShapes` would make a name yielding to a neighbour cancel the fade
+ * that was bringing it in — or the reverse — snapping whichever lost. The
+ * two attributes compose on the text, so the two animations compose on the
+ * timeline.
+ */
+const fadingFills = new WeakMap<object, { cancel: () => void }>();
+
+function fadeFill(shape: LiveShape, from: number, to: number, plan: MotionPlan) {
+  fadingFills.get(shape)?.cancel();
+  fadingFills.delete(shape);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) return;
+  try {
+    const running = shape.animate(
+      [{ fillOpacity: from }, { fillOpacity: to }],
+      g6KeyframeMotion(plan),
+    );
+    if (running) fadingFills.set(shape, running);
+  } catch {
+    // The nucleation race `fadeShape` names: `update` below has already
+    // written the destination, so the honest failure is to be there without
+    // the travel.
+  }
+}
+
+/** What the eye is seeing on the strength channel. See `liveOpacity`. */
+function liveFill(shape: LiveShape, standing: unknown): number {
+  const live = Number(shape.style?.fillOpacity);
+  if (Number.isFinite(live)) return live;
+  const last = Number(standing ?? 0);
+  return Number.isFinite(last) ? last : 0;
+}
+
+/**
+ * A name's reading strength, painted, on the text's own channel.
+ *
+ * The visibility pass's hand: `from` and `to` are absolute fill values — the
+ * lane multiplied its strengths by each label's authored base already — and
+ * only the text part moves. The plate is untouched, so a whisper keeps its
+ * gap; naming's `opacity` is untouched, so a show fade and a yielding never
+ * overwrite each other. A name recovering takes `restorePlan`, one yielding
+ * takes `weakenPlan`: the arrival and the release, borrowed from the motion
+ * the lanes already speak. Absent plans land outright, the reduced-motion
+ * rule every painter here follows.
+ *
+ * Elements G6 has not built yet are skipped, not failed: the store the lanes
+ * update alongside already carries the strength, and the element is built
+ * from it.
+ */
+export function paintLabelStrength(
+  graph: Graph,
+  patches: { id: string; from: number; to: number }[],
+  options: { weakenPlan?: MotionPlan; restorePlan?: MotionPlan } = {},
+): void {
+  for (const patch of patches) {
+    if (
+      !Number.isFinite(patch.from) ||
+      !Number.isFinite(patch.to)
+    ) {
+      continue;
+    }
+    const element = liveElement(graph, patch.id);
+    if (!element) continue;
+    const text =
+      element.labelParts().find((part) => part.nodeName === "text") ?? null;
+    // Read the painted strength before update commits the destination. Reading
+    // it afterwards gives `to` as the starting value and skips the fade.
+    const from = text ? liveFill(text, patch.from) : patch.from;
+    const plan =
+      patch.to > from ? options.restorePlan : options.weakenPlan;
+    const interrupted = text !== null && fadingFills.has(text);
+    if (text && plan === undefined) {
+      fadingFills.get(text)?.cancel();
+      fadingFills.delete(text);
+    }
+    // The commit; the fade below is only the travel — see `fadeShape`.
+    element.update({ labelFillOpacity: patch.to });
+    if (plan !== undefined && text) {
+      fadeFill(text, from, patch.to, plan);
+    } else if (text && interrupted) {
+      // G can reapply a cancelled effect on its next animation frame. Commit
+      // the snap on that same timeline so it cannot restore the old strength.
+      try {
+        const committed = text.animate([
+          { fillOpacity: patch.to }, { fillOpacity: patch.to },
+        ], { duration: 0, fill: "both" });
+        if (committed) fadingFills.set(text, committed);
+      } catch {
+        // The destination is already written if the shape cannot animate.
+      }
+    }
+  }
 }
 
 /** Whether this frame changes whether a name is showing at all. */
@@ -536,7 +754,7 @@ export async function transitionCanvasData(
   const diedNodeIds = [...previousNodes].filter((id) => !nextNodeIds.has(id));
   const diedEdgeIds = [...previousEdges].filter((id) => !nextEdgeIds.has(id));
 
-  if (reducedMotion()) {
+  if (reducedMotion() || options.still) {
     if (cancelled() || graph.destroyed) {
       return { bornNodes, bornEdges, diedNodeIds, diedEdgeIds };
     }

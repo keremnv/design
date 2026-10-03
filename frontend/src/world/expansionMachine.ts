@@ -37,7 +37,6 @@ export function expansionRequestReducer(
 export type ExpansionViewState =
   | { value: "on-field" }
   | { value: "loading" }
-  | { value: "table" }
   | { value: "failed"; message: string }
   | { value: "available" };
 
@@ -47,21 +46,18 @@ export function expansionViewState({
   referentId,
   relation,
   count,
-  room,
   request,
 }: {
   set: WorkingSet;
   referentId: string;
   relation: string;
   count: number;
-  room: number;
   request?: ExpansionRequestState;
 }): ExpansionViewState {
   if (expansionOnField(set, referentId, relation, count)) {
     return { value: "on-field" };
   }
   if (request?.value === "loading") return request;
-  if (count > room) return { value: "table" };
   if (request?.value === "failed") return request;
   return { value: "available" };
 }

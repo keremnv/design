@@ -88,9 +88,14 @@
 }
 
 .nodefind__label {
+  overflow: hidden;
   color: var(--ink);
   font-size: var(--type-subject);
   line-height: 1.3;
+  /* The anchor below already cuts; the label cut with nothing would print
+     past the list's edge on a long unbroken name. */
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .nodefind__anchor {

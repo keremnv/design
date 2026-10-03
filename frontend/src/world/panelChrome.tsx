@@ -25,3 +25,18 @@ export function PanelClose({ onClose }: { onClose: () => void }) {
     </button>
   );
 }
+
+/**
+ * The way back down the reader's trail, beside the way out of it.
+ *
+ * The same chip as `PanelClose`, because it is the same kind of thing: panel
+ * chrome, not a content action. It sits left of close — back first, out last —
+ * and only while there is somewhere back to go.
+ */
+export function PanelBack({ onBack }: { onBack: () => void }) {
+  return (
+    <button type="button" className="panel__back" onClick={onBack} aria-label="Back">
+      back
+    </button>
+  );
+}

@@ -14,7 +14,8 @@
      tokens have one source, `styles/graphDna.ts`, so that a theme can move them
      — see `GRAPH_DNA_STATUS`. The shell spreads them onto its own root. */
 
-  /* Switch UI typefaces here — keep in sync with styles/typography.ts */
+  /* First-paint face defaults; the tokens in styles/typography.ts restate
+     these vars at boot, so switch faces there, not here. */
   --font-sans: Jost, "Helvetica Neue", Helvetica, sans-serif;
   --font-mono: "DM Mono", ui-monospace, Menlo, Consolas, monospace;
 

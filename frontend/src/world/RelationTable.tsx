@@ -49,6 +49,11 @@ export function RelationTable({
   subject,
   present,
   onFocus,
+  onTakeOff,
+  onPlaceMany,
+  onBulkActive,
+  onClearRelation,
+  clearable,
   onWiden,
   onDerivation,
   chrome,
@@ -66,6 +71,16 @@ export function RelationTable({
   /** Assertion ids already on the field, so a row can say it is there. */
   present: Set<string>;
   onFocus: (roles: WorldRole[], tuple: WorldTuple) => void;
+  /** One row off the field — a single take-off, so its context stays standing. */
+  onTakeOff: (assertionId: string) => void;
+  /** A page of rows, onto the field — the bulk half of the §11 seam. */
+  onPlaceMany: (relation: string, roles: WorldRole[], tuples: WorldTuple[]) => void;
+  /** A bulk arrival started or ended, so the canvas can draw its frames still. */
+  onBulkActive: (active: boolean) => void;
+  /** Everything of the named relation, off the field — the inverse of add all. */
+  onClearRelation: (relation: string) => void;
+  /** Whether the relation has anything on the field for clear to take off. */
+  clearable: boolean;
   /** Drop the subject and read the whole extension. */
   onWiden: () => void;
   /** §8.6, from where you are actually standing when you want it. */
@@ -83,6 +98,22 @@ export function RelationTable({
   const [roles, setRoles] = useState<WorldRole[]>(relation.roles);
   const [pages, setPages] = useState<Map<number, WorldTuple[]>>(new Map());
   const [problem, setProblem] = useState<string | null>(null);
+  /**
+   * Tuples placed by the in-flight add-all, or null when the footer is idle.
+   *
+   * The count is the loading state: the button reads `adding… n / total`
+   * while it is non-null, which is the same idiom as the frontier footer
+   * flipping to `loading` — no spinner, no overlay, the control says what it
+   * is doing. There is deliberately no separate "done" state: the rows tick
+   * into the margin as they land, and that is the confirmation.
+   */
+  const [added, setAdded] = useState<number | null>(null);
+  /**
+   * Which add-all run owns the `added` count. A search typed mid-run starts a
+   * new table while the old run is still awaiting its page, and the old run's
+   * `finally` must not blank the new run's count on its way out.
+   */
+  const addingToken = useRef(0);
   const frame = useRef<HTMLElement>(null);
   const width = useTableWidth(frame);
   const window_ = useRowWindow(total, ROW_HEIGHT, OVERSCAN);
@@ -171,6 +202,7 @@ export function RelationTable({
       pages.get(Math.floor(index / PAGE))?.[index % PAGE] ?? null,
     [pages],
   );
+  const shared = useMemo(() => sharedSegments(pages, roles), [pages, roles]);
 
   const placeable = roles.some((role) => role.referent);
 
@@ -178,6 +210,77 @@ export function RelationTable({
     () => `${roles.map(() => "minmax(0, 1fr)").join(" ")} 84px`,
     [roles],
   );
+
+  /**
+   * Everything in this table, onto the field — whatever the header says "this
+   * table" is: the current search, order and subject narrow it exactly as they
+   * narrow the rows on screen.
+   *
+   * Page by page rather than one request, because the server pages and the
+   * field should grow while it runs rather than go quiet and jump. Each page
+   * is checked against the buffer key like a scrolled page is: a search typed
+   * mid-run is a new table, and the old run stops placing into it. A page
+   * that fails stops the run with the table's own problem notice, and the
+   * pages already placed stay placed — the margin says which.
+   */
+  const addAll = useCallback(async () => {
+    if (added !== null || !placeable || !total) return;
+    const asOf = buffer;
+    addingToken.current += 1;
+    const token = addingToken.current;
+    const current = () =>
+      live.current && bufferRef.current === asOf && addingToken.current === token;
+    setAdded(0);
+    onBulkActive(true);
+    try {
+      let bound = Math.ceil(total / PAGE);
+      let placed = 0;
+      for (let page = 0; page < bound; page += 1) {
+        let answer;
+        try {
+          answer = await worldApi.rows(relation.name, {
+            search,
+            limit: PAGE,
+            offset: page * PAGE,
+            order: order?.role ?? null,
+            desc: order?.desc,
+            subject: subject?.id ?? null,
+          });
+        } catch (failure) {
+          if (!current()) return;
+          setProblem((failure as Error).message);
+          return;
+        }
+        if (!current()) return;
+        setTotal(answer.total);
+        bound = Math.max(bound, Math.ceil(answer.total / PAGE));
+        onPlaceMany(relation.name, answer.roles, answer.rows);
+        placed += answer.rows.length;
+        setAdded(placed);
+        if (answer.rows.length < PAGE) break;
+      }
+    } finally {
+      if (addingToken.current !== token) return;
+      setAdded(null);
+      // A task later, not now: this microtask still holds the last page's
+      // placement, and releasing in it would batch the flag down with the
+      // final data — the one render whose frame must go out still.
+      window.setTimeout(() => {
+        if (addingToken.current === token) onBulkActive(false);
+      }, 0);
+    }
+  }, [
+    added,
+    buffer,
+    onBulkActive,
+    onPlaceMany,
+    order,
+    placeable,
+    relation.name,
+    search,
+    subject,
+    total,
+  ]);
 
   return (
     <section
@@ -190,18 +293,25 @@ export function RelationTable({
         chrome={chrome}
         title={relation.name}
         meta={
-          <>
-            {total} tuple{total === 1 ? "" : "s"}
-            {subject ? ` of ${subject.label}` : ""} · {relation.mode.toLowerCase()}
-            {/* Printed only when the world recorded it. An absent admission
-                document is not a claim of WORLD scope, and filling one in here
-                would make the stronger claim on the world's behalf. */}
-            {relation.scope ? ` · ${relation.scope.toLowerCase()}` : ""}
-            {relation.stale ? " · stale" : ""}
-            {relation.completeness && relation.completeness.status !== "COMPLETE"
-              ? ` · ${relation.completeness.status.toLowerCase()}`
-              : ""}
-          </>
+          pages.has(0) || problem ? (
+            <>
+              {total} tuple{total === 1 ? "" : "s"}
+              {subject ? ` of ${subject.label}` : ""} · {relation.mode.toLowerCase()}
+              {/* Printed only when the world recorded it. An absent admission
+                  document is not a claim of WORLD scope, and filling one in here
+                  would make the stronger claim on the world's behalf. */}
+              {relation.scope ? ` · ${relation.scope.toLowerCase()}` : ""}
+              {relation.stale ? " · stale" : ""}
+              {relation.completeness && relation.completeness.status !== "COMPLETE"
+                ? ` · ${relation.completeness.status.toLowerCase()}`
+                : ""}
+            </>
+          ) : (
+            /* The count is outstanding, not zero: the buffer was just reset and
+               the first page has not answered. Printing the reset would flash
+               "0 tuples" on every search and every subject change. */
+            "Reading tuples…"
+          )
         }
       >
         {subject ? (
@@ -267,7 +377,13 @@ export function RelationTable({
                 data-placeable={placeable}
                 role={tuple && placeable ? "button" : undefined}
                 tabIndex={tuple && placeable ? 0 : undefined}
-                title={placeable ? "Place on field" : "No referents to place on the field"}
+                title={
+                  tuple && present.has(tuple.assertion_id)
+                    ? "Right-click takes this row off the field"
+                    : placeable
+                      ? "Place on field"
+                      : "No referents to place on the field"
+                }
                 onKeyDown={(event) => {
                   if (tuple && placeable && (event.key === "Enter" || event.key === " ")) {
                     event.preventDefault();
@@ -275,11 +391,22 @@ export function RelationTable({
                   }
                 }}
                 onClick={tuple && placeable ? () => onFocus(roles, tuple) : undefined}
+                // The canvas idiom, in the extension: a right-button press on
+                // a placed row takes it back off at once. Left alone while a
+                // bulk arrival owns the field, like the footer's clear.
+                onContextMenu={
+                  tuple && added === null && present.has(tuple.assertion_id)
+                    ? (event) => {
+                        event.preventDefault();
+                        onTakeOff(tuple.assertion_id);
+                      }
+                    : undefined
+                }
               >
                 {tuple
                   ? roles.map((role) => (
                       <span key={role.name} title={String(tuple.values[role.name] ?? "")}>
-                        {display(tuple.values[role.name], role.referent)}
+                        {display(tuple.values[role.name], role.referent, shared.get(role.name))}
                       </span>
                     ))
                   : roles.map((role) => <span key={role.name} />)}
@@ -293,23 +420,89 @@ export function RelationTable({
           })}
         </div>
       </div>
+      <div className="table__foot">
+        <button
+          type="button"
+          onClick={addAll}
+          disabled={!placeable || !total || added !== null}
+          aria-busy={added !== null || undefined}
+          title={
+            placeable
+              ? "Place every row of this table on the field"
+              : "No referents to place on the field"
+          }
+          // Auto-sized: the button grows into `adding… N / N` for the length
+          // of the run, then settles back. Reserving the run's width kept
+          // `clear` from shifting, but the reserved size read as the button's
+          // size — normal sizing won.
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
+          {added !== null ? `adding… ${added} / ${total}` : "add all"}
+        </button>
+        <button
+          type="button"
+          onClick={() => onClearRelation(relation.name)}
+          disabled={added !== null || !clearable}
+          title="Take every row of this table off the field"
+        >
+          clear
+        </button>
+      </div>
     </section>
   );
 }
 
 /**
+ * How many leading segments every loaded id in each referent column shares.
+ *
+ * Measured over the rows held, so it can only shrink as pages land: a column
+ * of `program:ts:<snapshot>:call_site:<hash>` reads from `call_site` on once
+ * its rows agree on everything before it.
+ */
+function sharedSegments(
+  pages: Map<number, WorldTuple[]>,
+  roles: WorldRole[],
+): Map<string, number> {
+  const shared = new Map<string, number>();
+  for (const role of roles) {
+    if (!role.referent) continue;
+    let prefix: string[] | null = null;
+    for (const page of pages.values()) {
+      for (const tuple of page) {
+        const value = tuple.values[role.name];
+        if (value === null || value === undefined) continue;
+        const parts = String(value).split(":");
+        if (!prefix) {
+          prefix = parts;
+          continue;
+        }
+        let same = 0;
+        while (same < prefix.length && same < parts.length && prefix[same] === parts[same]) {
+          same += 1;
+        }
+        prefix = prefix.slice(0, same);
+      }
+    }
+    shared.set(role.name, prefix?.length ?? 0);
+  }
+  return shared;
+}
+
+/**
  * A cell.
  *
- * Referent ids arrive namespaced — `part:X160` — and the namespace repeats down
- * the whole column, so it is dropped from the referent columns and kept on the
- * cell's title, because an id you cannot read out of the table is an id you
- * cannot ask the rest of the product about. A scalar is printed as it is: a
- * colon inside a scalar is part of the value.
+ * Referent ids arrive namespaced — `part:X160` — and whatever repeats down the
+ * whole column, the namespace at least, is dropped from the referent columns
+ * and kept on the cell's title, because an id you cannot read out of the table
+ * is an id you cannot ask the rest of the product about. The last two segments
+ * always stay: a kind and its hash say more than the hash alone. A scalar is
+ * printed as it is: a colon inside a scalar is part of the value.
  */
-function display(value: unknown, referent: boolean): string {
+function display(value: unknown, referent: boolean, shared = 1): string {
   if (value === null || value === undefined) return "—";
   const text = String(value);
   if (!referent) return text;
-  const colon = text.indexOf(":");
-  return colon > 0 ? text.slice(colon + 1) : text;
+  const parts = text.split(":");
+  const drop = Math.min(Math.max(1, shared), Math.max(1, parts.length - 2));
+  return parts.length > 1 ? parts.slice(drop).join(":") : text;
 }

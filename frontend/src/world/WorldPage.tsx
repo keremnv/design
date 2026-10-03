@@ -49,6 +49,7 @@ import {
   still,
 } from "../styles/motion";
 import { ShowBand } from "./ShowBand";
+import { useFrames } from "./useFrames";
 import { ProblemNotice } from "./ProblemNotice";
 import {
   TABLES_HANDLE_RESERVE,
@@ -73,6 +74,7 @@ import { MARK_DEFAULTS } from "./marks";
 import { RelationTable } from "./RelationTable";
 import { SchemaCanvas } from "./SchemaCanvas";
 import { holdsField, readField, writeField } from "./fieldMemory";
+import { readShow, writeShow } from "./showMemory";
 import { chipKind } from "./schemaGraph";
 import { TableBar, type TableChrome } from "./tableChrome";
 import { WorldTable } from "./WorldTable";
@@ -91,12 +93,14 @@ import {
   expansionKey,
   fieldSize,
   foldingOf,
-  MAX_FIELD_NODES,
   open as openBond,
   place,
+  placeAll,
   placeDemand,
+  restack,
   seed,
   type Arrangement,
+  type FieldBond,
   type Point,
   type WorkingSet,
 } from "./workingSet";
@@ -105,7 +109,8 @@ import { chromeClass } from "./worldOverlayChrome";
 import { Swap } from "../styles/Swap";
 import { useHeld, usePresence } from "../styles/usePresence";
 import { useSequencedSwap } from "../styles/useSequencedSwap";
-import { PanelClose } from "./panelChrome";
+import { useLagging } from "../styles/useLagging";
+import { PanelBack, PanelClose } from "./panelChrome";
 import { readStoredPanelSize, storePanelSize } from "./WorldResize";
 import "../styles/presence.css";
 import {
@@ -114,6 +119,7 @@ import {
   originsLabel,
   relationShown,
   reveal,
+  revealSet,
   type ShowState,
 } from "./show";
 import "./WorldPage.css";
@@ -334,12 +340,15 @@ export function ReaderHeader({
   kind,
   meta,
   onClose,
+  onBack,
   children,
 }: {
   title: string;
   kind?: string;
   meta?: string;
   onClose?: () => void;
+  /** Null while there is nowhere back to go — the chip is the offer. */
+  onBack?: (() => void) | null;
   /**
    * What this subject *is*, carried above the rule with its name.
    *
@@ -363,11 +372,21 @@ export function ReaderHeader({
           * with neither the name nor the panel's own right edge.
           */}
         <div className="world-reader__title">
-          <h2>{title}</h2>
-          {kind ? <span className="node-reader__kind">{kind}</span> : null}
+          {/*
+            * The row cuts all three — name, type, id — so all three repeat on
+            * hover. A stubbed id with no way to read it is a label, not an
+            * identity.
+            */}
+          <h2 title={title}>{title}</h2>
+          {kind ? (
+            <span className="node-reader__kind" title={kind}>
+              {kind}
+            </span>
+          ) : null}
         </div>
-        {meta ? <p>{meta}</p> : null}
+        {meta ? <p title={meta}>{meta}</p> : null}
       </div>
+      {onBack ? <PanelBack onBack={onBack} /> : null}
       {onClose ? <PanelClose onClose={onClose} /> : null}
     </header>
       {children}
@@ -407,28 +426,47 @@ export function Grounding({ assertion }: { assertion: WorldAssertion }) {
 
 export function AssertionPanel({
   assertion,
+  problem,
+  set,
   folding,
   onFold,
   onTable,
   onDerivation,
   onRemove,
   onClose,
+  onBack,
+  onSelect,
 }: {
   assertion: WorldAssertion | null;
+  /** Why the read failed, when it did — the panel owns its failure. */
+  problem: string | null;
+  /** The field, for the filament roster — fellow claims are field data. */
+  set: WorkingSet;
   /** Which way this tuple's second drawing lies, or null if it has none. */
   folding: "open" | "collapse" | null;
   onFold: () => void;
   onTable: (relation: string) => void;
   onDerivation: (relation: string, assertion: string | null) => void;
-  onRemove: () => void;
+  /** Null when the shown tuple is not on the field — nothing to take off. */
+  onRemove: (() => void) | null;
   onClose: () => void;
+  onBack: (() => void) | null;
+  onSelect: (next: CanvasSelection) => void;
 }) {
   if (!assertion) {
     return (
       <article className="world-reader__article">
-        <ReaderHeader title="Reading assertion" onClose={onClose} />
+        <ReaderHeader
+          title={problem ? "Unable to read" : "Reading assertion"}
+          onClose={onClose}
+          onBack={onBack}
+        />
         <div className="world-reader__content">
-          <p className="world__hint">Loading its roles and grounding…</p>
+          {problem ? (
+            <ProblemNotice message={problem} title="Unable to read assertion" />
+          ) : (
+            <p className="world__hint">Reading its roles and grounding…</p>
+          )}
         </div>
       </article>
     );
@@ -440,6 +478,7 @@ export function AssertionPanel({
   const assessments = new Map(
     assertion.candidate_assessments.map((item) => [item.obligation_id, item]),
   );
+  const filament = filamentSiblings(set, assertion.assertion_id);
   return (
     <article className="world-reader__article">
       <ReaderHeader
@@ -447,16 +486,86 @@ export function AssertionPanel({
         kind={assertion.origin.toLowerCase()}
         meta={`${assertion.mode.toLowerCase()} · revision ${assertion.created_revision}${state ? ` · ${state}` : ""}`}
         onClose={onClose}
+        onBack={onBack}
       />
       <div className="world-reader__content">
         <ol className="world__roles">
-          {assertion.roles.map((role) => (
-            <li key={role.name}>
-              <b>{role.name}</b>
-              <span>{String(assertion.values[role.name] ?? "—")}</span>
-            </li>
-          ))}
+          {assertion.roles.map((role) => {
+            const value = assertion.values[role.name];
+            // A role naming a referent on the field goes back to its disc,
+            // the way a link row goes to its claim: same selection, same
+            // lookup, so button-ness and disc identity can never disagree
+            // about what "on the field" means. Anything else stays a span.
+            const target =
+              role.referent && typeof value === "string" ? value : null;
+            const home = target ? set.referents.get(target) : undefined;
+            return (
+              <li key={role.name}>
+                <b>{role.name}</b>
+                {target && home ? (
+                  <button
+                    type="button"
+                    title={target}
+                    onClick={() =>
+                      onSelect({ kind: "referent", id: target })
+                    }
+                  >
+                    {home.label || target}
+                  </button>
+                ) : (
+                  <span>{String(value ?? "—")}</span>
+                )}
+              </li>
+            );
+          })}
         </ol>
+        {filament.length ? (
+          <section className="world-reader__section world-reader__section--list">
+            <h3>On this filament</h3>
+            <ul className="gm__list">
+              {filament.slice(0, LINK_ROSTER_CAP).map((bond) => (
+                <li key={bond.assertion_id}>
+                  <button
+                    type="button"
+                    className={
+                      bond.assertion_id === assertion.assertion_id
+                        ? "is-selected"
+                        : undefined
+                    }
+                    title={bond.assertion_id}
+                    onClick={() =>
+                      onSelect({ kind: "assertion", id: bond.assertion_id })
+                    }
+                  >
+                    <span className="gm__list-name">
+                      {bond.relation}
+                      {bond.scalars.length
+                        ? ` · ${summarizeScalars(bond.scalars)}`
+                        : ""}
+                    </span>
+                    <span className="gm__list-meta">
+                      {bond.origin.toLowerCase()}
+                      {bond.stale ? " · stale" : ""}
+                    </span>
+                  </button>
+                </li>
+              ))}
+              {filament.length > LINK_ROSTER_CAP ? (
+                <li key="__more">
+                  <button
+                    type="button"
+                    onClick={() => onTable(assertion.relation)}
+                  >
+                    <span className="gm__list-name">
+                      {filament.length - LINK_ROSTER_CAP} more
+                    </span>
+                    <span className="gm__list-meta">table</span>
+                  </button>
+                </li>
+              ) : null}
+            </ul>
+          </section>
+        ) : null}
         {assertion.derivation?.inputs?.length ? (
           <section className="world-reader__section">
             <h3>Rests on</h3>
@@ -539,9 +648,11 @@ export function AssertionPanel({
         >
           Open extension
         </button>
-        <button type="button" className="node-reader__link" onClick={onRemove}>
-          Take off the field
-        </button>
+        {onRemove ? (
+          <button type="button" className="node-reader__link" onClick={onRemove}>
+            Take off the field
+          </button>
+        ) : null}
       </footer>
     </article>
   );
@@ -564,25 +675,52 @@ export function AssertionPanel({
 export function DemandPanel({
   obligation,
   demand,
+  problem,
+  settled,
   roles,
   onTable,
   onRemove,
   onClose,
+  onBack,
 }: {
   obligation: Obligation | null;
   demand: WorldDemand | null;
+  /** Why the frontier read failed, when it did. */
+  problem: string | null;
+  /** The frontier read has answered — content, null, or failure. */
+  settled: boolean;
   /** Role order, since an obligation's values are a JSON object. */
   roles: string[];
   onTable: (relation: string) => void;
-  onRemove: () => void;
+  /** Null when the shown demand is not on the field — nothing to take off. */
+  onRemove: (() => void) | null;
   onClose: () => void;
+  onBack: (() => void) | null;
 }) {
   if (!obligation) {
     return (
       <article className="world-reader__article">
-        <ReaderHeader title="Reading obligation" onClose={onClose} />
+        <ReaderHeader
+          title={
+            problem
+              ? "Unable to read"
+              : settled
+                ? "Unknown demand"
+                : "Reading obligation"
+          }
+          onClose={onClose}
+          onBack={onBack}
+        />
         <div className="world-reader__content">
-          <p className="world__hint">Loading the demanded tuple…</p>
+          {problem ? (
+            <ProblemNotice message={problem} title="Unable to read demand" />
+          ) : settled ? (
+            <p className="world__hint">
+              This world has no demand with that id.
+            </p>
+          ) : (
+            <p className="world__hint">Reading the demanded tuple…</p>
+          )}
         </div>
       </article>
     );
@@ -595,6 +733,7 @@ export function DemandPanel({
         kind={obligation.state.toLowerCase()}
         meta="Demanded tuple"
         onClose={onClose}
+        onBack={onBack}
       />
       <div className="world-reader__content">
         {/*
@@ -667,9 +806,11 @@ export function DemandPanel({
         >
           Open extension
         </button>
-        <button type="button" className="node-reader__link" onClick={onRemove}>
-          Take off the field
-        </button>
+        {onRemove ? (
+          <button type="button" className="node-reader__link" onClick={onRemove}>
+            Take off the field
+          </button>
+        ) : null}
       </footer>
     </article>
   );
@@ -772,10 +913,12 @@ export function GovernedObligationPanel({
   obligation,
   problem,
   onClose,
+  onBack,
 }: {
   obligation: WorldObligation | WorldObligationInspection;
   problem: string | null;
   onClose: () => void;
+  onBack: (() => void) | null;
 }) {
   const status = obligationStatus(obligation);
   const detailed = isObligationInspection(obligation);
@@ -790,6 +933,7 @@ export function GovernedObligationPanel({
         kind={readableStatus(status)}
         meta={`${obligation.obligation_id}${obligation.dimension ? ` · ${obligation.dimension}` : ""}`}
         onClose={onClose}
+        onBack={onBack}
       />
       <div className="world-reader__content">
         {problem ? <ProblemNotice message={problem} title="Unable to read Obligation" /> : null}
@@ -943,6 +1087,7 @@ function namespaceOf(id: string): string | undefined {
 
 export function ReferentPanel({
   detail,
+  problem,
   set,
   requests,
   onExpand,
@@ -951,29 +1096,43 @@ export function ReferentPanel({
   onDrop,
   onGather,
   onClose,
+  onBack,
+  onSelect,
 }: {
   detail: WorldReferent | null;
+  /** Why the read failed, when it did — the panel owns its failure. */
+  problem: string | null;
   set: WorkingSet;
   requests: ExpansionRequests;
-  onExpand: (relation: string, count: number) => void;
+  onExpand: (relation: string) => void;
   onRetract: (relation: string) => void;
   onTable: (relation: string) => void;
   onDrop: () => void;
   /** Null when nothing on the field is joined to this referent yet. */
   onGather: (() => void) | null;
   onClose: () => void;
+  onBack: (() => void) | null;
+  onSelect: (next: CanvasSelection) => void;
 }) {
   if (!detail) {
     return (
       <article className="world-reader__article">
-        <ReaderHeader title="Reading referent" onClose={onClose} />
+        <ReaderHeader
+          title={problem ? "Unable to read" : "Reading referent"}
+          onClose={onClose}
+          onBack={onBack}
+        />
         <div className="world-reader__content">
-          <p className="world__hint">Loading fields and possible expansions…</p>
+          {problem ? (
+            <ProblemNotice message={problem} title="Unable to read referent" />
+          ) : (
+            <p className="world__hint">Reading fields and possible expansions…</p>
+          )}
         </div>
       </article>
     );
   }
-  const room = MAX_FIELD_NODES - fieldSize(set);
+  const groups = referentLinkGroups(set, detail.id);
   return (
     <article className="world-reader__article">
       <ReaderHeader
@@ -983,6 +1142,7 @@ export function ReferentPanel({
         // referent is its own id, and printing it twice is not identity.
         meta={detail.label ? detail.id : undefined}
         onClose={onClose}
+        onBack={onBack}
       >
         {detail.fields.length ? (
           <div className="world-reader__facts">
@@ -990,7 +1150,23 @@ export function ReferentPanel({
               {detail.fields.map((field) => (
                 <li key={field.assertion_id}>
                   <b>{field.relation}</b>
-                  <span>{String(field.value)}</span>
+                  {/*
+                    * A fact's way back to the tuple that states it — the
+                    * return half of the assertion's role links. Always a
+                    * link, whether that tuple is on the field or not: the
+                    * reader reads any id the world serves, and the canvas
+                    * draws nothing for a mark it does not hold rather than
+                    * something wrong — no ants, no fan, no light.
+                    */}
+                  <button
+                    type="button"
+                    title={field.assertion_id}
+                    onClick={() =>
+                      onSelect({ kind: "assertion", id: field.assertion_id })
+                    }
+                  >
+                    {String(field.value)}
+                  </button>
                 </li>
               ))}
             </ol>
@@ -998,8 +1174,9 @@ export function ReferentPanel({
         ) : null}
       </ReaderHeader>
       <div className="world-reader__content">
+        {/* Expand through leads: acting on the field comes before reading it. */}
         <section className="world-reader__section world-reader__section--list">
-          <h3>Expand through</h3>
+          <h3>expand through</h3>
           <ul className="gm__list">
             {detail.relations.map((relation) => {
               const key = expansionKey(detail.id, relation.name);
@@ -1008,12 +1185,10 @@ export function ReferentPanel({
                 referentId: detail.id,
                 relation: relation.name,
                 count: relation.count,
-                room,
                 request: requests.get(key),
               });
               const already = state.value === "on-field";
               const loading = state.value === "loading";
-              const tooMany = state.value === "table";
               return (
                 <li key={relation.name}>
                   <button
@@ -1021,13 +1196,10 @@ export function ReferentPanel({
                     className={already ? "is-selected" : undefined}
                     disabled={loading}
                     aria-busy={loading || undefined}
-                    data-table={tooMany ? true : undefined}
                     onClick={() =>
                       already
                         ? onRetract(relation.name)
-                        : tooMany
-                        ? onTable(relation.name)
-                        : onExpand(relation.name, relation.count)
+                        : onExpand(relation.name)
                     }
                   >
                     <span className="gm__list-name">{relation.name}</span>
@@ -1036,11 +1208,9 @@ export function ReferentPanel({
                         ? "take off"
                         : loading
                           ? "loading"
-                          : tooMany
-                            ? `${relation.count} · table`
-                            : state.value === "failed"
-                              ? "retry"
-                              : relation.count}
+                          : state.value === "failed"
+                            ? "retry"
+                            : relation.count}
                     </span>
                   </button>
                 </li>
@@ -1048,6 +1218,49 @@ export function ReferentPanel({
             })}
           </ul>
         </section>
+        {groups.length ? (
+          <section className="world-reader__section world-reader__section--list">
+            <h3>on this disc</h3>
+            <ul className="gm__list">
+              {groups.flatMap((group) => [
+                ...group.links.slice(0, LINK_ROSTER_CAP).map((link) => (
+                  <li key={link.key}>
+                    <button
+                      type="button"
+                      onClick={() => onSelect(link.select)}
+                    >
+                      <span className="gm__list-name">
+                        {group.relation}
+                      </span>
+                      <span className="gm__list-meta">
+                        {link.role} · {link.far || "—"} ·{" "}
+                        {link.origin.toLowerCase()}
+                        {link.stale ? " · stale" : ""}
+                      </span>
+                    </button>
+                  </li>
+                )),
+                ...(group.links.length > LINK_ROSTER_CAP
+                  ? [
+                      <li key={`__more:${group.relation}`}>
+                        <button
+                          type="button"
+                          onClick={() => onTable(group.relation)}
+                        >
+                          <span className="gm__list-name">
+                            {group.links.length - LINK_ROSTER_CAP} more
+                          </span>
+                          <span className="gm__list-meta">
+                            table · {group.relation}
+                          </span>
+                        </button>
+                      </li>,
+                    ]
+                  : []),
+              ])}
+            </ul>
+          </section>
+        ) : null}
       </div>
       <footer className="world-reader__actions">
         {onGather ? (
@@ -1084,6 +1297,188 @@ function linkedRelationFromHash(): string | null {
   return new URLSearchParams(query).get("relation");
 }
 
+/**
+ * Whether the selection is still on the field after a removal landed.
+ *
+ * A referent takes everything that only existed because of it, so the
+ * question is not whether the selection *was* the mark but whether it
+ * survived it. Asked by every removal — one mark or one relation — so the
+ * reader goes exactly when what it was reading went.
+ */
+function selectionSurvived(
+  selection: NonNullable<CanvasSelection>,
+  set: WorkingSet,
+): boolean {
+  return selection.kind === "referent"
+    ? set.referents.has(selection.id)
+    : selection.kind === "demand"
+      ? set.demands.has(selection.id)
+      : set.assertions.has(selection.id) ||
+        set.bonds.some((bond) => bond.assertion_id === selection.id);
+}
+
+function sameSelection(a: CanvasSelection, b: CanvasSelection): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.kind === b.kind && a.id === b.id;
+}
+
+/** Rows shown per link group before the rest collapse into the table. */
+const LINK_ROSTER_CAP = 8;
+
+/**
+ * How far back the reader's trail reaches.
+ *
+ * Fifty arrivals is a long session of looking; past that the oldest steps
+ * fall off rather than the trail growing without bound. Falling off the
+ * front, never refusing the next push — a cap that stopped travel from
+ * recording would strand back at a stale mark.
+ */
+const READER_TRAIL_CAP = 50;
+
+/** Scalar values as one short line, for roster rows. */
+function summarizeScalars(scalars: { role: string; value: unknown }[]): string {
+  const parts = scalars.map((item) => String(item.value ?? "—"));
+  return parts.length > 3
+    ? `${parts.slice(0, 3).join(" · ")} · …`
+    : parts.join(" · ");
+}
+
+/**
+ * The parallel claims on one filament, in canvas order.
+ *
+ * Mirrors the bundle grouping in WorldCanvas — endpoints sorted and joined,
+ * claims sorted by relation then id — so the roster and the filament agree on
+ * what the filament holds. Empty unless the shown tuple is folded onto a
+ * shared line.
+ */
+function filamentSiblings(
+  set: WorkingSet,
+  assertionId: string,
+): FieldBond[] {
+  const shown = set.bonds.find((bond) => bond.assertion_id === assertionId);
+  if (!shown) return [];
+  const key = [shown.source, shown.target].sort().join("\u0000");
+  const group = set.bonds.filter(
+    (bond) => [bond.source, bond.target].sort().join("\u0000") === key,
+  );
+  if (group.length < 2) return [];
+  return [...group].sort((a, b) =>
+    `${a.relation}\u0000${a.assertion_id}`.localeCompare(
+      `${b.relation}\u0000${b.assertion_id}`,
+    ),
+  );
+}
+
+/** One thing joined to a referent: the plate, bond, or demand at a spoke. */
+type ReferentLink = {
+  key: string;
+  relation: string;
+  role: string;
+  /** What the far end shows: plate scalars, or the other referent's label. */
+  far: string;
+  origin: string;
+  stale: boolean;
+  select: NonNullable<CanvasSelection>;
+};
+
+type ReferentLinkGroup = {
+  relation: string;
+  links: ReferentLink[];
+};
+
+/**
+ * Everything joined to a referent, as relation runs in one flat roster.
+ *
+ * Plates, bonds, and demands alike: what is ON the field now, as opposed to
+ * "Expand through", which is what could be. Runs sort alphabetically by
+ * relation — the grouping survives only as ordering and per-relation
+ * overflow, not as headers, since a header per relation spent more space
+ * than the rows it introduced.
+ */
+function referentLinkGroups(
+  set: WorkingSet,
+  referentId: string,
+): ReferentLinkGroup[] {
+  const links: ReferentLink[] = [];
+  for (const item of set.assertions.values()) {
+    for (const spoke of item.spokes) {
+      if (spoke.id !== referentId) continue;
+      links.push({
+        key: `${item.assertion_id}\u0000${spoke.role}`,
+        relation: item.relation,
+        role: spoke.role,
+        far: summarizeScalars(item.scalars),
+        origin: item.origin,
+        stale: item.stale,
+        select: { kind: "assertion", id: item.assertion_id },
+      });
+    }
+  }
+  for (const bond of set.bonds) {
+    if (bond.source !== referentId && bond.target !== referentId) continue;
+    const other = bond.source === referentId ? bond.target : bond.source;
+    const role =
+      bond.spokes.find((spoke) => spoke.id === referentId)?.role ??
+      bond.relation;
+    links.push({
+      key: `${bond.assertion_id}\u0000${role}`,
+      relation: bond.relation,
+      role,
+      far: set.referents.get(other)?.label || other,
+      origin: bond.origin,
+      stale: bond.stale,
+      select: { kind: "assertion", id: bond.assertion_id },
+    });
+  }
+  for (const demand of set.demands.values()) {
+    for (const spoke of demand.spokes) {
+      if (spoke.id !== referentId) continue;
+      links.push({
+        key: `${demand.key}\u0000${spoke.role}`,
+        relation: demand.relation,
+        role: spoke.role,
+        far: summarizeScalars(demand.scalars),
+        origin: "unresolved",
+        stale: false,
+        select: { kind: "demand", id: demand.key },
+      });
+    }
+  }
+  const byRelation = new Map<string, ReferentLink[]>();
+  for (const link of links) {
+    const group = byRelation.get(link.relation) ?? [];
+    group.push(link);
+    byRelation.set(link.relation, group);
+  }
+  return [...byRelation]
+    .map(([relation, unsorted]) => ({
+      relation,
+      links: [...unsorted].sort((a, b) =>
+        `${a.role}\u0000${a.far}`.localeCompare(`${b.role}\u0000${b.far}`),
+      ),
+    }))
+    .sort((a, b) => a.relation.localeCompare(b.relation));
+}
+
+/**
+ * Details already read this session, so a subject read twice is rendered
+ * twice, not fetched twice.
+ *
+ * Capped, because the plane holds worlds too large to hold: the cache keeps
+ * the recent subjects someone is moving between, and the oldest goes when it
+ * is full. Insertion order is the eviction order, which a `Map` already is.
+ */
+const DETAIL_CACHE_CAP = 200;
+
+function keepDetail<T>(map: Map<string, T>, key: string, value: T): void {
+  if (!map.has(key) && map.size >= DETAIL_CACHE_CAP) {
+    const oldest = map.keys().next();
+    if (!oldest.done) map.delete(oldest.value);
+  }
+  map.set(key, value);
+}
+
 export function WorldPage() {
   const motion = DEFAULT_MOTION_PLANS;
   const browserMode = useBrowserTheme();
@@ -1104,7 +1499,6 @@ export function WorldPage() {
    */
   const [directoryShort, setDirectoryShort] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loadAttempt, setLoadAttempt] = useState(0);
 
   const [set, setSet] = useState<WorkingSet>(emptySet);
   /**
@@ -1135,6 +1529,19 @@ export function WorldPage() {
     new Map(),
   );
   const [selection, setSelection] = useState<CanvasSelection>(null);
+  /**
+   * The reader's trail: the marks it showed before this one, oldest first.
+   *
+   * Travel is every arrival through `chooseFieldMark` — a canvas pick, a role
+   * or roster link, a table row, the finder — and each pushes the mark being
+   * left, so back walks the session in reverse. Deselecting pushes nothing:
+   * leaving is not arriving, and the chip stays offered where the trail led.
+   * Removal does not prune it either: taking a mark off the field does not
+   * take it out of the world, so every entry still reads — the panel simply
+   * shows a mark with no canvas presence, the same as a fact's off-field
+   * tuple. Only clearing the field ends the trail.
+   */
+  const [past, setPast] = useState<NonNullable<CanvasSelection>[]>([]);
   const [hovered, setHovered] = useState<string | null>(null);
   const [hoveredRelation, setHoveredRelation] = useState<string | null>(null);
   const [focusedRelation, setFocusedRelation] = useState<string | null>(null);
@@ -1150,6 +1557,10 @@ export function WorldPage() {
    * reader's call to make.
    */
   const [spreadOnSelect, setSpreadOnSelect] = useState(true);
+  const [framing, setFraming] = useState(false);
+  /** Claims framing made binary that a person has opened back into plates. */
+  const [framedOpen, setFramedOpen] = useState<ReadonlySet<string>>(() => new Set());
+  const [foldSeed, setFoldSeed] = useState<{ id: string } | null>(null);
   const [show, setShow] = useState<ShowState>(SHOW_DEFAULT);
   const [readerOpen, setReaderOpen] = useState(false);
   const [readerWidth, setReaderWidth] = useState(() =>
@@ -1170,6 +1581,19 @@ export function WorldPage() {
   );
   const [assertion, setAssertion] = useState<WorldAssertion | null>(null);
   const [referent, setReferent] = useState<WorldReferent | null>(null);
+  const detailCache = useRef({
+    assertions: new Map<string, WorldAssertion>(),
+    referents: new Map<string, WorldReferent>(),
+  });
+  /**
+   * `kind:id` reads that failed, with why. State rather than a ref, because
+   * the failure is drawn: the reader stops holding for it, and the panel owns
+   * it — it names the subject the read was for, where the notice strip could
+   * only name the message.
+   */
+  const [detailProblems, setDetailProblems] = useState(
+    () => new Map<string, string>(),
+  );
   const [notice, setNotice] = useState<string | null>(null);
   /**
    * What is open on the left overlay. World is the idle catalogue; the legacy
@@ -1180,9 +1604,16 @@ export function WorldPage() {
   const [table, setTable] = useState<TableView>({ kind: "world" });
   const [legacyDemand, setLegacyDemand] = useState<WorldDemand | null>(null);
   const [demandProblem, setDemandProblem] = useState<string | null>(null);
-  const [governedObligations, setGovernedObligations] = useState<WorldObligationSummary[]>([]);
+  /**
+   * The frontier read has answered — landed, failed, or answered null. A null
+   * demand is a settled answer ("no Purpose demand is loaded"), not an
+   * outstanding read, so settled-ness is tracked and never inferred.
+   */
+  const [demandSettled, setDemandSettled] = useState(false);
+  const [governedObligations, setGovernedObligations] =
+    useState<WorldObligationSummary[] | null>(null);
   const [governedProblem, setGovernedProblem] = useState<string | null>(null);
-  const frontierRead = useRef(false);
+  const [frontierRequested, setFrontierRequested] = useState(false);
   const [selectedObligation, setSelectedObligation] =
     useState<WorldObligation | null>(null);
   const [obligationInspection, setObligationInspection] =
@@ -1225,9 +1656,10 @@ export function WorldPage() {
   /**
    * A mark a table named, distinct from canvas selection.
    *
-   * Clicking the field already has the mark under the pointer. A row does not,
-   * and the same row clicked twice still has to fly — so the token changes even
-   * when the id does not.
+   * Clicking the field already has the mark under the pointer. A row does not.
+   * The camera reveals rather than recenters, so a row whose mark is already
+   * showing holds still — and the token still changes when the id does not,
+   * so a mark that left the view flies back on the second click.
    */
   const [focus, setFocus] = useState<{ id: string; token: number } | null>(
     null,
@@ -1256,19 +1688,6 @@ export function WorldPage() {
   const expansionsInFlight = useRef(new Map<string, number>());
   /** Invalidates a response that lands after its field has been cleared. */
   const expansionGeneration = useRef(0);
-  /** A selected mark stays present while its ants collapse into it. */
-  const pendingRemovals = useRef(new Map<string, number>());
-
-  useEffect(
-    () => () => {
-      for (const timer of pendingRemovals.current.values()) {
-        window.clearTimeout(timer);
-      }
-      pendingRemovals.current.clear();
-    },
-    [],
-  );
-
   useEffect(() => {
     const frame = requestAnimationFrame(() => setMotionReady(true));
     return () => cancelAnimationFrame(frame);
@@ -1292,10 +1711,32 @@ export function WorldPage() {
       if (incoming) return incoming;
       return current;
     });
+    /**
+     * The filter menu comes back as left — see `showMemory` — whether or not
+     * a field came back with it. A stored menu wins over the reveal below: it
+     * was written alongside the field it filters, so re-revealing would switch
+     * back on a layer the person turned off after the last restore.
+     */
+    const storedShow = readShow(overview.world_id);
+    if (storedShow) {
+      setShow(storedShow.show);
+      setNamedAtRest(storedShow.namedAtRest);
+      setSpreadOnSelect(storedShow.spreadOnSelect);
+      setFraming(storedShow.framing);
+    } else if (incoming && !fieldSize(set)) {
+      /**
+       * The restore places marks, and placing reveals — see `revealSet` — so
+       * a restored mechanical field comes back standing instead of filtered
+       * out. Only when the restore actually placed, and only for a menu this
+       * browser never put away: a field built through a link keeps what its
+       * builder revealed.
+       */
+      setShow((current) => revealSet(incoming, current));
+    }
     // Both in one commit, so the rule below never sees a field that has not
     // arrived yet and flips the surface on its way there.
     setRestored(true);
-  }, [overview]);
+  }, [overview, set]);
 
   /**
    * The one rule: the vocabulary is showing exactly when the field is empty.
@@ -1320,6 +1761,19 @@ export function WorldPage() {
     if (!overview || !restored.current) return;
     writeField(overview.world_id, overview.revision, set);
   }, [overview, set]);
+
+  /**
+   * Keep the stored filter menu level with the one on screen.
+   *
+   * Gated on the restore having landed, not just started: this runs in the
+   * same commit as the restore scheduling, and writing the defaults over a
+   * stored menu before the restored one arrives would forget it between
+   * renders.
+   */
+  useEffect(() => {
+    if (!overview || !restoredField) return;
+    writeShow(overview.world_id, { show, namedAtRest, spreadOnSelect, framing });
+  }, [overview, restoredField, show, namedAtRest, spreadOnSelect, framing]);
 
   const onReaderWidth = useCallback((width: number) => {
     setReaderWidth(width);
@@ -1386,7 +1840,8 @@ export function WorldPage() {
     return () => {
       cancelled = true;
     };
-  }, [loadAttempt]);
+    // Once per mount: a refresh re-runs the load, which is the retry.
+  }, []);
 
   useEffect(() => {
     const name = linkedRelation.current;
@@ -1424,37 +1879,110 @@ export function WorldPage() {
       setReferent(null);
       return;
     }
+    const failedKey = `${selection.kind}:${selection.id}`;
+    setDetailProblems((current) => {
+      if (!current.has(failedKey)) return current;
+      const next = new Map(current);
+      next.delete(failedKey);
+      return next;
+    });
     let cancelled = false;
     if (selection.kind === "assertion") {
+      const cached = detailCache.current.assertions.get(selection.id);
+      if (cached) {
+        setAssertion(cached);
+        return;
+      }
       setAssertion(null);
       worldApi
         .assertion(selection.id)
-        .then((found) => !cancelled && setAssertion(found))
-        .catch((problem: Error) => !cancelled && setNotice(problem.message));
+        .then((found) => {
+          if (cancelled) return;
+          keepDetail(detailCache.current.assertions, selection.id, found);
+          setAssertion(found);
+        })
+        .catch((problem: Error) => {
+          if (cancelled) return;
+          setDetailProblems((current) =>
+            new Map(current).set(failedKey, problem.message),
+          );
+        });
     } else {
+      const cached = detailCache.current.referents.get(selection.id);
+      if (cached) {
+        setReferent(cached);
+        return;
+      }
       setReferent(null);
       worldApi
         .referent(selection.id)
-        .then((found) => !cancelled && setReferent(found))
-        .catch((problem: Error) => !cancelled && setNotice(problem.message));
+        .then((found) => {
+          if (cancelled) return;
+          keepDetail(detailCache.current.referents, selection.id, found);
+          setReferent(found);
+        })
+        .catch((problem: Error) => {
+          if (cancelled) return;
+          setDetailProblems((current) =>
+            new Map(current).set(failedKey, problem.message),
+          );
+        });
     }
     return () => {
       cancelled = true;
     };
   }, [selection]);
 
-  const chooseFieldMark = useCallback((next: CanvasSelection) => {
+  const showMark = useCallback((next: NonNullable<CanvasSelection>) => {
     setSelectedObligation(null);
     setObligationInspection(null);
     setObligationProblem(null);
     setSelection(next);
-    setReaderOpen(Boolean(next));
+    setReaderOpen(true);
   }, []);
 
-  const chooseSchemaRelation = useCallback((name: string | null) => {
-    setFocusedRelation(name);
-    setReaderOpen(Boolean(name));
-  }, []);
+  const chooseFieldMark = useCallback((next: CanvasSelection) => {
+    if (!next) {
+      setSelectedObligation(null);
+      setObligationInspection(null);
+      setObligationProblem(null);
+      setSelection(null);
+      setReaderOpen(false);
+      return;
+    }
+    // Travel pushes: the mark being left is where back returns to. A
+    // re-press of the mark already shown pushes nothing — back past a
+    // no-op is a loop, not a trail.
+    if (selection && !sameSelection(next, selection)) {
+      setPast((prev) => [...prev.slice(-(READER_TRAIL_CAP - 1)), selection]);
+    }
+    showMark(next);
+  }, [selection, showMark]);
+
+  /**
+   * One step down the trail, without pushing: back is travel whose arrival
+   * must not become its own return.
+   */
+  const goBack = useCallback(() => {
+    const next = past[past.length - 1];
+    if (!next) return;
+    setPast(past.slice(0, -1));
+    showMark(next);
+  }, [past, showMark]);
+
+  const chooseSchemaRelation = useCallback(
+    (name: string | null) => {
+      setFocusedRelation(name);
+      // The vocabulary room opens no panels: with a field behind it the
+      // reader would surface the stale field selection instead of the
+      // relation just named — measured opening program_entity's panel from
+      // an enters_flow click. The room implies a field, so its absence is
+      // the default screen, where no stale selection exists and the reader
+      // legitimately reads the focused relation.
+      if (!hasField) setReaderOpen(Boolean(name));
+    },
+    [hasField],
+  );
 
   const onSeed = useCallback((id: string, label: string) => {
     setSet((current) => seed(current, id, label));
@@ -1501,15 +2029,9 @@ export function WorldPage() {
   }, [onSeed, chooseFieldMark, revealMark, set]);
 
   const onExpand = useCallback(
-    async (relation: string, count: number) => {
-      if (!selection || selection.kind !== "referent") return;
-      const anchor = selection.id;
+    async (anchor: string, relation: string) => {
       const key = expansionKey(anchor, relation);
       if (expansionsInFlight.current.has(key)) return;
-      if (count > MAX_FIELD_NODES - fieldSize(set)) {
-        setNotice(`${relation} has ${count} tuples — more than the field holds.`);
-        return;
-      }
       const schema = relations.find((item) => item.name === relation);
       // No `reveal` here. Expanding through a filtered-out relation is allowed
       // — the neighbours arrive and referents draw under every filter — but it
@@ -1519,54 +2041,68 @@ export function WorldPage() {
       expansionsInFlight.current.set(key, generation);
       dispatchExpansion({ type: "start", key });
       try {
-        const expansion = await worldApi.expand(anchor, relation);
-        if (generation !== expansionGeneration.current) return;
-        /**
-         * Names for the neighbours the directory did not carry.
-         *
-         * Only when it is short: a complete directory already holds every
-         * label, and a request per expansion for an answer already in hand is
-         * the plane being asked to repeat itself. A neighbour with no name
-         * still draws — `workingSet` falls back to the id — so this failing is
-         * a field of ids, not a field of nothing.
-         */
-        if (directoryShort) {
-          const missing = [
-            ...new Set(
-              expansion.tuples.flatMap((tuple) =>
-                expansion.roles
-                  .filter((role) => role.referent)
-                  .map((role) => String(tuple.values[role.name] ?? ""))
-                  .filter((id) => id && !labels.current.has(id)),
+        let offset = 0;
+        while (true) {
+          // The expansion endpoint returns only one bounded batch. Rows can
+          // page the same referent's neighborhood without losing its tail.
+          const page = await worldApi.rows(relation, {
+            subject: anchor,
+            limit: 200,
+            offset,
+          });
+          if (generation !== expansionGeneration.current) return;
+          /**
+           * Names for the neighbours the directory did not carry.
+           *
+           * Only when it is short: a complete directory already holds every
+           * label, and a request per expansion for an answer already in hand is
+           * the plane being asked to repeat itself. A neighbour with no name
+           * still draws — `workingSet` falls back to the id — so this failing is
+           * a field of ids, not a field of nothing.
+           */
+          if (directoryShort) {
+            const missing = [
+              ...new Set(
+                page.rows.flatMap((tuple) =>
+                  page.roles
+                    .filter((role) => role.referent)
+                    .map((role) => String(tuple.values[role.name] ?? ""))
+                    .filter((id) => id && !labels.current.has(id)),
+                ),
               ),
-            ),
-          ];
-          if (missing.length) {
-            try {
-              const found = await worldApi.labels(missing);
-              for (const [id, label] of Object.entries(found)) {
-                labels.current.set(id, label);
+            ];
+            if (missing.length) {
+              try {
+                const found = await worldApi.labels(missing);
+                for (const [id, label] of Object.entries(found)) {
+                  labels.current.set(id, label);
+                }
+              } catch {
+                // A name is not the claim. The expansion stands either way.
               }
-            } catch {
-              // A name is not the claim. The expansion stands either way.
+              if (generation !== expansionGeneration.current) return;
             }
-            if (generation !== expansionGeneration.current) return;
+          }
+          setSet((current) =>
+            current.referents.has(anchor)
+              ? expand(current, {
+                  anchor,
+                  relation,
+                  mode: schema?.mode ?? "BASE",
+                  stale: schema?.stale ?? false,
+                  completeness: schema?.completeness?.status ?? null,
+                  roles: page.roles,
+                  tuples: page.rows,
+                  labels: labels.current,
+                })
+              : current,
+          );
+          offset += page.rows.length;
+          if (offset >= page.total) break;
+          if (!page.rows.length) {
+            throw new Error("The neighborhood read ended before all tuples arrived. Try again.");
           }
         }
-        setSet((current) =>
-          current.referents.has(anchor)
-            ? expand(current, {
-                anchor,
-                relation,
-                mode: schema?.mode ?? "BASE",
-                stale: schema?.stale ?? false,
-                completeness: schema?.completeness?.status ?? null,
-                roles: expansion.roles,
-                tuples: expansion.tuples,
-                labels: labels.current,
-              })
-            : current,
-        );
         dispatchExpansion({ type: "succeed", key });
       } catch (problem) {
         if (generation === expansionGeneration.current) {
@@ -1580,20 +2116,45 @@ export function WorldPage() {
         }
       }
     },
-    [relations, selection, set],
+    [directoryShort, relations],
   );
 
   const onRetract = useCallback(
-    (relation: string) => {
-      if (!selection || selection.kind !== "referent") return;
-      setSet((current) => retractExpansion(current, selection.id, relation));
+    (anchor: string, relation: string) => {
+      setSet((current) => retractExpansion(current, anchor, relation));
     },
-    [selection],
+    [],
   );
 
-  const onPositions = useCallback((positions: Map<string, { x: number; y: number }>) => {
-    setSet((current) => ({ ...current, positions: new Map([...current.positions, ...positions]) }));
-  }, []);
+  /**
+   * Where the renderer put everything, and what was dropped to put it there.
+   *
+   * The dropped mark restacks to the front — but only when its place actually
+   * changed. A press that went nowhere is a click, not a drop, and restacking
+   * it would reorder the depth stack for an action that moved nothing. One
+   * set either way, so positions and depth land in a single frame.
+   */
+  const onPositions = useCallback(
+    (
+      positions: Map<string, { x: number; y: number }>,
+      droppedId?: string,
+    ) => {
+      setSet((current) => {
+        const merged = new Map([...current.positions, ...positions]);
+        const at = droppedId ? merged.get(droppedId) : undefined;
+        const was = droppedId ? current.positions.get(droppedId) : undefined;
+        if (
+          !droppedId ||
+          !at ||
+          (was && at.x === was.x && at.y === was.y)
+        ) {
+          return { ...current, positions: merged };
+        }
+        return restack({ ...current, positions: merged }, droppedId);
+      });
+    },
+    [],
+  );
 
   /**
    * A row focuses its graph projection (§11).
@@ -1637,21 +2198,76 @@ export function WorldPage() {
   }, [placeTuple, table]);
 
   /**
+   * A bulk arrival is in flight, so frames draw still — no per-mark births.
+   *
+   * Set by the table running the add-all, cleared by it when the run ends. The
+   * release lands after the last page's render (the table defers it a task),
+   * so the final frame is already enqueued still before the flag falls.
+   */
+  const [bulkActive, setBulkActive] = useState(false);
+
+  /**
+   * A page of rows, onto the field — the bulk half of the §11 seam.
+   *
+   * One `setSet` folds the whole page through the same `place` a single row
+   * takes, so a page costs one render no matter how many tuples it holds.
+   * Deliberately not `placeTuple` in a loop: that would fly the camera once
+   * per row and re-decide the selection per row, and a bulk add is neither a
+   * focus nor a choice. The camera stays where it was, the selection is
+   * untouched, and the rows say they arrived by ticking into the margin.
+   */
+  const placeMany = useCallback(
+    (relation: string, roles: WorldRole[], tuples: WorldTuple[]) => {
+      const schema = relations.find((item) => item.name === relation);
+      if (schema) setShow((current) => reveal(schema, current));
+      setSet((current) =>
+        placeAll(current, {
+          relation,
+          mode: schema?.mode ?? "BASE",
+          stale: schema?.stale ?? false,
+          completeness: schema?.completeness?.status ?? null,
+          roles,
+          tuples,
+          labels: labels.current,
+        }),
+      );
+    },
+    [relations],
+  );
+
+  /**
    * Load the two read contracts together when either obligation surface is
-   * opened. The values remain separate: `/world/demand` is legacy Purpose
-   * demand, while `/world/obligations` is the durable governed set.
+   * opened — or a demand is read. The values remain separate: `/world/demand`
+   * is legacy Purpose demand, while `/world/obligations` is the durable
+   * governed set. Reading on selection as well as on open is what keeps a
+   * field demand from showing its loading frame forever: without it the
+   * document nobody asked for never arrives.
    */
   useEffect(() => {
-    if (
-      (table?.kind !== "frontier" && table?.kind !== "governed") ||
-      frontierRead.current
-    ) return;
-    frontierRead.current = true;
+    const wantsFrontier =
+      table?.kind === "frontier" ||
+      table?.kind === "governed" ||
+      selection?.kind === "demand";
+    if (wantsFrontier) setFrontierRequested(true);
+  }, [table?.kind, selection]);
+
+  // Once requested, these reads belong to the mounted World, not to the
+  // selection that opened them. Navigation must not discard their answers.
+  useEffect(() => {
+    if (!frontierRequested) return;
     let cancelled = false;
     worldApi
       .demand()
-      .then((found) => !cancelled && setLegacyDemand(found))
-      .catch((problem: Error) => !cancelled && setDemandProblem(problem.message));
+      .then((found) => {
+        if (cancelled) return;
+        setLegacyDemand(found);
+        setDemandSettled(true);
+      })
+      .catch((problem: Error) => {
+        if (cancelled) return;
+        setDemandProblem(problem.message);
+        setDemandSettled(true);
+      });
     worldApi
       .obligations()
       .then((read) => !cancelled && setGovernedObligations(read.obligations))
@@ -1659,7 +2275,7 @@ export function WorldPage() {
     return () => {
       cancelled = true;
     };
-  }, [table?.kind]);
+  }, [frontierRequested]);
 
   /** Obligations by the key the field knows them under. */
   const obligations = useMemo(() => {
@@ -1671,7 +2287,7 @@ export function WorldPage() {
   }, [legacyDemand]);
 
   const governed = useMemo(
-    () => governedObligations.map((obligation) => ({
+    () => (governedObligations ?? []).map((obligation) => ({
       ...obligation,
       key: obligation.obligation_id,
     })),
@@ -1769,16 +2385,101 @@ export function WorldPage() {
   }, [set]);
 
   /**
+   * Relations standing on the field in full — `present` at relation grain.
+   *
+   * The catalogue row carries the same margin rule as an extension row, but
+   * only for full coverage: a relation with half its tuples placed is not
+   * present, it is half read. Obligations are not world tuples, so demands
+   * never count toward their relation's fullness.
+   */
+  const complete = useMemo(() => {
+    const counts = new Map<string, number>();
+    const tally = (relation: string) =>
+      counts.set(relation, (counts.get(relation) ?? 0) + 1);
+    for (const assertion of set.assertions.values()) tally(assertion.relation);
+    for (const bond of set.bonds) tally(bond.relation);
+    return new Set(
+      relations
+        .filter(
+          (item) => item.count > 0 && (counts.get(item.name) ?? 0) >= item.count,
+        )
+        .map((item) => item.name),
+    );
+  }, [relations, set]);
+
+  /**
+   * Relations with anything on the field — the grain the footer's clear
+   * disables at. Demands never count: they are not world tuples, so no
+   * extension table can clear them.
+   */
+  const relationsOnField = useMemo(() => {
+    const names = new Set<string>();
+    for (const assertion of set.assertions.values()) names.add(assertion.relation);
+    for (const bond of set.bonds) names.add(bond.relation);
+    return names;
+  }, [set]);
+
+  /**
+   * The selection the reader is showing — the first reading law. It lags
+   * `selection` while the new subject's detail is still in flight, so a
+   * subject change is one exchange and never the loading frame between them.
+   *
+   * A demand's detail is the frontier document, not a per-subject read, so it
+   * is ready when that document has settled — landed or failed — rather than
+   * at once. And the first read advances at once: the loading frame inside an
+   * opening drawer names the subject being read, which is honest, while
+   * holding it would open on the empty column, which claims nothing is
+   * selected while a mark is.
+   */
+  const readerSelection = useLagging(
+    selection,
+    (next, shown) =>
+      next === null ||
+      shown === null ||
+      !selectionSurvived(shown, set) ||
+      (next.kind === "demand"
+        ? demandSettled
+        : detailProblems.has(`${next.kind}:${next.id}`) ||
+          (next.kind === "referent" && referent?.id === next.id) ||
+          (next.kind === "assertion" &&
+            assertion?.assertion_id === next.id)),
+    sameSelection,
+  );
+  // A retained subject reads its own cached detail. The in-flight detail
+  // states below only say whether the target has answered; they may be null
+  // or already belong to a different subject.
+  const readerAssertion = readerSelection?.kind === "assertion"
+    ? detailCache.current.assertions.get(readerSelection.id) ?? null
+    : null;
+  const readerReferent = readerSelection?.kind === "referent"
+    ? detailCache.current.referents.get(readerSelection.id) ?? null
+    : null;
+
+  /**
    * Whether the open assertion has a second drawing, and which way.
    *
    * Asked of the field rather than of the tuple: the same assertion is
    * foldable when it is standing on the field and nothing at all when it is
    * only a row in a table, because there is no line to open.
    */
+  const framed = useFrames(
+    set,
+    relations,
+    overview?.revision ?? null,
+    overview?.world_id ?? null,
+    framing,
+    framedOpen,
+  );
+  /**
+   * Read off what is drawn, so the offer matches the mark: under framing a
+   * claim's binary reading can exist only in the view.
+   */
   const folding = useMemo(
     () =>
-      selection?.kind === "assertion" ? foldingOf(set, selection.id) : null,
-    [selection, set],
+      readerSelection?.kind === "assertion"
+        ? foldingOf(framed.view, readerSelection.id)
+        : null,
+    [framed.view, readerSelection],
   );
 
   /**
@@ -1789,71 +2490,155 @@ export function WorldPage() {
    * — it was showing the tuple's roles all along, which is the argument for
    * the feature: opening puts on the field what the panel already knew.
    */
-  const onFold = useCallback(() => {
-    if (!selection || selection.kind !== "assertion") return;
-    const id = selection.id;
+  const onFold = useCallback((id: string) => {
+    if (framed.reprojected.has(id)) {
+      // Toggling toward the plate seeds the canvas with where the bond's
+      // name stood; toggling back onto the line needs no seat.
+      setFoldSeed(framedOpen.has(id) ? null : { id });
+      setFramedOpen((current) => {
+        const next = new Set(current);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+      return;
+    }
+    // An opening seeds the canvas; a collapse draws the line it always drew.
+    setFoldSeed(foldingOf(set, id) === "open" ? { id } : null);
     setSet((current) =>
       foldingOf(current, id) === "open" ? openBond(current, id) : collapse(current, id),
     );
-  }, [selection]);
+  }, [framed.reprojected, framedOpen, set]);
 
+  /**
+   * Take a mark off the field, the moment it is asked for.
+   *
+   * Removal begins on the press, not the release: the set changes in the same
+   * tick, the ring stands down with its mark, and the collapse plays from the
+   * set change. There is nothing to stage and no second phase — a tap, a
+   * click, a hold, Delete and take-off all land here, so they all remove the
+   * same way. A press on what is already gone (a fading element mid-collapse,
+   * a repeated delivery) is ignored.
+   */
   const removeMark = useCallback(
     (mark: NonNullable<CanvasSelection>) => {
-      if (pendingRemovals.current.has(mark.id)) return;
+      const onField =
+        mark.kind === "referent"
+          ? set.referents.has(mark.id)
+          : mark.kind === "demand"
+            ? set.demands.has(mark.id)
+            : set.assertions.has(mark.id) ||
+              set.bonds.some((bond) => bond.assertion_id === mark.id);
+      if (!onField) return;
       if (mark.kind === "referent") {
         expansionGeneration.current += 1;
         expansionsInFlight.current.clear();
         dispatchExpansion({ type: "reset" });
       }
-      const finish = () => {
-        pendingRemovals.current.delete(mark.id);
-        setSet((current) => dropMark(current, mark.id));
-      };
-      const reduced = window.matchMedia(
-        "(prefers-reduced-motion: reduce)",
-      ).matches;
-      const wasSelected = selection?.id === mark.id;
-      if (reduced) {
-        setSelection((current) => (current?.id === mark.id ? null : current));
-        setReaderOpen((open) => (wasSelected ? false : open));
-        finish();
-        return;
-      }
-
-      const collapseRing = () => {
-        // First the fast ring contracts. Only after it has handed the outline
-        // back does the slower node mass begin its own absorption in G6.
-        setSelection((current) => (current?.id === mark.id ? null : current));
-        const timer = window.setTimeout(
-          finish,
-          motion.absorb.durationMs,
-        );
-        pendingRemovals.current.set(mark.id, timer);
-      };
-
-      if (wasSelected) {
+      const next = dropMark(set, mark.id);
+      setSet(next);
+      // If it went down with the mark — directly or in the cascade — it and
+      // its reader go too; otherwise both stay where they were.
+      const survived = selection ? selectionSurvived(selection, next) : false;
+      if (selection && !survived) {
+        setSelection(null);
         setReaderOpen(false);
-        collapseRing();
-        return;
       }
-
-      // A direct right-click may not have selected the node first. Give it a
-      // ring long enough to resolve, then run the same ring → mass sequence;
-      // otherwise only previously selected nodes would get the stated death.
-      setSelection(mark);
-      const timer = window.setTimeout(
-        collapseRing,
-        motion.emit.durationMs,
-      );
-      pendingRemovals.current.set(mark.id, timer);
     },
-    [motion.absorb.durationMs, motion.emit.durationMs, selection],
+    [selection, set],
   );
 
   const onRemove = useCallback(() => {
     if (!selection) return;
     removeMark(selection);
   }, [removeMark, selection]);
+
+  /**
+   * Everything of one relation, off the field — the footer's inverse of add
+   * all. Assertions and bonds go, and so do referents nothing references
+   * anymore: a clear promises the relation is gone from the field, not that
+   * its discs stand around empty. A disc another relation still names stays.
+   *
+   * Bulk only. A single take-off deliberately leaves its context standing;
+   * clearing is the action that says the whole neighborhood went with it.
+   */
+  const clearRelation = useCallback(
+    (relation: string) => {
+      const ids = new Set<string>();
+      for (const [id, assertion] of set.assertions) {
+        if (assertion.relation === relation) ids.add(id);
+      }
+      for (const bond of set.bonds) {
+        if (bond.relation === relation) ids.add(bond.assertion_id);
+      }
+      if (!ids.size) return;
+      let next = set;
+      for (const id of ids) next = dropMark(next, id);
+      const used = new Set<string>();
+      for (const assertion of next.assertions.values()) {
+        for (const spoke of assertion.spokes) used.add(spoke.id);
+      }
+      for (const demand of next.demands.values()) {
+        for (const spoke of demand.spokes) used.add(spoke.id);
+      }
+      for (const bond of next.bonds) {
+        used.add(bond.source);
+        used.add(bond.target);
+      }
+      let pruned = false;
+      for (const id of [...next.referents.keys()]) {
+        if (!used.has(id)) {
+          next = dropMark(next, id);
+          pruned = true;
+        }
+      }
+      if (pruned) {
+        expansionGeneration.current += 1;
+        expansionsInFlight.current.clear();
+        dispatchExpansion({ type: "reset" });
+      }
+      setSet(next);
+      const survived = selection ? selectionSurvived(selection, next) : false;
+      if (selection && !survived) {
+        setSelection(null);
+        setReaderOpen(false);
+      }
+    },
+    [selection, set],
+  );
+
+  /**
+   * One row off the field — the extension's per-row inverse of place. A
+   * single take-off, so its context stays standing; see `clearRelation`.
+   */
+  const takeOffTuple = useCallback(
+    (assertionId: string) => {
+      removeMark({ kind: "assertion", id: assertionId });
+    },
+    [removeMark],
+  );
+
+  /**
+   * The whole field, emptied — the catalogue footer's clear.
+   *
+   * The counterpart to clearing one relation: where that leaves referents
+   * standing the way a take-off does, this leaves nothing at all, which is
+   * what the top level is for.
+   */
+  const clearField = useCallback(() => {
+    expansionGeneration.current += 1;
+    expansionsInFlight.current.clear();
+    dispatchExpansion({ type: "reset" });
+    setSet(emptySet());
+    setSelection(null);
+    setPast([]);
+    setHovered(null);
+    setReaderOpen(false);
+    // Back to the state the surface starts in. The vocabulary follows from the
+    // field being empty and is not set here; the dock is, because a person
+    // asked for an empty field and the catalogue is what refills it.
+    setTablesOpen(true);
+  }, []);
 
   /**
    * Arrangement: the two ways a person may re-place matter already standing.
@@ -1910,24 +2695,6 @@ export function WorldPage() {
     setArrangeUndo(null);
   }, [fieldMembership]);
 
-  const clearField = useCallback(() => {
-    for (const timer of pendingRemovals.current.values()) {
-      window.clearTimeout(timer);
-    }
-    pendingRemovals.current.clear();
-    expansionGeneration.current += 1;
-    expansionsInFlight.current.clear();
-    dispatchExpansion({ type: "reset" });
-    setSet(emptySet());
-    setSelection(null);
-    setHovered(null);
-    setReaderOpen(false);
-    // Back to the state the surface starts in. The vocabulary follows from the
-    // field being empty and is not set here; the dock is, because a person
-    // asked for an empty field and the catalogue is what refills it.
-    setTablesOpen(true);
-  }, []);
-
   const enterVocabulary = useCallback(() => {
     setVocabularyFocus(true);
     setReaderOpen(false);
@@ -1983,11 +2750,27 @@ export function WorldPage() {
    */
   const readerSubject = selectedObligation
     ? `obligation:${selectedObligation.obligation_id}`
-    : onField && selection
-    ? `${selection.kind}:${selection.id}`
+    : onField && readerSelection
+    ? `${readerSelection.kind}:${readerSelection.id}`
     : relation
       ? `relation:${relation.name}`
       : "reader:empty";
+  /**
+   * What the header's back chip is offered on, everywhere it appears.
+   *
+   * One step down the trail, or nothing while the trail is empty — every
+   * panel shares the header, so every panel shares the offer, including the
+   * empty column, where back is the way to the last thing read.
+   */
+  const onBack = past.length ? goBack : null;
+  /**
+   * Whether the shown subject stands on the field, for the footer that would
+   * take it off. The same question `removeMark` asks before acting, so a
+   * mark the footer cannot remove is a mark the footer does not offer to.
+   */
+  const shownOnField = readerSelection
+    ? selectionSurvived(readerSelection, set)
+    : false;
   /**
    * The notice is a thing that arrives and leaves, so it does both.
    *
@@ -2013,20 +2796,19 @@ export function WorldPage() {
     () =>
       worldCameraInsets({
         focus: focusDrawn,
+        // Whether the field is really empty — the same boolean the shell
+        // class uses — not the drawn view. A fielded vocabulary hides its
+        // dock like every other focus room, so insets that reserved it
+        // would frame the schema for a panel that is not there. The flip
+        // lands with the value swap, past the gap, which is when the
+        // unparked camera reads it.
         unfielded: !onField,
         tablesOpen,
         tablesWidth,
         readerOpen,
         readerWidth,
       }),
-    [
-      readerOpen,
-      readerWidth,
-      tablesOpen,
-      tablesWidth,
-      focusDrawn,
-      onField,
-    ],
+    [readerOpen, readerWidth, tablesOpen, tablesWidth, focusDrawn, onField],
   );
 
   return (
@@ -2062,21 +2844,29 @@ export function WorldPage() {
             </button>
           </div>
           {onField ? (
-            <button
-              type="button"
-              className="product-shell__local world__occupancy"
-              title="Clear the field"
-              aria-label={`Clear field, ${fieldSize(set)} of ${MAX_FIELD_NODES} on field`}
-              onClick={clearField}
-            >
-              <span className="world__occupancy-count">
-                {fieldSize(set)}/{MAX_FIELD_NODES} on field
-              </span>
-              <span className="world__occupancy-clear" aria-hidden="true">
-                clear
-              </span>
-            </button>
+            <span className="product-shell__local world__occupancy">
+              {fieldSize(set)} on field
+            </span>
           ) : null}
+          {onField
+            ? framed.frames.map((frame) => (
+                <button
+                  key={frame.id}
+                  type="button"
+                  className="product-shell__local world__frame"
+                  title={`The field is framed by ${frame.label}${
+                    frame.held ? `; ${frame.held} claims are about it alone` : ""
+                  }`}
+                  aria-label={`Open frame ${frame.label}`}
+                  onClick={() => chooseFieldMark({ kind: "referent", id: frame.id })}
+                >
+                  <span className="world__frame-name">in {frame.label}</span>
+                  <span className="world__frame-open" aria-hidden="true">
+                    open
+                  </span>
+                </button>
+              ))
+            : null}
         </div>
       </header>
 
@@ -2104,7 +2894,12 @@ export function WorldPage() {
                     <WorldTable
                       overview={overview}
                       relations={relations}
+                      complete={complete}
                       chrome={tableChrome}
+                      onClearField={clearField}
+                      clearable={fieldSize(set) > 0}
+                      onField={relationsOnField}
+                      onTakeOffRelation={clearRelation}
                       onOpen={(name) => {
                         const schema = relations.find(
                           (item) => item.name === name,
@@ -2123,6 +2918,10 @@ export function WorldPage() {
                     <GovernedObligationTable
                       obligations={governed}
                       problem={governedProblem}
+                      settled={
+                        governedObligations !== null ||
+                        governedProblem !== null
+                      }
                       chrome={tableChrome}
                       onFocus={onFocusGovernedObligation}
                     />
@@ -2131,6 +2930,7 @@ export function WorldPage() {
                       demand={legacyDemand}
                       relations={relations}
                       problem={demandProblem}
+                      settled={demandSettled}
                       present={present}
                       chrome={tableChrome}
                       onFocus={onFocusLegacyObligation}
@@ -2153,6 +2953,11 @@ export function WorldPage() {
                       subject={table.subject}
                       present={present}
                       onFocus={onFocusRow}
+                      onTakeOff={takeOffTuple}
+                      onPlaceMany={placeMany}
+                      onBulkActive={setBulkActive}
+                      onClearRelation={clearRelation}
+                      clearable={relationsOnField.has(extension.name)}
                       onWiden={() =>
                         showTable({
                           kind: "relation",
@@ -2205,16 +3010,23 @@ export function WorldPage() {
               >
                 {error ? (
                   <div className="world__error">
-                    <ProblemNotice message={error} onRetry={() => setLoadAttempt((attempt) => attempt + 1)} />
+                    <ProblemNotice message={error} />
                   </div>
                 ) : (
                   <>
-                    {onField ? (
+                    {/* The drawn view, not the field state: during the absorb
+                        gap the old view is still mounted and fading, and the
+                        swap lands with the palette under darkness. Keyed on
+                        the field instead, the canvas hard-cut to the new view
+                        in the old palette, then dipped it out and in. Focus
+                        with a field behind it keeps the world mounted but
+                        parked, so toggling back never rebuilds it. */}
+                    {!focusDrawn || (onField && vocabularyFocus) ? (
                       <div
                         className={`world__layer${focusDrawn ? " is-parked" : ""}`}
                       >
                         <WorldCanvas
-                          set={set}
+                          set={framed.view}
                           mode={mode}
                           params={MARK_DEFAULTS}
                           hovered={hovered}
@@ -2223,11 +3035,15 @@ export function WorldPage() {
                           focusId={focus?.id ?? null}
                           focusToken={focus?.token ?? 0}
                           arrangeToken={arrangeToken}
+                          foldSeed={foldSeed}
                           animateInitial={Boolean(selection)}
+                          still={bulkActive}
                           insets={cameraInsets}
                           motion={motion}
                           spreadOnSelect={spreadOnSelect}
                           light={undefined}
+                          world={overview?.world_id ?? null}
+                          revision={overview?.revision ?? null}
                           onHover={setHovered}
                           onSelect={chooseFieldMark}
                           onPositions={onPositions}
@@ -2245,9 +3061,7 @@ export function WorldPage() {
                         by the world's relations, not its field, so the
                         second graph is cheap to simply keep. */}
                     <div
-                      className={`world__layer${
-                        onField && !focusDrawn ? " is-parked" : ""
-                      }`}
+                      className={`world__layer${!focusDrawn ? " is-parked" : ""}`}
                     >
                         <SchemaCanvas
                           relations={visibleRelations}
@@ -2259,6 +3073,8 @@ export function WorldPage() {
                           focusId={focus?.id ?? null}
                           focusToken={focus?.token ?? 0}
                           insets={cameraInsets}
+                          world={overview?.world_id ?? null}
+                          revision={overview?.revision ?? null}
                           onHover={setHoveredRelation}
                           onSelect={chooseSchemaRelation}
                         />
@@ -2305,17 +3121,20 @@ export function WorldPage() {
                         setSelectedObligation(null);
                         setObligationInspection(null);
                       }}
+                      onBack={onBack}
                     />
-                  ) : onField && selection?.kind === "demand" ? (
+                  ) : onField && readerSelection?.kind === "demand" ? (
                     <DemandPanel
-                      obligation={obligations.get(selection.id) ?? null}
+                      obligation={obligations.get(readerSelection.id) ?? null}
                       demand={legacyDemand}
+                      problem={demandProblem}
+                      settled={demandSettled}
                       roles={
                         relations
                           .find(
                             (item) =>
                               item.name ===
-                              obligations.get(selection.id)?.relation,
+                              obligations.get(readerSelection.id)?.relation,
                           )
                           ?.roles.map((role) => role.name) ?? []
                       }
@@ -2326,14 +3145,24 @@ export function WorldPage() {
                           subject: null,
                         })
                       }
-                      onRemove={onRemove}
+                      onRemove={
+                        shownOnField ? () => removeMark(readerSelection) : null
+                      }
                       onClose={() => setReaderOpen(false)}
+                      onBack={onBack}
                     />
-                  ) : onField && selection?.kind === "assertion" ? (
+                  ) : onField && readerSelection?.kind === "assertion" ? (
                     <AssertionPanel
-                      assertion={assertion}
+                      assertion={readerAssertion}
+                      problem={
+                        detailProblems.get(
+                          `assertion:${readerSelection.id}`,
+                        ) ?? null
+                      }
+                      set={set}
                       folding={folding}
-                      onFold={onFold}
+                      onSelect={chooseFieldMark}
+                      onFold={() => onFold(readerSelection.id)}
                       onTable={(name) =>
                         showTable({
                           kind: "relation",
@@ -2348,29 +3177,37 @@ export function WorldPage() {
                           assertion: id,
                         })
                       }
-                      onRemove={onRemove}
+                      onRemove={
+                        shownOnField ? () => removeMark(readerSelection) : null
+                      }
                       onClose={() => setReaderOpen(false)}
+                      onBack={onBack}
                     />
-                  ) : onField && selection?.kind === "referent" ? (
+                  ) : onField && readerSelection?.kind === "referent" ? (
                     <ReferentPanel
-                      detail={referent}
+                      detail={readerReferent}
+                      problem={
+                        detailProblems.get(`referent:${readerSelection.id}`) ??
+                        null
+                      }
                       set={set}
+                      onSelect={chooseFieldMark}
                       requests={expansionRequests}
-                      onExpand={onExpand}
-                      onRetract={onRetract}
+                      onExpand={(name) => onExpand(readerSelection.id, name)}
+                      onRetract={(name) => onRetract(readerSelection.id, name)}
                       onTable={(name) =>
                         showTable({
                           kind: "relation",
                           relation: name,
-                          subject: referent
+                          subject: readerReferent
                             ? {
-                                id: referent.id,
-                                label: referent.label || referent.id,
+                                id: readerReferent.id,
+                                label: readerReferent.label || readerReferent.id,
                               }
                             : null,
                         })
                       }
-                      onDrop={onRemove}
+                      onDrop={() => removeMark(readerSelection)}
                       // Withheld for now. `separate` stays: it answers a
                       // question a reader actually has — two marks are sitting
                       // on top of each other — where gather re-places matter
@@ -2379,6 +3216,7 @@ export function WorldPage() {
                       // and not a deletion.
                       onGather={null}
                       onClose={() => setReaderOpen(false)}
+                      onBack={onBack}
                     />
                   ) : relation ? (
                     <article className="world-reader__article">
@@ -2393,6 +3231,7 @@ export function WorldPage() {
                         }
                         meta={`${relation.count} tuple${relation.count === 1 ? "" : "s"} · ${relation.arity} roles${conditionOf(relation.stale, relation.completeness)}`}
                         onClose={() => setReaderOpen(false)}
+                        onBack={onBack}
                       />
                       <div className="world-reader__content">
                         {relation.description ? (
@@ -2458,6 +3297,7 @@ export function WorldPage() {
                         title="Reader"
                         meta="Select a mark on the field"
                         onClose={() => setReaderOpen(false)}
+                        onBack={onBack}
                       />
                       <div className="world-reader__content">
                         <p className="world__hint">
@@ -2510,6 +3350,11 @@ export function WorldPage() {
                     on: spreadOnSelect,
                     onToggle: () => setSpreadOnSelect((on) => !on),
                   }
+                : undefined
+            }
+            frame={
+              onField && !focusDrawn
+                ? { on: framing, onToggle: () => setFraming((on) => !on) }
                 : undefined
             }
           />

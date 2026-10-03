@@ -28,6 +28,8 @@ account.json
 frontend/node_modules/
 frontend/dist/
 frontend/data/
+frontend/test-results/
+frontend/playwright-report/
 
 # --- Generated graphs and run state ---
 *.lbug
