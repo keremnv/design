@@ -13,7 +13,7 @@ Relationship between the three layers:
 ```text
 research document      = exploratory reasoning / evidence
 pre-application base   = reconciled downstream conclusions (this document)
-Application v1 contract = concrete normative application specification (not yet written)
+Application construction contract = docs/SOFTWARE_GOVERNANCE_CONSTRUCTION_CONTRACT.md (accepted Construction v0; not Core authority). Acceptance record = docs/SOFTWARE_GOVERNANCE_CONSTRUCTION_ACCEPTANCE.md.
 ```
 
 Core authority remains
