@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from ontology_author.world.runtime.world import ConstructionWorld
+from ontology_author.world.runtime.world import ConstructionError, ConstructionWorld
 
 
 @dataclass(frozen=True)
@@ -92,8 +92,39 @@ def write_sidecars(
         write_construction_receipt(directory, construction_receipt_payload)
 
 
+def _verify_retained_evidence_closure(bundle: Path) -> None:
+    """Reject a publication whose retained TypeScript evidence cannot resolve.
+
+    Generic Contract admission intentionally remains provider-neutral. This
+    publication-boundary check only activates for source observations owned by
+    the TypeScript program-evidence provider; other providers retain their own
+    verification contracts.
+    """
+
+    database = bundle / "world.sqlite"
+    if not database.exists():
+        return
+    from ontology_author.evidence.program_source import verify_retained_program_inputs
+
+    opened = ConstructionWorld.open(database, read_only=True)
+    try:
+        errors = verify_retained_program_inputs(opened)
+    finally:
+        opened.close()
+    if errors:
+        raise ConstructionError(
+            "retained program evidence verification failed: " + "; ".join(errors)
+        )
+
+
 def _replace_candidate(candidate: Path, world: Path) -> None:
-    """Replace the current World with a sealed candidate directory."""
+    """Replace the current World with a sealed candidate directory.
+
+    Replacement is legacy publication behavior retained until Phase 2. Phase
+    1 still treats this as the acceptance boundary and refuses to cross it
+    when a candidate's recorded TypeScript evidence cannot reconstruct from
+    the bytes that will actually be retained.
+    """
 
     candidate = Path(candidate)
     world = Path(world)
@@ -103,6 +134,12 @@ def _replace_candidate(candidate: Path, world: Path) -> None:
     if staging.exists():
         _remove_tree(staging)
     shutil.copytree(candidate, staging)
+    try:
+        _verify_retained_evidence_closure(staging)
+    except Exception:
+        if staging.exists():
+            _remove_tree(staging)
+        raise
     if previous.exists():
         _remove_tree(previous)
     _seal_world(staging)
@@ -135,7 +172,6 @@ def _remove_tree(path: Path) -> None:
         child.chmod(child.stat().st_mode | (0o700 if child.is_dir() else 0o600))
     path.chmod(path.stat().st_mode | 0o700)
     shutil.rmtree(path)
-
 
 
 def discard_candidate(candidate: Path) -> None:
