@@ -22,6 +22,7 @@ PROGRAM_INPUTS_DIR = "program_inputs"
 
 _BYTE_LOCATION = re.compile(r"^bytes:(\d+):(\d+)$")
 _HANDLE_DIGEST = re.compile(r"@sha256:([0-9a-fA-F]+)$")
+_PROGRAM_PROVIDERS = frozenset({"typescript", "typescript-config"})
 
 
 def _canonical_json(value: Any) -> str:
@@ -113,6 +114,47 @@ def reconstruct_program_observation(world: ConstructionWorld, observation: Mappi
         return "", "FAILED"
 
 
+def verify_retained_program_inputs(world: ConstructionWorld) -> list[str]:
+    """Verify every recorded TypeScript source observation can reconstruct.
+
+    This is deliberately provider-scoped rather than a generic World rule.
+    Other evidence providers own their own retention/reconstruction contracts.
+    A publication carrying TypeScript source observations, however, may not be
+    accepted with only pointer-shaped groundings and missing snapshot bytes.
+    """
+
+    errors: list[str] = []
+    rows = world.query(
+        "SELECT subject_type, subject_id, detail FROM _world_groundings "
+        "WHERE kind='SOURCE' ORDER BY subject_type, subject_id, detail"
+    )
+    for row in rows:
+        try:
+            detail = json.loads(row.get("detail") or "{}")
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(detail, Mapping):
+            continue
+        provider = str(detail.get("provider") or "")
+        if provider not in _PROGRAM_PROVIDERS:
+            continue
+        subject = f"{row.get('subject_type')}:{row.get('subject_id')}"
+        required = ("native_handle", "source_revision", "native_location")
+        missing = [key for key in required if not str(detail.get(key) or "").strip()]
+        if missing:
+            errors.append(
+                f"program source observation for {subject} lacks {', '.join(missing)}"
+            )
+            continue
+        _text, status = reconstruct_program_observation(world, detail)
+        if status != "OK":
+            errors.append(
+                "program source observation cannot reconstruct retained bytes: "
+                f"{subject} {detail.get('native_handle')} {detail.get('native_location')}"
+            )
+    return sorted(set(errors))
+
+
 def source_evidence_record(
     *,
     world: ConstructionWorld,
@@ -142,7 +184,7 @@ def source_evidence_record(
         "snapshot": snapshot_id,
         "provider": str(observation.get("provider") or ""),
         # ``native_handle`` is the canonical SourceObservation field used by
-        # semantic persistence.  Keep the historical ``handle`` alias for
+        # semantic persistence. Keep the historical ``handle`` alias for
         # existing application/read surfaces while consumers migrate.
         "native_handle": handle,
         "handle": handle,
