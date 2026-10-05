@@ -122,6 +122,10 @@ def source_evidence_record(
         "side": side,
         "snapshot": snapshot_id,
         "provider": str(observation.get("provider") or ""),
+        # ``native_handle`` is the canonical SourceObservation field used by
+        # semantic persistence.  Keep the historical ``handle`` alias for
+        # existing application/read surfaces while consumers migrate.
+        "native_handle": handle,
         "handle": handle,
         "path": _path_from_handle(handle),
         "source_revision": str(observation.get("source_revision") or ""),
