@@ -13,6 +13,7 @@ from typing import Any
 from ontology_author.evidence.program_source import reconstruct_program_observation
 from ontology_author.software_governance.evidence import reconstruct_governance_observation
 from ontology_author.software_governance.reads import GovernanceView
+from ontology_author.world.runtime.publication import PublicationRef, verify_publication_ref
 from ontology_author.world.runtime.world import ConstructionWorld
 
 CASE_RELATIONS = (
@@ -39,11 +40,11 @@ def assemble_case(
     """Present bounded World material. Inclusion is not applicability."""
 
     world = view.world
+    publication = PublicationRef.from_world(world)
     labels = {
         str(row["id"]): str(row["label"])
         for row in world.query("SELECT id, label FROM _world_referents")
     }
-    revision = int(world.query("SELECT revision FROM _world_meta WHERE singleton = 1")[0]["revision"])
     facts: list[dict[str, Any]] = []
     inspected: list[str] = []
     for relation in CASE_RELATIONS:
@@ -65,9 +66,9 @@ def assemble_case(
     return {
         "case_id": case_id,
         "question": question,
-        "world_id": world.world_id,
-        "revision": revision,
-        "world_address": str(world.path.parent),
+        "world_id": publication.world_id,
+        "revision": publication.revision,
+        "world_address": publication.address,
         "proposition_ids": list(proposition_ids),
         "subject_ids": list(subject_ids),
         "inspected_relations": inspected,
@@ -76,14 +77,20 @@ def assemble_case(
 
 
 def verify_case(view: GovernanceView, case: dict[str, Any]) -> list[str]:
-    """Check each citation against the sealed assertion and its grounding.
+    """Check the exact publication and every cited assertion/support path.
 
     Referent labels are display text. They are not part of the citation.
     """
 
-    errors = []
-    if case["world_id"] != view.world.world_id:
-        errors.append("world id differs")
+    errors: list[str] = []
+    try:
+        recorded = PublicationRef.from_mapping(case)
+    except (TypeError, ValueError):
+        errors.append("case publication reference is malformed")
+        return errors
+    errors.extend(verify_publication_ref(view.world, recorded))
+    if errors:
+        return errors
     for fact in case["facts"]:
         relation = str(fact["relation"])
         sealed_values = _values_for_assertion(view.world, relation, str(fact["assertion_id"]))
