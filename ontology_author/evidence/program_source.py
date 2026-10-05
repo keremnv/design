@@ -87,7 +87,12 @@ def _snapshot_revision_matches(world: ConstructionWorld, revision: str) -> bool:
 
 
 def reconstruct_program_observation(world: ConstructionWorld, observation: Mapping[str, str]) -> tuple[str, str]:
-    """Return (text, OK|FAILED) from sealed ``program_inputs`` blobs only."""
+    """Return (text, OK|FAILED) from sealed ``program_inputs`` blobs only.
+
+    Program entity and relation witnesses use exact ``bytes:start:end``
+    locations. Snapshot/config/effective-input groundings use ``input`` to
+    identify the whole retained input. Both are part of the producer contract.
+    """
 
     handle = str(observation.get("native_handle") or "")
     revision = str(observation.get("source_revision") or "")
@@ -95,15 +100,20 @@ def reconstruct_program_observation(world: ConstructionWorld, observation: Mappi
     digest_hex = _digest_from_handle(handle)
     if not digest_hex or not revision or not _snapshot_revision_matches(world, revision):
         return "", "FAILED"
-    match = _BYTE_LOCATION.match(location)
-    if match is None:
-        return "", "FAILED"
     blob = world.path.parent / PROGRAM_INPUTS_DIR / digest_hex
     try:
         payload = blob.read_bytes()
     except OSError:
         return "", "FAILED"
     if hashlib.sha256(payload).hexdigest() != digest_hex:
+        return "", "FAILED"
+    if location == "input":
+        try:
+            return payload.decode("utf-8"), "OK"
+        except UnicodeDecodeError:
+            return "", "FAILED"
+    match = _BYTE_LOCATION.match(location)
+    if match is None:
         return "", "FAILED"
     start, end = int(match.group(1)), int(match.group(2))
     if start < 0 or end < start or end > len(payload):
