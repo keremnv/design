@@ -91,12 +91,21 @@ def reconstruct_authority_observation(
         return "", "FAILED"
 
 
+def _database_path(value: Path | str) -> Path:
+    path = Path(value)
+    return path / "world.sqlite" if path.is_dir() else path
+
+
 def retained_authority_sources(
     world: ConstructionWorld | Path | str,
 ) -> dict[str, MarkdownSource]:
     """Reopen all authority sources from one retained publication only."""
 
-    opened = world if isinstance(world, ConstructionWorld) else ConstructionWorld.open(world, read_only=True)
+    opened = (
+        world
+        if isinstance(world, ConstructionWorld)
+        else ConstructionWorld.open(_database_path(world), read_only=True)
+    )
     close = not isinstance(world, ConstructionWorld)
     try:
         result: dict[str, MarkdownSource] = {}
