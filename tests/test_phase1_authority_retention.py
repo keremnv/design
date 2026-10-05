@@ -51,7 +51,7 @@ def test_authority_publication_reconstructs_after_external_markdown_is_removed(
     )
     assert result.succeeded, result.errors
 
-    world = ConstructionWorld.open(authority_world, read_only=True)
+    world = ConstructionWorld.open(authority_world / "world.sqlite", read_only=True)
     try:
         assertion_rows = world.query(
             "SELECT assertion_id FROM _world_assertions "
@@ -74,7 +74,7 @@ def test_authority_publication_reconstructs_after_external_markdown_is_removed(
     first = observations[0]
     assert retained[first.native_handle].reconstruct(first)
 
-    world = ConstructionWorld.open(authority_world, read_only=True)
+    world = ConstructionWorld.open(authority_world / "world.sqlite", read_only=True)
     try:
         text, status = reconstruct_authority_observation(world, first)
     finally:
