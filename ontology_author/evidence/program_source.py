@@ -67,13 +67,32 @@ def _path_from_handle(handle: str) -> str:
     return handle.split("@sha256:", 1)[0]
 
 
+def _snapshot_revision_matches(world: ConstructionWorld, revision: str) -> bool:
+    """Validate the snapshot revision when the publication declares one.
+
+    The TypeScript spine records ``source_state`` as SourceObservation's
+    ``source_revision``. Worlds without a program-snapshot contract are left
+    to their own producer-specific verification rather than inheriting this
+    convention accidentally.
+    """
+
+    try:
+        rows = world.relation_rows("program_snapshot")
+    except Exception:
+        return True
+    if not rows:
+        return True
+    return len(rows) == 1 and str(rows[0].get("source_state") or "") == revision
+
+
 def reconstruct_program_observation(world: ConstructionWorld, observation: Mapping[str, str]) -> tuple[str, str]:
     """Return (text, OK|FAILED) from sealed ``program_inputs`` blobs only."""
 
     handle = str(observation.get("native_handle") or "")
+    revision = str(observation.get("source_revision") or "")
     location = str(observation.get("native_location") or "")
     digest_hex = _digest_from_handle(handle)
-    if not digest_hex:
+    if not digest_hex or not revision or not _snapshot_revision_matches(world, revision):
         return "", "FAILED"
     match = _BYTE_LOCATION.match(location)
     if match is None:
