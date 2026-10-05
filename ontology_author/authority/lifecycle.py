@@ -20,6 +20,7 @@ from ontology_author.world.runtime.world import ConstructionWorld, world_id_of
 from ontology_author.evidence import EvidenceError
 
 from .construction import AuthorityConstructor, AuthorityUniverse
+from .evidence import retain_authority_sources
 from .schemas import (
     DEFAULT_PROFILE,
     AuthorityConstructionError,
@@ -64,7 +65,9 @@ def construct_authority_world(
     """Create a governed World by cloning a program spine, then adding authority facts.
 
     The sealed program World is an immutable input. Failure discards the
-    candidate and does not modify that input.
+    candidate and does not modify that input. Every declared authority source
+    is retained in the candidate before admission so an accepted publication
+    never depends on the original workspace copy remaining available.
     """
 
     source = Path(program_world).resolve()
@@ -95,6 +98,7 @@ def construct_authority_world(
             )
             build(constructor)
             receipt = constructor.finish()
+            retain_authority_sources(candidate, constructor.markdown)
             errors = validate_authority_construction(constructor, receipt)
             if errors:
                 world.close()
