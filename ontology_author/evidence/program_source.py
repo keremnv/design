@@ -72,17 +72,15 @@ def _snapshot_revision_matches(world: ConstructionWorld, revision: str) -> bool:
     """Validate the snapshot revision when the publication declares one.
 
     The TypeScript spine records ``source_state`` as SourceObservation's
-    ``source_revision``. Worlds without a program-snapshot contract are left
-    to their own producer-specific verification rather than inheriting this
-    convention accidentally.
+    ``source_revision``. TypeScript observations fail closed unless exactly
+    one program-snapshot contract is present; otherwise the recorded revision
+    has no qualified snapshot against which it can be checked.
     """
 
     try:
         rows = world.relation_rows("program_snapshot")
     except Exception:
-        return True
-    if not rows:
-        return True
+        return False
     return len(rows) == 1 and str(rows[0].get("source_state") or "") == revision
 
 
