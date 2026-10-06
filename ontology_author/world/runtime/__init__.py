@@ -11,6 +11,7 @@ The semantic core does not import this construction package.
 from ontology_author.world.runtime.commit import RunResult
 from ontology_author.world.runtime.entry import create, open_world, rebuild
 from ontology_author.world.runtime.project import Project
+from ontology_author.world.runtime.publication import PublicationRef, verify_publication_ref
 from ontology_author.world.runtime.resolution import (
     ResolutionEvaluationError,
     resolve_world,
@@ -25,6 +26,7 @@ __all__ = [
     "FAILURE_RELATION",
     "GroundingError",
     "Project",
+    "PublicationRef",
     "ResolutionEvaluationError",
     "Purpose",
     "RunResult",
@@ -33,4 +35,5 @@ __all__ = [
     "open_world",
     "rebuild",
     "resolve_world",
+    "verify_publication_ref",
 ]

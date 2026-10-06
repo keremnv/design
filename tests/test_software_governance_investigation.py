@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import copy
 import hashlib
+import shutil
 from pathlib import Path
 
 import pytest
@@ -189,6 +190,37 @@ def test_unresolved_investigation_does_not_invent_a_result(worlds: dict[str, Pat
     rendered = str(result["receipt"])
     assert "manager-signoff" not in rendered
     assert "billing-review is absent" not in rendered
+
+
+
+def test_expansion_uses_canonical_publication_identity(
+    worlds: dict[str, Path],
+    tmp_path: Path,
+) -> None:
+    direct = open_governance_world(worlds["accepted"])
+    try:
+        subject = _export_subject(direct)
+        parent = _case(direct, "canonical-parent", EXPORT_ID, subject)
+    finally:
+        direct.world.close()
+
+    alias = tmp_path / "accepted-link"
+    alias.symlink_to(worlds["accepted"], target_is_directory=True)
+    through_alias = open_governance_world(alias)
+    try:
+        child = expanded_case(through_alias, parent, case_id="canonical-child")
+        assert child["world_address"] == parent["world_address"]
+    finally:
+        through_alias.world.close()
+
+    copied = tmp_path / "accepted-copy"
+    shutil.copytree(worlds["accepted"], copied)
+    copy_view = open_governance_world(copied)
+    try:
+        with pytest.raises(InvestigationBoundary, match="world address differs"):
+            expanded_case(copy_view, parent, case_id="copied-child")
+    finally:
+        copy_view.world.close()
 
 
 def test_cross_world_assertion_is_rejected(worlds: dict[str, Path]) -> None:

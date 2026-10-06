@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from ontology_author.evidence.program_source import reconstruct_program_observation
 from ontology_author.software_governance.evidence import reconstruct_governance_observation
 from ontology_author.world.core.origins import ConstructionOrigin
 from ontology_author.world.runtime.world import ConstructionWorld
@@ -216,6 +217,7 @@ def _basis_errors(
     errors: list[str] = []
     saw_source = False
     saw_method = False
+    broken_observations = 0
     extra: dict[str, Any] = {}
     for base in warrant["bases"]:
         detail = base.get("detail")
@@ -227,13 +229,31 @@ def _basis_errors(
             extra = detail["extra"]
         for observation in detail.get("observations") or []:
             if not isinstance(observation, dict):
+                broken_observations += 1
+                continue
+            required = (
+                "provider",
+                "native_handle",
+                "source_revision",
+                "native_location",
+            )
+            if not all(str(observation.get(key) or "").strip() for key in required):
+                broken_observations += 1
                 continue
             _text, status = reconstruct_governance_observation(world, observation)
+            if status != "OK":
+                _text, status = reconstruct_program_observation(world, observation)
             if status == "OK":
                 saw_source = True
+            else:
+                broken_observations += 1
     label = str(values.get("proposition") or assertion_id)
     if not saw_source or not saw_method:
         errors.append(f"{relation} {label} lacks recoverable source grounding or a construction method")
+    if broken_observations:
+        errors.append(
+            f"{relation} {label} has {broken_observations} unreconstructible recorded evidence observation(s)"
+        )
     for key in FORBIDDEN_EXTRA:
         if key in extra:
             errors.append(f"{relation} {label} carries numeric confidence field {key}")

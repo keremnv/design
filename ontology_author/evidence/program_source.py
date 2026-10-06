@@ -22,6 +22,7 @@ PROGRAM_INPUTS_DIR = "program_inputs"
 
 _BYTE_LOCATION = re.compile(r"^bytes:(\d+):(\d+)$")
 _HANDLE_DIGEST = re.compile(r"@sha256:([0-9a-fA-F]+)$")
+_PROGRAM_PROVIDERS = frozenset({"typescript", "typescript-config"})
 
 
 def _canonical_json(value: Any) -> str:
@@ -67,16 +68,35 @@ def _path_from_handle(handle: str) -> str:
     return handle.split("@sha256:", 1)[0]
 
 
+def _snapshot_revision_matches(world: ConstructionWorld, revision: str) -> bool:
+    """Validate the snapshot revision when the publication declares one.
+
+    The TypeScript spine records ``source_state`` as SourceObservation's
+    ``source_revision``. TypeScript observations fail closed unless exactly
+    one program-snapshot contract is present; otherwise the recorded revision
+    has no qualified snapshot against which it can be checked.
+    """
+
+    try:
+        rows = world.relation_rows("program_snapshot")
+    except Exception:
+        return False
+    return len(rows) == 1 and str(rows[0].get("source_state") or "") == revision
+
+
 def reconstruct_program_observation(world: ConstructionWorld, observation: Mapping[str, str]) -> tuple[str, str]:
-    """Return (text, OK|FAILED) from sealed ``program_inputs`` blobs only."""
+    """Return (text, OK|FAILED) from sealed ``program_inputs`` blobs only.
+
+    Program entity and relation witnesses use exact ``bytes:start:end``
+    locations. Snapshot/config/effective-input groundings use ``input`` to
+    identify the whole retained input. Both are part of the producer contract.
+    """
 
     handle = str(observation.get("native_handle") or "")
+    revision = str(observation.get("source_revision") or "")
     location = str(observation.get("native_location") or "")
     digest_hex = _digest_from_handle(handle)
-    if not digest_hex:
-        return "", "FAILED"
-    match = _BYTE_LOCATION.match(location)
-    if match is None:
+    if not digest_hex or not revision or not _snapshot_revision_matches(world, revision):
         return "", "FAILED"
     blob = world.path.parent / PROGRAM_INPUTS_DIR / digest_hex
     try:
@@ -85,6 +105,14 @@ def reconstruct_program_observation(world: ConstructionWorld, observation: Mappi
         return "", "FAILED"
     if hashlib.sha256(payload).hexdigest() != digest_hex:
         return "", "FAILED"
+    if location == "input":
+        try:
+            return payload.decode("utf-8"), "OK"
+        except UnicodeDecodeError:
+            return "", "FAILED"
+    match = _BYTE_LOCATION.match(location)
+    if match is None:
+        return "", "FAILED"
     start, end = int(match.group(1)), int(match.group(2))
     if start < 0 or end < start or end > len(payload):
         return "", "FAILED"
@@ -92,6 +120,47 @@ def reconstruct_program_observation(world: ConstructionWorld, observation: Mappi
         return payload[start:end].decode("utf-8"), "OK"
     except UnicodeDecodeError:
         return "", "FAILED"
+
+
+def verify_retained_program_inputs(world: ConstructionWorld) -> list[str]:
+    """Verify every recorded TypeScript source observation can reconstruct.
+
+    This is deliberately provider-scoped rather than a generic World rule.
+    Other evidence providers own their own retention/reconstruction contracts.
+    A publication carrying TypeScript source observations, however, may not be
+    accepted with only pointer-shaped groundings and missing snapshot bytes.
+    """
+
+    errors: list[str] = []
+    rows = world.query(
+        "SELECT subject_type, subject_id, detail FROM _world_groundings "
+        "WHERE kind='SOURCE' ORDER BY subject_type, subject_id, detail"
+    )
+    for row in rows:
+        try:
+            detail = json.loads(row.get("detail") or "{}")
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(detail, Mapping):
+            continue
+        provider = str(detail.get("provider") or "")
+        if provider not in _PROGRAM_PROVIDERS:
+            continue
+        subject = f"{row.get('subject_type')}:{row.get('subject_id')}"
+        required = ("native_handle", "source_revision", "native_location")
+        missing = [key for key in required if not str(detail.get(key) or "").strip()]
+        if missing:
+            errors.append(
+                f"program source observation for {subject} lacks {', '.join(missing)}"
+            )
+            continue
+        _text, status = reconstruct_program_observation(world, detail)
+        if status != "OK":
+            errors.append(
+                "program source observation cannot reconstruct retained bytes: "
+                f"{subject} {detail.get('native_handle')} {detail.get('native_location')}"
+            )
+    return sorted(set(errors))
 
 
 def source_evidence_record(
@@ -122,6 +191,10 @@ def source_evidence_record(
         "side": side,
         "snapshot": snapshot_id,
         "provider": str(observation.get("provider") or ""),
+        # ``native_handle`` is the canonical SourceObservation field used by
+        # semantic persistence. Keep the historical ``handle`` alias for
+        # existing application/read surfaces while consumers migrate.
+        "native_handle": handle,
         "handle": handle,
         "path": _path_from_handle(handle),
         "source_revision": str(observation.get("source_revision") or ""),

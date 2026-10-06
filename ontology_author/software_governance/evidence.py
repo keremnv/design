@@ -38,11 +38,17 @@ def reconstruct_governance_observation(
     """Return (text, OK|FAILED) from sealed governance evidence blobs only."""
 
     handle = str(observation.get("native_handle") or "")
+    revision = str(observation.get("source_revision") or "")
     location = str(observation.get("native_location") or "")
     match = _HANDLE_DIGEST.search(handle)
     if match is None:
         return "", "FAILED"
-    digest = match.group(1)
+    digest = match.group(1).lower()
+    # This evidence store is explicitly content-revisioned.  A retained blob
+    # matching the handle must not validate an observation that claims a
+    # different source state.
+    if revision != f"sha256:{digest}":
+        return "", "FAILED"
     located = _BYTE_LOCATION.match(location)
     if located is None:
         return "", "FAILED"

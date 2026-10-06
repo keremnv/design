@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
+from ontology_author.evidence.program_source import verify_retained_program_inputs
 from ontology_author.software_governance.evidence import write_governance_evidence
 from ontology_author.software_governance.validation import CONTRACT_ID, validate_governance_world
 from ontology_author.world.core.model import Role, RoleType
@@ -271,7 +272,12 @@ def construct_software_governance(
             from ontology_author.world.runtime.commit import write_sidecars
 
             write_sidecars(world)
-            errors = tuple(validate_governance_world(world))
+            errors = tuple(
+                [
+                    *validate_governance_world(world),
+                    *verify_retained_program_inputs(world),
+                ]
+            )
         finally:
             world.close()
         if errors:

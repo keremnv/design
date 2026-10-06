@@ -12,6 +12,7 @@ from typing import Any
 from ontology_author.software_governance.investigation.records import InvestigationBoundary
 from ontology_author.software_governance.judgment import assemble_case, verify_case
 from ontology_author.software_governance.reads import GovernanceView
+from ontology_author.world.runtime.publication import PublicationRef, verify_publication_ref
 
 
 def expanded_case(view: GovernanceView, parent: dict[str, Any], *, case_id: str) -> dict[str, Any]:
@@ -22,10 +23,13 @@ def expanded_case(view: GovernanceView, parent: dict[str, Any], *, case_id: str)
     not identify the publication.
     """
 
-    if str(view.world.path.parent) != parent["world_address"]:
-        raise InvestigationBoundary("the opened world is not the case publication")
-    if view.world.world_id != parent["world_id"]:
-        raise InvestigationBoundary("world id differs")
+    try:
+        recorded = PublicationRef.from_mapping(parent)
+    except (TypeError, ValueError) as exc:
+        raise InvestigationBoundary("case publication reference is malformed") from exc
+    publication_errors = verify_publication_ref(view.world, recorded)
+    if publication_errors:
+        raise InvestigationBoundary("; ".join(publication_errors))
     child = assemble_case(
         view,
         case_id=case_id,
@@ -33,8 +37,6 @@ def expanded_case(view: GovernanceView, parent: dict[str, Any], *, case_id: str)
         proposition_ids=tuple(parent["proposition_ids"]),
         subject_ids=tuple(parent["subject_ids"]),
     )
-    if child["revision"] != parent["revision"]:
-        raise InvestigationBoundary("revision differs")
     errors = verify_case(view, child)
     if errors:
         raise InvestigationBoundary("; ".join(errors))
