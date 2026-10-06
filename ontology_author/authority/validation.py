@@ -323,6 +323,13 @@ def verify_construction_boundary(
                     for member in path.members:
                         if (member.native_handle, member.source_revision) not in declared or reconstruct_authority_observation(world, member)[1] != "OK":
                             errors.append(f"claim {assertion_id} support member does not reconstruct within basis")
+            else:
+                # Flat support without recorded grouping keeps its recorded
+                # meaning; no grouping is inferred. Its observations must still
+                # be qualified by the declared basis and reconstruct.
+                for observation in observations_for_assertion(world, assertion_id):
+                    if (observation.native_handle, observation.source_revision) not in declared or reconstruct_authority_observation(world, observation)[1] != "OK":
+                        errors.append(f"claim {assertion_id} support member does not reconstruct within basis")
     except (KeyError, TypeError, ValueError) as exc:
         errors.append(f"malformed construction boundary: {exc}")
     errors.extend(str(item) for item in world.admission_errors())

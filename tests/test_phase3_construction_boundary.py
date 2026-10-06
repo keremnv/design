@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import sqlite3
 from contextlib import closing
 from dataclasses import replace
 from pathlib import Path
@@ -270,3 +271,70 @@ def test_publication_verification_detects_retained_receipt_tampering(tmp_path):
     path.write_text(json.dumps(payload))
     with closing(ConstructionWorld.open(result.world_dir / "world.sqlite")) as world:
         assert verify_authority_publication(world) == ["authority receipt digest differs from manifest"]
+
+
+def _strip_grouping(bundle: Path, *, corrupt_flat: bool) -> str:
+    database = bundle / "world.sqlite"
+    connection = sqlite3.connect(database)
+    try:
+        aid = connection.execute(
+            "SELECT assertion_id FROM _world_assertions WHERE relation_name='requires_approval'"
+        ).fetchone()[0]
+        rowid, detail = connection.execute(
+            "SELECT rowid, detail FROM _world_groundings WHERE subject_id=? AND kind='WORLD'",
+            (aid,),
+        ).fetchone()
+        payload = json.loads(detail)
+        del payload["extra"]["support_paths"]
+        del payload["extra"]["constructor_version"]
+        connection.execute(
+            "UPDATE _world_groundings SET detail=? WHERE rowid=?",
+            (json.dumps(payload), rowid),
+        )
+        if corrupt_flat:
+            flat_rowid, flat_detail = connection.execute(
+                "SELECT rowid, detail FROM _world_groundings WHERE subject_id=? AND kind='SOURCE'",
+                (aid,),
+            ).fetchone()
+            flat = json.loads(flat_detail)
+            flat["source_revision"] = "sha256:" + "9" * 64
+            connection.execute(
+                "UPDATE _world_groundings SET detail=? WHERE rowid=?",
+                (json.dumps(flat), flat_rowid),
+            )
+        connection.commit()
+        return aid
+    finally:
+        connection.close()
+
+
+def _writable_copy(world_dir: Path, dest: Path) -> None:
+    shutil.copytree(world_dir, dest)
+    for path in (dest, *dest.rglob("*")):
+        path.chmod(path.stat().st_mode | (0o700 if path.is_dir() else 0o600))
+
+
+def test_retained_verification_rejects_unreconstructible_flat_support(tmp_path):
+    result = construct(universe(tmp_path / "source"), tmp_path / "W")
+    assert result.succeeded, result.errors
+    copied = tmp_path / "W-copy"
+    _writable_copy(result.world_dir, copied)
+    aid = _strip_grouping(copied, corrupt_flat=True)
+    with closing(ConstructionWorld.open(copied / "world.sqlite")) as world:
+        assert support_paths_for_assertion(world, aid) == ()
+        errors = verify_authority_publication(world)
+        assert any("does not reconstruct within basis" in item for item in errors), errors
+
+
+def test_honest_flat_support_without_grouping_stays_readable(tmp_path):
+    result = construct(universe(tmp_path / "source"), tmp_path / "W")
+    assert result.succeeded, result.errors
+    copied = tmp_path / "W-copy"
+    _writable_copy(result.world_dir, copied)
+    aid = _strip_grouping(copied, corrupt_flat=False)
+    with closing(ConstructionWorld.open(copied / "world.sqlite")) as world:
+        assert support_paths_for_assertion(world, aid) == ()
+        assert verify_authority_publication(world) == []
+        flat = observations_for_assertion(world, aid)
+        assert len(flat) == 1
+        assert reconstruct_authority_observation(world, flat[0])[1] == "OK"
