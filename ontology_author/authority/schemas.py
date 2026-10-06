@@ -19,7 +19,7 @@ MECHANISM_VERSION = "v0"
 MECHANISM_KEY = f"{MECHANISM_ID}/{MECHANISM_VERSION}"
 RECEIPT_VERSION = "authority_construction_receipt/v1"
 CONSTRUCTOR_ID = "ontology_author.authority.construction"
-CONSTRUCTOR_VERSION = "v0"
+CONSTRUCTOR_VERSION = "v1"
 DEFAULT_PROFILE = "authority-construction-v0"
 
 
@@ -122,6 +122,8 @@ class AuthorityConstructionReceipt:
     completeness_references: tuple[Mapping[str, Any], ...]
     adequacy_probe_results: tuple[Mapping[str, Any], ...]
     acceptance: Mapping[str, Any] | None = None
+    construction_basis: Mapping[str, Any] | None = None
+    construction_contract: Mapping[str, Any] | None = None
 
     @classmethod
     def from_dict(cls, payload: Mapping[str, Any]) -> "AuthorityConstructionReceipt":
@@ -190,6 +192,8 @@ class AuthorityConstructionReceipt:
             completeness_references=tuple(_copy(item) for item in payload["completeness_references"]),
             adequacy_probe_results=tuple(_copy(item) for item in payload["adequacy_probe_results"]),
             acceptance=_copy(payload["acceptance"]) if payload.get("acceptance") is not None else None,
+            construction_basis=_copy(payload["construction_basis"]) if payload.get("construction_basis") is not None else None,
+            construction_contract=_copy(payload["construction_contract"]) if payload.get("construction_contract") is not None else None,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -224,6 +228,8 @@ class AuthorityConstructionReceipt:
             "completeness_references": [_copy(item) for item in self.completeness_references],
             "adequacy_probe_results": [_copy(item) for item in self.adequacy_probe_results],
             "acceptance": _copy(self.acceptance) if self.acceptance is not None else None,
+            "construction_basis": _copy(self.construction_basis) if self.construction_basis is not None else None,
+            "construction_contract": _copy(self.construction_contract) if self.construction_contract is not None else None,
         }
 
     def write(self, path: Path | str) -> None:

@@ -17,6 +17,8 @@ from ontology_author.world.core.model import Completeness, CompletenessStatus, R
 from ontology_author.world.core.origins import ConstructionOrigin
 from ontology_author.world.core.source import AssertionGrounding, SourceObservation
 from ontology_author.world.runtime.world import ConstructionWorld
+from ontology_author.construction_boundary import ConstructionBasis, SupportPath
+from ontology_author.world.runtime.publication import PublicationRef
 
 from .schemas import (
     MECHANISM_KEY,
@@ -101,6 +103,8 @@ class AuthorityConstructor:
     constructor_id: str = CONSTRUCTOR_ID
     constructor_version: str = CONSTRUCTOR_VERSION
     acceptance: Mapping[str, Any] | None = None
+    publication_inputs: tuple[PublicationRef, ...] = ()
+    candidate_baseline: PublicationRef | None = None
 
     def __post_init__(self) -> None:
         self.markdown: dict[str, MarkdownSource] = {}
@@ -115,8 +119,28 @@ class AuthorityConstructor:
         self._method = f"{self.profile}:explicit"
         _declare_authority_relations(self.world)
         self._load_snapshot()
+        if len({source.handle for source in self.universe.sources}) != len(self.universe.sources):
+            raise AuthorityConstructionError("declared source handles must be unique")
         self._load_markdown()
         self._declare_sources()
+        self.basis = ConstructionBasis(
+            observations=tuple(source.observe(source.document()) for source in self.markdown.values()),
+            publications=self.publication_inputs,
+            program_snapshots=(
+                ((self.candidate_baseline, self._snapshot_ref, self._snapshot_id),)
+                if self._snapshot_ref and self.candidate_baseline else ()
+            ),
+            configuration_json=json.dumps({
+                "purpose": self.purpose, "profile": self.profile,
+                "universe_id": self.universe.universe_id,
+                "program_universe": self.program_universe if self._snapshot_ref else None,
+                "sources": [
+                    {"handle": item.handle, "standing": item.standing.value, "driver": item.driver}
+                    for item in self.universe.sources
+                ],
+            }, sort_keys=True),
+            candidate_baseline=self.candidate_baseline,
+        )
 
     def source(self, handle: str) -> MarkdownSource:
         if handle not in self.markdown:
@@ -124,6 +148,8 @@ class AuthorityConstructor:
         return self.markdown[handle]
 
     def note_exploration(self, *, action: str, target: str, detail: str = "") -> None:
+        # Compatibility scratch state only. Investigation is not publication
+        # provenance and is deliberately omitted from new durable receipts.
         self.exploration.append({"action": action, "target": target, "detail": detail})
 
     def examine(self, observation: SourceObservation, *, block_kind: str = "") -> None:
@@ -206,6 +232,7 @@ class AuthorityConstructor:
         warrant: Sequence[Mapping[str, Any]] = (),
         construction_method: str = "",
         resolvers: Sequence[str] = (),
+        support_paths: Sequence[SupportPath] | None = None,
     ) -> str:
         kind = ClaimKind(claim_kind)
         support_class = RelationSupport(support)
@@ -217,6 +244,11 @@ class AuthorityConstructor:
             self.world.declare_relation(relation, roles, description="Purpose-specific authority domain relation.")
         if not observations:
             raise AuthorityConstructionError("persisted claims need support observations")
+        paths = tuple(support_paths) if support_paths is not None else (SupportPath(tuple(observations)),)
+        if not paths or {
+            tuple(member.as_pointer().items()) for path in paths for member in path.members
+        } != {tuple(item.as_pointer().items()) for item in observations}:
+            raise AuthorityConstructionError("support paths must cover exactly the claim observations")
         if kind != ClaimKind.UNRESOLVED_RECORD:
             for role, resolution in resolutions.items():
                 if resolution not in CERTAIN_RESOLUTIONS:
@@ -237,6 +269,7 @@ class AuthorityConstructor:
             governing=governing_flag,
             resolvers=resolvers,
         )
+        extra["support_paths"] = [path.as_dict() for path in paths]
         inserted = self._assert(
             relation,
             values,
@@ -526,12 +559,12 @@ class AuthorityConstructor:
     ) -> list[str]:
         kinds = {
             str(row["entity"]): str(row["kind"])
-            for row in self.world.relation_rows("program_entity_kind")
+            for row in optional_program_rows(self.world, "program_entity_kind")
         }
         labels = _labels(self.world)
         descriptors = {
             str(row["entity"]): str(row["descriptor"])
-            for row in self.world.relation_rows("program_identity_descriptor")
+            for row in optional_program_rows(self.world, "program_identity_descriptor")
         }
         output = []
         for entity, entity_kind in kinds.items():
@@ -550,7 +583,7 @@ class AuthorityConstructor:
             raise AuthorityConstructionError(f"callable {target_label!r} is not unique: {targets}")
         matches = [
             str(row["call_site"])
-            for row in self.world.relation_rows("program_invokes")
+            for row in optional_program_rows(self.world, "program_invokes")
             if row["target"] == targets[0]
         ]
         if len(matches) != 1:
@@ -575,7 +608,7 @@ class AuthorityConstructor:
     def invoked_targets(self, call_site: str) -> list[str]:
         return [
             str(row["target"])
-            for row in self.world.relation_rows("program_invokes")
+            for row in optional_program_rows(self.world, "program_invokes")
             if row["call_site"] == call_site
         ]
 
@@ -585,7 +618,11 @@ class AuthorityConstructor:
         return receipt
 
     def _load_snapshot(self) -> None:
-        rows = self.world.relation_rows("program_snapshot")
+        rows = optional_program_rows(self.world, "program_snapshot")
+        if not rows:
+            if optional_program_rows(self.world, "program_entity"):
+                raise AuthorityConstructionError("program entities require a qualified program snapshot")
+            return
         if len(rows) != 1:
             raise AuthorityConstructionError("governed World must contain exactly one program snapshot")
         self._snapshot_ref = str(rows[0]["snapshot"])
@@ -653,7 +690,7 @@ class AuthorityConstructor:
                     "status": row["status"],
                     "capability": row["capability"],
                 }
-                for row in self.world.relation_rows("program_resolution")
+                for row in optional_program_rows(self.world, "program_resolution")
                 if row["subject"] == entity
             ],
             "relation_support": support.value,
@@ -810,7 +847,7 @@ class AuthorityConstructor:
         return output
 
     def _entity_kind(self, entity: str) -> str:
-        for row in self.world.relation_rows("program_entity_kind"):
+        for row in optional_program_rows(self.world, "program_entity_kind"):
             if str(row["entity"]) == entity:
                 return str(row["kind"] or "")
         return ""
@@ -954,7 +991,7 @@ class AuthorityConstructor:
                     for row in examined
                 ],
             },
-            exploration_provenance=tuple(self.exploration),
+            exploration_provenance=(),
             source_native_relationships_used=tuple(self.native_relationships),
             semantic_referents_created=tuple(self.created_semantic),
             semantic_referents_reused=tuple(dict.fromkeys(self.reused_semantic)),
@@ -979,6 +1016,8 @@ class AuthorityConstructor:
                 for row in self.world.relation_rows("authority_adequacy")
             ),
             acceptance=dict(self.acceptance) if self.acceptance is not None else None,
+            construction_basis=self.basis.as_dict(),
+            construction_contract=authority_construction_contract(),
         )
 
     def _assert(
@@ -1025,12 +1064,16 @@ class AuthorityConstructor:
             "relation_support": support.value,
             "endpoint_resolution": {role: value.value for role, value in resolutions.items()},
             "authorized_source_ids": sorted({item.native_handle for item in observations}),
-            "program_snapshot_id": self._snapshot_id,
+            **({"program_snapshot_id": self._snapshot_id} if claim_kind in {
+                ClaimKind.SOURCE_PROGRAM, ClaimKind.SEMANTIC_PROGRAM,
+            } else {}),
             "constructor_id": self.constructor_id,
+            "constructor_version": self.constructor_version,
             "constructor_profile": self.profile,
             "reusable_resolver_ids": list(resolvers),
             "governing": governing,
             "observation_locators": locators,
+            "support_paths": [SupportPath(tuple(observations)).as_dict()],
         }
 
     def _governing_flag(self, support: RelationSupport, governing: bool | None) -> bool:
@@ -1054,6 +1097,7 @@ class AuthorityConstructor:
             source = self.markdown[observation.native_handle]
             if observation.source_revision != source.revision:
                 raise AuthorityConstructionError("observation is not reconstructible from current source bytes")
+            source.reconstruct(observation)
             start, end = parse_byte_location(observation.native_location)
             if end > len(source.data):
                 raise AuthorityConstructionError("observation byte range is not reconstructible")
@@ -1076,13 +1120,38 @@ class AuthorityConstructor:
         return any(row["entity"] == referent_id for row in self.world.relation_rows("semantic_entity"))
 
     def _is_program_entity(self, referent_id: str) -> bool:
-        return any(row["entity"] == referent_id for row in self.world.relation_rows("program_entity"))
+        return any(row["entity"] == referent_id for row in optional_program_rows(self.world, "program_entity"))
 
     def _entity_snapshot(self, entity: str) -> str:
-        for row in self.world.relation_rows("program_entity"):
+        for row in optional_program_rows(self.world, "program_entity"):
             if row["entity"] == entity:
                 return str(row["snapshot"])
         return ""
+
+
+def optional_program_rows(world: ConstructionWorld, relation: str) -> list[dict[str, Any]]:
+    """Absence of the optional program plane has no semantic disposition."""
+    if not world.query("SELECT 1 FROM _world_relations WHERE name=?", (relation,)):
+        return []
+    return world.relation_rows(relation)
+
+
+def authority_construction_contract() -> dict[str, Any]:
+    """Local declaration of the existing executable authority admission policy.
+
+    No shared runtime contract is required by the heterogeneous constructors.
+    This declaration identifies the checks; validation below executes them.
+    """
+    return {
+        "id": "authority-construction-boundary/v1",
+        "input_scope": "declared revision-qualified Markdown and exact publication inputs; optional qualified program snapshot",
+        "target_schema": "explicitly declared typed authority and domain relations",
+        "admission_requirements": [
+            "recorded basis and method", "retained source reconstruction",
+            "support path closure", "source standing", "resolved endpoint integrity",
+            "kernel contract admission", "provider-owned program reconstruction closure",
+        ],
+    }
 
 
 def _declare_authority_relations(world: ConstructionWorld) -> None:
@@ -1153,5 +1222,3 @@ def _grounding_extra(world: ConstructionWorld, assertion_id: str) -> dict[str, A
         if isinstance(detail, dict) and isinstance(detail.get("extra"), dict):
             return dict(detail["extra"])
     return {}
-
-

@@ -3,22 +3,27 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from typing import Any
 
 from ontology_author.world.core.source import SourceObservation
 from ontology_author.world.runtime.world import ConstructionWorld
+from ontology_author.construction_boundary import support_paths_for_assertion
+from ontology_author.world.runtime.publication import PublicationRef
+from .evidence import reconstruct_authority_observation
 
 from ontology_author.program_spine.comparison import COMPARABLE_RELATIONS, RELATION_CAPABILITIES
 
 from ontology_author.evidence.markdown import parse_byte_location
 
-from .construction import AuthorityConstructor
+from .construction import AuthorityConstructor, optional_program_rows, authority_construction_contract
 from .schemas import (
     AdequacyOutcome,
     AuthorityConstructionReceipt,
     ClaimKind,
     CompletenessScope,
     RECEIPT_VERSION,
+    load_receipt,
     ReferentResolution,
     RelationSupport,
     SourceStanding,
@@ -92,7 +97,7 @@ def validate_authority_construction(
         row["source_handle"]: (row["standing"], row["content_revision"])
         for row in world.relation_rows("authority_source")
     }
-    program_entities = {str(row["entity"]): str(row["snapshot"]) for row in world.relation_rows("program_entity")}
+    program_entities = {str(row["entity"]): str(row["snapshot"]) for row in optional_program_rows(world, "program_entity")}
     semantic_entities = {str(row["entity"]) for row in world.relation_rows("semantic_entity")}
 
     if receipt.receipt_version != RECEIPT_VERSION:
@@ -255,11 +260,101 @@ def validate_authority_construction(
         errors.append("receipt semantic→program count does not match World claims")
 
     errors.extend(_validate_relevance_scopes(world, constructor))
+    if receipt.construction_basis != constructor.basis.as_dict():
+        errors.append("receipt construction basis does not match admitted constructor inputs")
+    errors.extend(verify_construction_boundary(world, receipt))
     return sorted(set(errors))
 
 
+def verify_construction_boundary(
+    world: ConstructionWorld, receipt: AuthorityConstructionReceipt,
+) -> list[str]:
+    """Check retained material closure; never certify semantic judgment or discovery.
+
+    Publication dependencies identify retained occurrences. They need not be
+    recursively read to reconstruct this publication's own source support.
+    """
+    errors: list[str] = []
+    if receipt.construction_contract != authority_construction_contract():
+        errors.append("construction contract is missing or unsupported")
+    if not receipt.constructor.get("id") or not receipt.constructor.get("version"):
+        errors.append("construction method requires id and version")
+    basis = receipt.construction_basis
+    if not isinstance(basis, dict):
+        return [*errors, "construction basis is missing"]
+    try:
+        observations = [SourceObservation(**item) for item in basis["observations"]]
+        publications = [PublicationRef.from_mapping(item) for item in basis["publications"]]
+        if basis.get("candidate_baseline") is not None:
+            baseline = PublicationRef.from_mapping(basis["candidate_baseline"])
+            if baseline not in publications:
+                errors.append("candidate baseline is missing from construction publication inputs")
+        declared = {
+            (str(row["source_handle"]), str(row["content_revision"]))
+            for row in world.relation_rows("authority_source")
+        }
+        if {(item.native_handle, item.source_revision) for item in observations} != declared:
+            errors.append("construction basis does not match declared source revisions")
+        for observation in observations:
+            if reconstruct_authority_observation(world, observation)[1] != "OK":
+                errors.append("construction basis source does not reconstruct")
+        snapshots = optional_program_rows(world, "program_snapshot")
+        qualifiers = basis["program_snapshots"]
+        if len(qualifiers) != len(snapshots):
+            errors.append("construction basis program snapshot qualification is missing or extraneous")
+        for qualifier, snapshot in zip(qualifiers, snapshots):
+            reference = PublicationRef.from_mapping(qualifier["publication"])
+            if reference not in publications or qualifier["snapshot"] != snapshot["snapshot"] or qualifier["snapshot_id"] != receipt.program_snapshot_id:
+                errors.append("construction basis program qualification disagrees with snapshot")
+        for row in world.relation_rows("authority_claim"):
+            assertion_id = str(row["assertion_id"])
+            paths = support_paths_for_assertion(world, assertion_id)
+            # Legacy flat warrants retain their recorded meaning. New envelopes
+            # must explicitly group support, including unresolved records.
+            extra = grounding_extra(world, assertion_id)
+            if not paths and extra.get("constructor_version"):
+                errors.append(f"claim {assertion_id} lacks explicit support paths")
+            if paths:
+                pointers = {tuple(member.as_pointer().items()) for path in paths for member in path.members}
+                flat = {tuple(item.as_pointer().items()) for item in observations_for_assertion(world, assertion_id)}
+                if pointers != flat:
+                    errors.append(f"claim {assertion_id} support paths disagree with recorded grounding")
+                for path in paths:
+                    for member in path.members:
+                        if (member.native_handle, member.source_revision) not in declared or reconstruct_authority_observation(world, member)[1] != "OK":
+                            errors.append(f"claim {assertion_id} support member does not reconstruct within basis")
+    except (KeyError, TypeError, ValueError) as exc:
+        errors.append(f"malformed construction boundary: {exc}")
+    errors.extend(str(item) for item in world.admission_errors())
+    from ontology_author.evidence.program_source import verify_retained_program_inputs
+    errors.extend(verify_retained_program_inputs(world))
+    return sorted(set(errors))
+
+
+def verify_authority_publication(world: ConstructionWorld) -> list[str]:
+    """Verify the retained receipt and boundary from the bundle alone."""
+    try:
+        directory = world.path.parent
+        manifest = json.loads((directory / "authority.manifest.json").read_text())
+        path = directory / "authority.construction.receipt.json"
+        if manifest["receipt"]["path"] != path.name:
+            return ["authority manifest receipt path differs"]
+        if hashlib.sha256(path.read_bytes()).hexdigest() != manifest["receipt"]["sha256"]:
+            return ["authority receipt digest differs from manifest"]
+        receipt = load_receipt(path)
+        if manifest.get("admission") != {
+            "contract": authority_construction_contract()["id"], "outcome": "PASS",
+        }:
+            return ["authority admission record is missing or unsupported"]
+        if any(manifest[key] != getattr(receipt, key) for key in ("construction_id", "purpose", "profile", "program_snapshot_id")):
+            return ["authority manifest disagrees with receipt"]
+        return verify_construction_boundary(world, receipt)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return [f"authority publication metadata cannot reconstruct: {exc}"]
+
+
 def _entity_kind(world: ConstructionWorld, entity: str) -> str:
-    for row in world.relation_rows("program_entity_kind"):
+    for row in optional_program_rows(world, "program_entity_kind"):
         if str(row["entity"]) == entity:
             return str(row["kind"] or "")
     return ""
@@ -267,7 +362,7 @@ def _entity_kind(world: ConstructionWorld, entity: str) -> str:
 
 def _validate_relevance_scopes(world: ConstructionWorld, constructor: AuthorityConstructor) -> list[str]:
     errors: list[str] = []
-    program_entities = {str(row["entity"]) for row in world.relation_rows("program_entity")}
+    program_entities = {str(row["entity"]) for row in optional_program_rows(world, "program_entity")}
     warrants = {
         str(row.get("_assertion_id") or ""): row
         for row in relation_rows_with_ids(world, "authority_attachment_warrant")

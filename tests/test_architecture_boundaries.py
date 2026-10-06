@@ -22,6 +22,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 WORLD_ROOT = REPOSITORY_ROOT / "ontology_author" / "world"
 WORLD_CORE_ROOT = WORLD_ROOT / "core"
 EVIDENCE_ROOT = REPOSITORY_ROOT / "ontology_author" / "evidence"
+PROGRAM_ROOT = REPOSITORY_ROOT / "ontology_author" / "program_spine"
 
 # Application/domain regions the World layer must never import. ``profiles``
 # is a top-level application package; the rest live under ``ontology_author``.
@@ -31,6 +32,8 @@ FORBIDDEN_WORLD_IMPORTS = (
     "ontology_author.governance",
     "ontology_author.program_spine",
     "ontology_author.software_governance",
+    "ontology_author.config_routes",
+    "ontology_author.construction_boundary",
     "profiles",
 )
 
@@ -52,8 +55,14 @@ def _imported_modules(path: Path) -> set[str]:
         if isinstance(node, ast.Import):
             modules.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
-            if node.module:
-                modules.add(node.module)
+            module = node.module or ""
+            if node.level:
+                package = path.relative_to(REPOSITORY_ROOT).parts[:-1]
+                package = package[:len(package) - node.level + 1]
+                module = ".".join((*package, *((module,) if module else ())))
+            if module:
+                modules.add(module)
+                modules.update(f"{module}.{alias.name}" for alias in node.names)
     return modules
 
 
@@ -80,3 +89,8 @@ def test_evidence_adapters_do_not_import_application_rules():
     # Evidence observes and reconstructs sources; standing lives elsewhere.
     # (Reading sealed World state is allowed; assigning standing is not.)
     assert _violations(EVIDENCE_ROOT, FORBIDDEN_WORLD_IMPORTS) == []
+
+
+def test_program_spine_does_not_depend_on_semantic_construction():
+    forbidden = tuple(item for item in FORBIDDEN_WORLD_IMPORTS if item != "ontology_author.program_spine")
+    assert _violations(PROGRAM_ROOT, forbidden) == []
