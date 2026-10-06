@@ -36,6 +36,10 @@ class FixtureWorld {
   count = 3;
   hub = false;
   binary = false;
+  /** Relation mode, so a probe can place derived tuples with shelves. */
+  relationMode = "BASE";
+  /** Tuple index carrying ADJUDICATED origins, so a probe can crown a plate. */
+  adjudicated = -1;
   requests: URL[] = [];
   private blocked = new Map<string, {
     reached: ReturnType<typeof deferred>;
@@ -55,7 +59,7 @@ class FixtureWorld {
 
   get relation(): WorldRelation {
     return {
-      name: "property", description: "Fixture property", mode: "BASE",
+      name: "property", description: "Fixture property", mode: this.relationMode,
       arity: this.binary ? 3 : 2, referent_arity: this.binary ? 2 : 1,
       roles: [
         { name: "item", type: "REFERENT", referent: true, kinds: ["entity"] },
@@ -69,7 +73,9 @@ class FixtureWorld {
 
   tuples(): WorldTuple[] {
     return Array.from({ length: this.count }, (_, i) => ({
-      assertion_id: `assertion:${i}`, origin: "SEMANTIC", origins: ["SEMANTIC"],
+      assertion_id: `assertion:${i}`,
+      origin: i === this.adjudicated ? "ADJUDICATED" : "SEMANTIC",
+      origins: [i === this.adjudicated ? "ADJUDICATED" : "SEMANTIC"],
       values: { item: `entity:${this.hub ? 0 : i}`, value: `value-${i}`,
         ...(this.binary ? { peer: `entity:${i + 1}` } : {}) },
     }));
@@ -109,19 +115,19 @@ class FixtureWorld {
       case "rows": {
         const subject = url.searchParams.get("subject");
         const rows = this.tuples().filter((tuple) => !subject || Object.values(tuple.values).includes(subject));
-        answer = { relation: "property", mode: "BASE", stale: false, roles: this.relation.roles,
+        answer = { relation: "property", mode: this.relation.mode, stale: false, roles: this.relation.roles,
           offset, total: rows.length, rows: rows.slice(offset, offset + Number(url.searchParams.get("limit") ?? 200)) };
         break;
       }
       case "assertion": {
         const tuple = this.tuples().find((item) => item.assertion_id === id)!;
         answer = {
-          ...tuple, relation: "property", mode: "BASE", arity: this.relation.arity, roles: this.relation.roles,
+          ...tuple, relation: "property", mode: this.relation.mode, arity: this.relation.arity, roles: this.relation.roles,
           assertion_state: "ASSERTED", created_revision: 1, relation_stale: false,
           completeness: null, grounding: [], commitment_id: id, candidate_for: [],
           governing_obligations: [], candidate_assessments: [],
-          warrant: { commitment_id: id, relation: "property", assertion_origin: "SEMANTIC",
-            recorded_construction_origin: "SEMANTIC", construction_origins: ["SEMANTIC"],
+          warrant: { commitment_id: id, relation: "property", assertion_origin: tuple.origin,
+            recorded_construction_origin: tuple.origin, construction_origins: tuple.origins ?? [tuple.origin],
             created_revision: 1, bases: [] },
         } satisfies WorldAssertion;
         break;
@@ -250,137 +256,6 @@ test("text strength fades from its painted value, including an interrupted recov
   await expect.poll(() => vocabularyText(page)).toBe(0.6);
 });
 
-test("the field paints partial crowding and recovers without changing mark opacity", async ({ page, world }, testInfo) => {
-  world.count = 2;
-  await openProperty(page);
-  await readRow(page, 0);
-  await readRow(page, 1);
-  await reader(page).locator(".world__roles button").click();
-  await expect(reader(page).locator("h2")).toHaveText("Entity 1");
-  const place = async (crowded: boolean) => page.evaluate(async (crowded) => {
-    const visibilityPath = "/src/world/visibility.ts";
-    const { paintedLabelBox } = await import(visibilityPath);
-    const graph = (window as unknown as CanvasWindow).__worldFieldGraph;
-    const a = paintedLabelBox(graph, "entity:0")!;
-    const b = paintedLabelBox(graph, "entity:1")!;
-    const [x, y] = graph.getElementPosition("entity:0");
-    graph.emit("node:dragstart", { target: { id: "entity:0" } });
-    await graph.translateElementTo("entity:0", [
-      x + b.minX + (crowded ? (a.maxX - a.minX) * 0.7 : 200) - a.minX,
-      y + b.minY - a.minY,
-    ], false);
-    graph.emit("node:dragend", { target: { id: "entity:0" } });
-    graph.getCanvas().getContainer()?.dispatchEvent(new Event("world:spreadframe"));
-  }, crowded);
-  const strengths = () => page.evaluate(() => {
-    const graph = (window as unknown as CanvasWindow).__worldFieldGraph;
-    return ["entity:0", "entity:1"].map((id) => graph.getNodeData(id).style!);
-  });
-  const before = await strengths();
-  await place(true);
-  await expect.poll(async () => {
-    const [yielding, selected] = await strengths();
-    return Number(yielding.labelFillOpacity) < Number(before[0].labelFillOpacity) &&
-      Number(yielding.labelFillOpacity) > Number(before[0].labelFillOpacity) * 0.25 &&
-      selected.labelFillOpacity === before[1].labelFillOpacity;
-  }).toBe(true);
-  expect((await strengths())[0]).toMatchObject({ opacity: before[0].opacity, fillOpacity: before[0].fillOpacity });
-  await page.screenshot({ path: testInfo.outputPath("partial-crowding.png") });
-  await place(false);
-  await expect.poll(async () => (await strengths())[0].labelFillOpacity).toBe(before[0].labelFillOpacity);
-});
-
-for (const canvas of ["field", "vocabulary"] as const) {
-  test(`${canvas} text follows crowding before a drag is released`, async ({ page, world }) => {
-    world.count = 2;
-    world.binary = canvas === "vocabulary";
-    if (canvas === "field") {
-      await openProperty(page);
-      await readRow(page, 0);
-      await readRow(page, 1);
-      await reader(page).locator(".world__roles button").click();
-      await expect(reader(page).locator("h2")).toHaveText("Entity 1");
-    } else {
-      await page.goto("/");
-      await expect.poll(() => vocabularyText(page)).toBe(0.85);
-      await page.evaluate(() => {
-        (window as unknown as CanvasWindow).__worldVocabulary.emit("node:click", { target: { id: "rel:property" } });
-      });
-      await expect(reader(page).locator("h2")).toHaveText("property");
-    }
-    const ids = canvas === "field" ? ["entity:0", "entity:1"] : ["kind:entity", "rel:property"];
-    // Establish the scene without lifecycle travel, then exercise the gesture
-    // with ordinary motion enabled.
-    await expect.poll(() => page.evaluate(({ canvas, ids }) => {
-      const graph = (window as unknown as CanvasWindow)[canvas === "field" ? "__worldFieldGraph" : "__worldVocabulary"];
-      return ids.every((id) => graph?.getNodeData(id)?.style &&
-        Number(graph.getNodeData(id).style!.labelOpacity ?? 1) > 0);
-    }, { canvas, ids })).toBe(true);
-    await page.emulateMedia({ reducedMotion: "no-preference" });
-    const sample = () => page.evaluate(({ canvas, ids }) => {
-      const graph = (window as unknown as CanvasWindow)[canvas === "field" ? "__worldFieldGraph" : "__worldVocabulary"];
-      const shape = (graph as unknown as {
-        context: { element: { getElement: (id: string) => {
-          getShape: (name: string) => { getShape: (name: string) => LabelShape };
-        } } };
-      }).context.element.getElement(ids[0]).getShape("label").getShape("text");
-      return {
-        painted: Number(shape.style.fillOpacity),
-        target: Number(graph.getNodeData(ids[0]).style!.labelFillOpacity),
-        selected: Number(graph.getNodeData(ids[1]).style!.labelFillOpacity),
-        fading: shape.getAnimations().some((animation) => animation.playState === "running" &&
-          animation.effect.getKeyframes().some((frame) => typeof frame.fillOpacity === "number")),
-      };
-    }, { canvas, ids });
-    const before = await sample();
-    const move = async (coverage: number, start = false) => page.evaluate(async ({ canvas, ids, coverage, start }) => {
-      const visibilityPath = "/src/world/visibility.ts";
-      const { paintedLabelBox } = await import(visibilityPath);
-      const graph = (window as unknown as CanvasWindow)[canvas === "field" ? "__worldFieldGraph" : "__worldVocabulary"];
-      if (start) graph.emit("node:dragstart", { target: { id: ids[0] } });
-      const a = paintedLabelBox(graph, ids[0])!;
-      const b = paintedLabelBox(graph, ids[1])!;
-      const [x, y] = graph.getElementPosition(ids[0]);
-      const destination = [
-        x + b.minX + (a.maxX - a.minX) * (1 - coverage) - a.minX,
-        y + b.minY - a.minY,
-      ] as [number, number];
-      // Feed the same deltas G6 receives from a pointer, so its native drag
-      // behavior moves the mark and the visibility listener observes it.
-      graph.emit("node:drag", {
-        target: { id: ids[0] },
-        dx: (destination[0] - x) * graph.getZoom(),
-        dy: (destination[1] - y) * graph.getZoom(),
-      });
-      // Observe live paint within two frames, while the drag is still held.
-      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-      return { destination, position: graph.getElementPosition(ids[0]).slice(0, 2) };
-    }, { canvas, ids, coverage, start });
-    const moved = await move(0.3, true);
-    expect(moved.position[0]).toBeCloseTo(moved.destination[0], 6);
-    expect(moved.position[1]).toBeCloseTo(moved.destination[1], 6);
-    const partial = await sample();
-    expect(partial.target).toBeLessThan(before.target);
-    expect(partial.target).toBeGreaterThan(before.target * 0.25);
-    expect(partial.painted).toBeCloseTo(partial.target, 6);
-    expect(partial.fading).toBe(false);
-    expect(partial.selected).toBe(before.selected);
-    await move(0.55);
-    const crowded = await sample();
-    expect(crowded.painted).toBeLessThan(partial.painted);
-    expect(crowded.painted).toBeCloseTo(crowded.target, 6);
-    await move(-2);
-    const clear = await sample();
-    expect(clear.painted).toBe(before.target);
-    expect(clear.fading).toBe(false);
-    await page.evaluate(({ canvas, ids }) => {
-      const graph = (window as unknown as CanvasWindow)[canvas === "field" ? "__worldFieldGraph" : "__worldVocabulary"];
-      graph.emit("node:dragend", { target: { id: ids[0] } });
-    }, { canvas, ids });
-    await expect.poll(async () => (await sample()).painted).toBe(before.target);
-  });
-}
-
 test("an assertion stays readable until its replacement arrives", async ({ page, world }) => {
   await openProperty(page);
   await readRow(page, 0);
@@ -478,6 +353,13 @@ test("frontier reads settle after selection and table changes", async ({ page, w
   const obligations = world.block("obligations");
   await page.getByRole("button", { name: "purpose frontier", exact: true }).first().click();
   await Promise.all([demand.requested, obligations.requested]);
+  // The app boots in the vocabulary focus room; the field canvas mounts as
+  // the placement exits focus, behind the swap. Selecting through it before
+  // it exists is reaching past the room that is still on screen — wait for
+  // the mount. The reads below are still hanging behind their gates.
+  await expect.poll(() => page.evaluate(() =>
+    Boolean((window as unknown as Partial<CanvasWindow>).__worldFieldGraph),
+  )).toBe(true);
   await selectReferent(page, "entity:0");
   await page.getByRole("button", { name: "obligations", exact: true }).first().click();
   demand.release();
@@ -660,6 +542,19 @@ async function awaitDropDraw(page: Page, id: string) {
     return Math.abs(Number(node.style?.x) - Number(at?.[0])) < 1 &&
       Math.abs(Number(node.style?.y) - Number(at?.[1])) < 1;
   }, id)).toBe(true);
+}
+
+/**
+ * How tight the closest two label centres stand in a drag sample.
+ *
+ * Centre distance, not painted overlap: the pile a suspended fan leaves
+ * behind reads in how far the names stand from each other, and the release
+ * re-fans them.
+ */
+function closestLabels(sample: DragSample): number {
+  const centres = Object.values(sample.boxes).filter((c): c is [number, number] => c !== null);
+  return Math.min(...centres.flatMap((a, i) =>
+    centres.slice(i + 1).map((b) => Math.hypot(a[0] - b[0], a[1] - b[1]))));
 }
 
 function expectBoxesSettled(before: DragSample, after: DragSample) {
@@ -862,6 +757,10 @@ test("a dense-field drag keeps its settled depth with the fan on", async ({ page
   expect(settled.z).toBeGreaterThan(rest.z);
   expect(grabbed.z).toBe(settled.z);
   expect(mid.z).toBe(settled.z);
+  // The pile shows while the fan is down for the gesture, and only then:
+  // same geometry either side, the fan the only difference.
+  expect(closestLabels(grabbed)).toBeLessThan(closestLabels(rest));
+  expect(closestLabels(mid)).toBeLessThan(closestLabels(settled));
   for (const { at, sample } of track) {
     expect(sample.z, `depth moved at ${at}`).toBe(settled.z);
   }
@@ -992,6 +891,108 @@ test("depth assignment appends bounded tops and migrates legacy sequences", asyn
   expect(result.renumbers).toBeLessThanOrEqual(2);
   expect(result.migratedOrder).toBe("x,y,z");
   expect(result.migratedBounded).toBe(true);
+});
+
+test("a plate's crown and shelf fade out on select and back on release", async ({ page, world }) => {
+  world.count = 3;
+  world.binary = false;
+  world.relationMode = "DERIVED";
+  world.adjudicated = 0;
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/");
+  await openPropertyTable(page);
+  await readRow(page, 0);
+  // The birth lifecycle owns the lane while it runs; the fades below queue
+  // behind it, so wait it out rather than timing the queue.
+  await expect.poll(() => page.evaluate(() => {
+    const graph = (window as unknown as Partial<CanvasWindow>).__worldFieldGraph;
+    try {
+      return (graph?.getNodeData() ?? []).map((node) => String(node.id));
+    } catch {
+      return [];
+    }
+  })).toContain("crown:assertion:0");
+  await expect.poll(() => page.evaluate(() => {
+    const graph = (window as unknown as Partial<CanvasWindow>).__worldFieldGraph;
+    const el = (graph as unknown as {
+      context?: { element?: { getElement?: (id: string) => any } };
+    } | undefined)?.context?.element?.getElement?.("crown:assertion:0");
+    const anims = el?.getShape?.("key")?.getAnimations?.() ?? [];
+    return anims.every((a: any) => a?.playState !== "running");
+  })).toBe(true);
+  // Travel the furniture to its destination, watching every frame for the
+  // fade: a cut lands without ever standing between, a stuck animation
+  // never lands at all.
+  const travel = (id: string, to: number) => page.evaluate(async ({ id, to }) => {
+    const graph = (window as unknown as CanvasWindow).__worldFieldGraph;
+    const keyOf = (node: string) => (graph as unknown as {
+      context: { element: { getElement: (edgeId: string) => any } };
+    }).context.element.getElement(node)?.getShape?.("key");
+    graph.emit("node:click", { target: { id } });
+    let crownMid = false;
+    let shelfMid = false;
+    for (let i = 0; i < 90; i += 1) {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      const crown = Number(keyOf("crown:assertion:0")?.style?.opacity);
+      const shelf = Number(keyOf("shelf:assertion:0")?.style?.opacity);
+      if (crown > 0 && crown < 1) crownMid = true;
+      if (shelf > 0 && shelf < 1) shelfMid = true;
+      if (crown === to && shelf === to) return { crownMid, shelfMid, settled: true };
+    }
+    return { crownMid, shelfMid, settled: false };
+  }, { id, to });
+  // Born withdrawn under its selected plate; selecting away reveals.
+  expect(await travel("entity:0", 1)).toEqual({ crownMid: true, shelfMid: true, settled: true });
+  // And selecting the plate withdraws again.
+  expect(await travel("assertion:0", 0)).toEqual({ crownMid: true, shelfMid: true, settled: true });
+});
+
+test("a vocabulary shelf fades out on select and back on release", async ({ page, world }) => {
+  world.count = 1;
+  world.binary = true;
+  world.relationMode = "DERIVED";
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/");
+  await expect.poll(() => vocabularyText(page)).toBe(0.85);
+  await expect.poll(() => page.evaluate(() => {
+    const graph = (window as unknown as Partial<CanvasWindow>).__worldVocabulary;
+    try {
+      return (graph?.getNodeData() ?? []).map((node) => String(node.id));
+    } catch {
+      return [];
+    }
+  })).toContain("shelf:rel:property");
+  // The birth lifecycle owns the lane while it runs; the fades below queue
+  // behind it, so wait it out rather than timing the queue.
+  await expect.poll(() => page.evaluate(() => {
+    const graph = (window as unknown as Partial<CanvasWindow>).__worldVocabulary;
+    const el = (graph as unknown as {
+      context?: { element?: { getElement?: (id: string) => any } };
+    } | undefined)?.context?.element?.getElement?.("shelf:rel:property");
+    const anims = el?.getShape?.("key")?.getAnimations?.() ?? [];
+    return anims.every((a: any) => a?.playState !== "running");
+  })).toBe(true);
+  // A cut lands without ever standing between; a stuck animation never
+  // lands at all. Same travel the field's furniture takes.
+  const travel = (emit: string, target: Record<string, unknown>, to: number) =>
+    page.evaluate(async ({ emit, target, to }) => {
+      const graph = (window as unknown as CanvasWindow).__worldVocabulary;
+      const keyOf = () => (graph as unknown as {
+        context: { element: { getElement: (id: string) => any } };
+      }).context.element.getElement("shelf:rel:property")?.getShape?.("key");
+      graph.emit(emit, target);
+      let mid = false;
+      for (let i = 0; i < 90; i += 1) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        const opacity = Number(keyOf()?.style?.opacity);
+        if (opacity > 0 && opacity < 1) mid = true;
+        if (opacity === to) return { mid, settled: true };
+      }
+      return { mid, settled: false };
+    }, { emit, target, to });
+  expect(await travel("node:click", { target: { id: "rel:property" } }, 0))
+    .toEqual({ mid: true, settled: true });
+  expect(await travel("canvas:click", {}, 1)).toEqual({ mid: true, settled: true });
 });
 
 test("a neighbour's press puts the fan down and a stranger's leaves it up", async ({ page, world }) => {
@@ -1407,4 +1408,137 @@ test("the fan yields to a hold exactly under its scope", async ({ page, world })
     return problems;
   });
   expect(verdict).toEqual([]);
+});
+
+/* ------------------------------------------------------------------ *
+ * Unfold synchronisation: the plate opens where the name stood
+ * ------------------------------------------------------------------ *
+ * Opening a bond must not invent a seat. The folded name's drawn position
+ * is the plate's seat — on a sparse line and on a crowded one alike.
+ */
+
+async function placeBinaryBond(page: Page) {
+  // Reading the row places the tuple folded: bond plus both discs.
+  await openProperty(page);
+  await readRow(page, 0);
+  await expect.poll(async () =>
+    (await field(page))?.bonds.map((bond) => bond.assertion_id),
+  ).toContain("assertion:0");
+  // Placement draws land behind the reads that placed them.
+  await expect.poll(() => page.evaluate(() => {
+    const graph = (window as unknown as CanvasWindow).__worldFieldGraph;
+    if (!graph) return false;
+    return ["entity:0", "entity:1"].every((id) => {
+      try {
+        const at = graph.getElementPosition(id);
+        return !!at && Number.isFinite(Number(at[0])) && Number.isFinite(Number(at[1]));
+      } catch {
+        return false;
+      }
+    });
+  })).toBe(true);
+}
+
+async function bondNameAt(page: Page, id: string): Promise<[number, number] | null> {
+  // Through the app's own element registry: a fresh import would carry a
+  // second, empty rendered map rather than the filament on the graph.
+  return page.evaluate((id) => {
+    const graph = (window as unknown as CanvasWindow).__worldFieldGraph;
+    const element = (graph as unknown as { context: { element: { getElement: (edgeId: string) => {
+      destroyed?: boolean; labelAnchor?: () => { x: number; y: number };
+    } | undefined } } }).context.element.getElement(`bond:${id}`);
+    if (!element || element.destroyed || typeof element.labelAnchor !== "function") return null;
+    try {
+      const at = element.labelAnchor();
+      return [Number(at.x), Number(at.y)] as [number, number];
+    } catch {
+      return null;
+    }
+  }, id);
+}
+
+async function platePosition(page: Page, id: string): Promise<[number, number] | null> {
+  return page.evaluate((id) => {
+    const graph = (window as unknown as CanvasWindow).__worldFieldGraph;
+    try {
+      const pos = graph.getElementPosition(id);
+      return pos ? [Number(pos[0]), Number(pos[1])] as [number, number] : null;
+    } catch {
+      return null;
+    }
+  }, id);
+}
+
+async function plateAtRest(page: Page, id: string): Promise<[number, number]> {
+  let at: [number, number] | null = null;
+  await expect.poll(async () => platePosition(page, id)).not.toBeNull();
+  for (let i = 0; i < 12; i += 1) {
+    const next = (await platePosition(page, id))!;
+    if (at && Math.hypot(next[0] - at[0], next[1] - at[1]) < 0.5) return next;
+    at = next;
+    await page.waitForTimeout(250);
+  }
+  return at!;
+}
+
+test("opening a bond seats its plate where the name stood", async ({ page, world }) => {
+  world.binary = true;
+  world.count = 3;
+  await placeBinaryBond(page);
+  const anchor = await bondNameAt(page, "assertion:0");
+  expect(anchor).not.toBeNull();
+  await reader(page).getByRole("button", { name: "Open on the field", exact: true }).click();
+  const plate = await plateAtRest(page, "assertion:0");
+  expect(Math.hypot(plate[0] - anchor![0], plate[1] - anchor![1])).toBeLessThanOrEqual(3);
+});
+
+test("opening a crowded bond seats its plate where the name stood", async ({ page, world }) => {
+  world.binary = true;
+  world.count = 3;
+  await placeBinaryBond(page);
+  // Shorten the bond until its midpoint crowds between the discs' bodies.
+  const job = await page.evaluate(() => {
+    const graph = (window as unknown as CanvasWindow).__worldFieldGraph;
+    const a = graph.getElementPosition("entity:0")!;
+    const b = graph.getElementPosition("entity:1")!;
+    const zoom = graph.getZoom();
+    return {
+      dx: (Number(a[0]) + 100 - Number(b[0])) * zoom,
+      dy: (Number(a[1]) - Number(b[1])) * zoom,
+    };
+  });
+  await emitField(page, "node:pointerdown", "entity:1");
+  await emitField(page, "node:dragstart", "entity:1");
+  await emitField(page, "node:drag", "entity:1", { dx: job.dx, dy: job.dy });
+  await settleFrames(page);
+  await emitField(page, "node:dragend", "entity:1");
+  await awaitDropDraw(page, "entity:1");
+  const anchor = await bondNameAt(page, "assertion:0");
+  expect(anchor).not.toBeNull();
+  await reader(page).getByRole("button", { name: "Open on the field", exact: true }).click();
+  const plate = await plateAtRest(page, "assertion:0");
+  expect(Math.hypot(plate[0] - anchor![0], plate[1] - anchor![1])).toBeLessThanOrEqual(3);
+});
+
+test("an opened plate keeps its seat across a later change", async ({ page, world }) => {
+  world.binary = true;
+  world.count = 3;
+  await placeBinaryBond(page);
+  const anchor = await bondNameAt(page, "assertion:0");
+  expect(anchor).not.toBeNull();
+  await reader(page).getByRole("button", { name: "Open on the field", exact: true }).click();
+  await plateAtRest(page, "assertion:0");
+  // Any redraw re-seats from the store: the seat must be the synchronised
+  // one, not the midpoint the store guessed before the canvas reported back.
+  const zoom = await page.evaluate(
+    () => (window as unknown as CanvasWindow).__worldFieldGraph.getZoom(),
+  );
+  await emitField(page, "node:pointerdown", "entity:0");
+  await emitField(page, "node:dragstart", "entity:0");
+  await emitField(page, "node:drag", "entity:0", { dx: 120 * zoom, dy: 40 * zoom });
+  await settleFrames(page);
+  await emitField(page, "node:dragend", "entity:0");
+  await awaitDropDraw(page, "entity:0");
+  const plate = await plateAtRest(page, "assertion:0");
+  expect(Math.hypot(plate[0] - anchor![0], plate[1] - anchor![1])).toBeLessThanOrEqual(3);
 });

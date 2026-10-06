@@ -5,6 +5,8 @@ import { createRoot } from "react-dom/client";
 import "@fontsource/ibm-plex-mono/latin-400.css";
 import "@fontsource/dm-mono/latin-400.css";
 import "@fontsource/space-mono/latin-400.css";
+import "@fontsource/azeret-mono/latin-400.css";
+import "@fontsource/spline-sans-mono/latin-400.css";
 // Jost carries the three weight-scale steps (styles/type.ts) and nothing
 // else — 200/300/700 were loaded and never referenced by any live rule.
 import "@fontsource/jost/latin-400.css";

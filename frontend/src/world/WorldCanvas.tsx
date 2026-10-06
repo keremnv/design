@@ -137,12 +137,7 @@ import {
   type CameraInsets,
 } from "./canvasFocus";
 import type { FieldBond, WorkingSet } from "./workingSet";
-import {
-  paintDepths,
-  plateSeatClear,
-  rankedDepths,
-  restackTop,
-} from "./workingSet";
+import { paintDepths, rankedDepths, restackTop } from "./workingSet";
 import { createCameraRecorder, type CameraRecorder } from "./cameraMemory";
 import {
   assertionShown,
@@ -3523,15 +3518,17 @@ export function WorldCanvas({
     const arranged = arrangeToken !== drawnArrangeToken.current;
     drawnArrangeToken.current = arrangeToken;
     /**
-     * A plate opens where its name stood.
+     * A plate opens where its name stood — and stays there.
      *
-     * The store seats the fold on the line's midpoint, which is where the
-     * name is until a fan carries it elsewhere — and the fan is renderer
-     * state the store cannot see. So the canvas asks the bond still on the
-     * graph where its name stands and seats the newborn plate there, once:
-     * the plate is new to this frame and the last draw had no such mark.
-     * An unreadable anchor, an occupied seat, or a plate that is not new
-     * all keep the stored seat, which is the midpoint the fold always had.
+     * The folded name's drawn position is the plate's seat, full stop: the
+     * name proves the seat legible, so no occupancy rule second-guesses it.
+     * The fan is renderer state the store cannot see, which is why the canvas
+     * asks the bond still on the graph where its name stands rather than
+     * re-deriving the station. The seat is reported back to the store, so the
+     * next frame, the next change, and the persisted field all stand on the
+     * same point instead of the midpoint the store guessed first. An
+     * unreadable anchor (the bond was never drawn), or a plate that is not
+     * new, keeps the stored seat — there is nothing to synchronise with.
      */
     let nodes = data.nodes as CanvasDatum[];
     const seed = foldSeed?.id ?? null;
@@ -3539,9 +3536,14 @@ export function WorldCanvas({
       const plate = nodes.find((node) => node.id === seed);
       const graph = graphRef.current;
       const anchor = graph ? filamentLabelAnchor(graph, bondElementId(seed)) : null;
-      if (anchor && plate?.style && plateSeatClear(set, anchor, seed)) {
+      if (anchor && plate?.style) {
         const x = Math.round(anchor.x);
         const y = Math.round(anchor.y);
+        const stored = set.positions.get(seed);
+        if (!stored || stored.x !== x || stored.y !== y) {
+          // No dropped id: an unfold seats, it does not restack.
+          onPositions(new Map([[seed, { x, y }]]));
+        }
         if (plate.style.x !== x || plate.style.y !== y) {
           nodes = nodes.map((node) =>
             node.id === seed ? { ...node, style: { ...node.style, x, y } } : node,
@@ -3569,6 +3571,7 @@ export function WorldCanvas({
     arrangeToken,
     data,
     foldSeed,
+    onPositions,
     queueCanvasDraw,
     ready,
     set,

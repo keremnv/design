@@ -444,18 +444,6 @@ function isClear(next: WorkingSet, at: Point, radius: number, ignore?: string): 
 }
 
 /**
- * Whether a plate could open here without landing on a standing mark.
- *
- * The fold's seat is authored — the drawn label's station — so unlike a fresh
- * placement it is never walked out to freedom: it either stands where the name
- * stood or keeps the pushed seat `open` already gave it. Same bodies as
- * `isClear`, so the canvas and the store agree about what "clear" means.
- */
-export function plateSeatClear(set: WorkingSet, at: Point, ignore: string): boolean {
-  return isClear(set, at, PLATE_BODY, ignore);
-}
-
-/**
  * How far the search will go before it gives up and takes the last slot.
  *
  * Eight tiers, which at `RING_TIER` apart reaches well past any field yet
@@ -1095,11 +1083,12 @@ export function foldingOf(
 /**
  * Unfold a bond into the plate it is.
  *
- * The plate lands on the midpoint of the line it replaces, so the line appears
- * to open rather than to be swapped for something elsewhere, and neither disc
- * moves — this changes how a tuple is drawn and nothing about where the field
- * stands. `plateAt` still probes outward if the midpoint is already occupied,
- * by the same phyllotaxis walk every other plate is placed with.
+ * Neither disc moves — this changes how a tuple is drawn and nothing about
+ * where the field stands. The seat here is a fallback: the midpoint of the
+ * line it replaces, probed outward by `plateAt` if occupied. When the bond
+ * was drawn, the canvas synchronises the plate onto the folded name's own
+ * position and reports it back, so this guess stands only when there is no
+ * drawn name to synchronise with.
  */
 export function open(set: WorkingSet, assertionId: string): WorkingSet {
   const bond = set.bonds.find((edge) => edge.assertion_id === assertionId);

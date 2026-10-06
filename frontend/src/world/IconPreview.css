@@ -20,4 +20,4 @@
 .icon-preview__sample:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
 .icon-preview__sizes { display: flex; align-items: end; gap: 24px; margin: 16px 0; }
 .icon-preview__sizes > span { display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 11px; }
-.icon-preview__name { max-width: 220px; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 12px; }
+.icon-preview__name { max-width: 220px; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: calc(12px * var(--font-mono-scale, 1)); }

@@ -18,7 +18,11 @@
 
 import { GRAPH_DNA_CHIP, GRAPH_DNA_GEOMETRY, radixValue } from "../styles/graphDna";
 import type { GraphDnaTheme } from "../styles/graphDna";
-import { FONT_MONO_FAMILY, FONT_SANS_FAMILY } from "../styles/typography";
+import {
+  FONT_MONO_FAMILY,
+  FONT_MONO_SCALE,
+  FONT_SANS_FAMILY,
+} from "../styles/typography";
 import { WORLD_FILAMENT_EDGE, type RoleEnds } from "./filaments";
 
 /**
@@ -597,7 +601,7 @@ export function spokeEdge(
       labelPointerEvents: options.showRole ? "auto" as const : "none" as const,
       labelText: options.role ?? "",
       labelFontFamily: FONT_MONO_FAMILY,
-      labelFontSize: p.roleLabelSize,
+      labelFontSize: p.roleLabelSize * FONT_MONO_SCALE,
       labelFontWeight: p.roleLabelWeight,
       labelFill: paint.ink,
       // Stated, not inherited — and now actually so. A label left to take the
@@ -754,14 +758,19 @@ export const SPOKE_LABEL_RIM_GAP_PX = 4;
  * A role plate's width. The same arithmetic as `chipWidth`, at role metrics.
  *
  * A role is set in the mono face at the same size and weight as a relation —
- * the family carries the kind distinction, nothing else. Measuring a role
- * with the chip's (sans) metrics misstates it, and the whole point of a
- * width-aware station is that the width is the real one.
+ * the family carries the kind distinction, plus the trial's apparent-size
+ * scale (see FONT_MONO_SCALE). Measuring a role with the chip's (sans)
+ * metrics misstates it, and the whole point of a width-aware station is
+ * that the width is the real one.
  */
 export function roleWidth(text: string, p: MarkParams): number {
   return Math.round(
-    textWidth(text, p.roleLabelSize, p.roleLabelWeight, FONT_MONO_FAMILY) +
-      p.chipPaddingX * 2,
+    textWidth(
+      text,
+      p.roleLabelSize * FONT_MONO_SCALE,
+      p.roleLabelWeight,
+      FONT_MONO_FAMILY,
+    ) + p.chipPaddingX * 2,
   );
 }
 
@@ -1326,7 +1335,7 @@ export function roleEnds(
     source: end(roles.source),
     target: end(roles.target),
     fontFamily: FONT_MONO_FAMILY,
-    fontSize: p.roleLabelSize,
+    fontSize: p.roleLabelSize * FONT_MONO_SCALE,
     fontWeight: p.roleLabelWeight,
     fill: paint.ink,
     ground: paint.chip,

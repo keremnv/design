@@ -1248,7 +1248,7 @@
    column for column, so they are the only thing set in a monospace. */
 .deriv__rule {
   font-family: var(--font-mono);
-  font-size: var(--type-label);
+  font-size: calc(var(--type-label) * var(--font-mono-scale, 1));
   color: var(--rule-strong, var(--ink-muted));
   white-space: pre;
 }
@@ -1314,7 +1314,7 @@
   border-bottom: 1px solid var(--rule);
   background: var(--canvas);
   font-family: var(--font-mono);
-  font-size: var(--type-label);
+  font-size: calc(var(--type-label) * var(--font-mono-scale, 1));
   line-height: 1.6;
   color: var(--ink);
   overflow-x: auto;

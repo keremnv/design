@@ -237,7 +237,7 @@
   overflow: hidden;
   color: var(--ink-muted);
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: var(--type-caption);
+  font-size: calc(var(--type-caption) * var(--font-mono-scale, 1));
   font-weight: var(--weight-regular);
   letter-spacing: 0;
   line-height: inherit;

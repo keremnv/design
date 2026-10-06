@@ -14,7 +14,7 @@
  * secondary emphasis alone is never a reason to switch families.
  *
  * Mono is a trial against Jost. Flip `FONT_MONO` to another loaded id and
- * rebuild; there is no runtime picker yet. Loaded faces: dm, plex, space.
+ * rebuild; there is no runtime picker yet. Loaded faces: dm, plex, space, azeret, spline.
  */
 export const FONT_SANS_FAMILY =
   'Jost, "Helvetica Neue", Helvetica, sans-serif';
@@ -25,27 +25,49 @@ export const FONT_MONO_TRIALS = {
   dm: {
     name: "DM Mono",
     note: "Geometric, same construction as Jost. Quiet at small sizes.",
+    scale: 1,
   },
   plex: {
     name: "IBM Plex Mono",
     note: "Humanist, a little softer than Jost.",
+    scale: 1,
   },
   space: {
     name: "Space Mono",
     note: "Also geometric, more ink and character. Louder in a tag.",
+    scale: 1,
+  },
+  azeret: {
+    name: "Azeret Mono",
+    note: "Low-contrast grotesque mono, generous spacing. Airy at small sizes.",
+    scale: 0.9,
+  },
+  spline: {
+    name: "Spline Sans Mono",
+    note: "Geometric-grotesque mono, open apertures. Calm at small sizes.",
+    scale: 0.9,
   },
 } as const;
 
 export type FontMonoId = keyof typeof FONT_MONO_TRIALS;
 
 /** The mono in use. Change this to try another loaded face. */
-export const FONT_MONO: FontMonoId = "dm";
+export const FONT_MONO: FontMonoId = "spline";
 
 export function fontMonoFamily(id: FontMonoId = FONT_MONO): string {
   return `"${FONT_MONO_TRIALS[id].name}", ${FONT_MONO_STACK}`;
 }
 
 export const FONT_MONO_FAMILY = fontMonoFamily(FONT_MONO);
+
+/**
+ * Apparent-size compensation for the active trial. Faces with generous
+ * metrics (Azeret) render larger than their nominal size next to Jost; the
+ * scale restores parity. Every mono size — canvas paint, canvas measure,
+ * and DOM rules via `--font-mono-scale` — multiplies by this, so measure
+ * and paint can never drift apart.
+ */
+export const FONT_MONO_SCALE = FONT_MONO_TRIALS[FONT_MONO].scale;
 
 /** Default G6 node label face — keep in sync with FONT_SANS_FAMILY. */
 export const FONT_NODE_LABEL_FAMILY = FONT_SANS_FAMILY;
@@ -61,4 +83,5 @@ export function applyTypographyToDocument(): void {
   const root = document.documentElement;
   root.style.setProperty("--font-sans", FONT_SANS_FAMILY);
   root.style.setProperty("--font-mono", FONT_MONO_FAMILY);
+  root.style.setProperty("--font-mono-scale", String(FONT_MONO_SCALE));
 }

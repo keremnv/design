@@ -194,6 +194,7 @@ code,
 pre,
 .mono {
   font-family: var(--font-mono);
+  font-size: calc(1em * var(--font-mono-scale, 1));
 }
 
 /* Visible to a screen reader, to nothing else.
