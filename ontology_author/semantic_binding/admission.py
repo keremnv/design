@@ -29,6 +29,7 @@ from ontology_author.authority.evaluate import (
     snapshot_id as authority_snapshot_id,
 )
 from ontology_author.authority.validation import observations_for_assertion
+from ontology_author.evidence.program_source import verify_retained_program_inputs
 from ontology_author.program_spine.comparison import SpineComparisonResult
 from ontology_author.world.core.model import Role, RoleType
 from ontology_author.world.core.origins import ConstructionOrigin
@@ -1024,6 +1025,12 @@ def materialize_semantic_commitment_revision(
             raise SemanticPersistenceError(
                 "materialized World failed admission validation: "
                 + "; ".join(str(item.get("message") or item) for item in report.ungrounded)
+            )
+        program_errors = verify_retained_program_inputs(world)
+        if program_errors:
+            raise SemanticPersistenceError(
+                "materialized World failed retained program evidence verification: "
+                + "; ".join(program_errors)
             )
         (staging / "world.admission.json").write_text(
             json.dumps(world.admission_payload(), indent=2, sort_keys=True) + "\n",
