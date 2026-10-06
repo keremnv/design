@@ -21,6 +21,7 @@ every World must implement:
 - Program representation: [spine](PROGRAM_SPINE_CONTRACT.md), [extractor](SPINE_EXTRACTOR_CONTRACT.md), [comparison](SPINE_COMPARISON_CONTRACT.md), [TypeScript profile](TYPESCRIPT_SPINE_PROFILE.md).
 - [Semantic persistence and recorded-dependency maintenance](SEMANTIC_PERSISTENCE_CONTRACT.md).
 - [Target Architecture v0 Phase 3](TARGET_ARCHITECTURE_V0_PHASE3.md): construction-path audit, basis/support separation, grouped support and source-only semantic publication.
+- [Target Architecture v0 Phase 4](TARGET_ARCHITECTURE_V0_PHASE4.md): W0→P1→W1→P2→W2 vertical slice, exact binding, historical reconsideration and the program capability-demand ledger.
 - Authority: [construction](AUTHORITY_CONSTRUCTION_CONTRACT.md), [maintenance](AUTHORITY_MAINTENANCE_CONTRACT.md). Historical relative to the construction draft where they conflict.
 - Earlier governance records, not superior to the construction draft: [foundations](GOVERNANCE_FOUNDATIONS.md), [cases](GOVERNANCE_CASE_CONTRACT.md), [adjudication](GOVERNANCE_ADJUDICATION_CONTRACT.md), [kernel mapping](GOVERNANCE_KERNEL_MAPPING.md), [candidate lifecycle](GOVERNED_CANDIDATE_LIFECYCLE.md).
 - [Design checkout experiment](DESIGN_CHECKOUT_CONSTRUCTION_CONTRACT.md) and [profile](../profiles/design_checkout/).

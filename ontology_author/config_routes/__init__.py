@@ -14,6 +14,7 @@ from ontology_author.config_routes.construct import (
     construct_config_world,
 )
 from ontology_author.config_routes.semantic import construct_config_requirements
+from ontology_author.config_routes.binding import construct_config_binding
 from ontology_author.config_routes.inspect import (
     inspect_binding,
     inspect_config_world,
@@ -45,6 +46,7 @@ __all__ = [
     "ConfigRoutesReport",
     "construct_config_world",
     "construct_config_requirements",
+    "construct_config_binding",
     "inspect_binding",
     "inspect_config_world",
     "inspect_proposition",
