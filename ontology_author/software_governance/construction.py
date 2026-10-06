@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
@@ -20,7 +21,7 @@ from ontology_author.software_governance.validation import CONTRACT_ID, validate
 from ontology_author.world.core.model import Role, RoleType
 from ontology_author.world.core.origins import ConstructionOrigin
 from ontology_author.world.core.source import AssertionGrounding, SourceObservation
-from ontology_author.world.runtime.commit import _seal_world
+from ontology_author.world.runtime.commit import _exclusive_rename, _seal_world
 from ontology_author.world.runtime.world import ConstructionError, ConstructionWorld
 
 
@@ -133,8 +134,14 @@ def construct_software_governance(
             succeeded=False,
             errors=(f"software world has no world.sqlite: {source}",),
         )
-    work = publication.with_name(publication.name + ".sg-work")
-    _discard(work)
+    work = publication.with_name(
+        f".{publication.name}.sg-work-{uuid.uuid4().hex}"
+    )
+    if os.path.lexists(work):
+        return GovernanceConstructionResult(
+            succeeded=False,
+            errors=(f"governance staging address already exists: {work}",),
+        )
     errors: tuple[str, ...] = ()
     try:
         _writable_copy(source, work)
@@ -458,57 +465,3 @@ def _discard(path: Path) -> None:
         child.chmod(child.stat().st_mode | (0o700 if child.is_dir() else 0o600))
     path.chmod(path.stat().st_mode | 0o700)
     shutil.rmtree(path)
-
-
-def _exclusive_rename(source: Path, dest: Path) -> None:
-    """Atomically publish ``source`` at ``dest`` without overwriting.
-
-    Raises ``FileExistsError`` when ``dest`` already exists (including an
-    empty directory or symlink) and ``OSError`` on other publication
-    failures. On Linux, ``renameat2(RENAME_NOREPLACE)`` closes the
-    check-then-rename race; elsewhere an existence check plus ``rename``
-    fails safe for the deterministic cases (a non-empty existing World
-    makes ``rename`` fail instead of overwriting).
-    """
-    if os.path.lexists(dest):
-        raise FileExistsError(str(dest))
-    no_replace = _rename_noreplace(source, dest)
-    if no_replace is not None:
-        return
-    # Fallback: re-check immediately before rename. A concurrent winner
-    # leaves a non-empty World, so this rename fails rather than replacing.
-    if os.path.lexists(dest):
-        raise FileExistsError(str(dest))
-    os.rename(source, dest)
-
-
-def _rename_noreplace(source: Path, dest: Path) -> bool | None:
-    """Try Linux renameat2 NOREPLACE. Returns True, or None to fall back."""
-    try:
-        import ctypes
-    except ImportError:
-        return None
-    try:
-        libc = ctypes.CDLL("libc.so.6", use_errno=True)
-    except OSError:
-        return None
-    renameat2 = getattr(libc, "renameat2", None)
-    if renameat2 is None:
-        return None
-    renameat2.argtypes = [
-        ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint,
-    ]
-    renameat2.restype = ctypes.c_int
-    ret = renameat2(
-        -100, os.fsencode(source), -100, os.fsencode(dest), 1  # RENAME_NOREPLACE
-    )
-    if ret == 0:
-        return True
-    import errno as _errno
-
-    code = ctypes.get_errno()
-    if code in (_errno.ENOSYS, _errno.EINVAL):
-        return None
-    if code == _errno.EEXIST:
-        raise FileExistsError(str(dest))
-    raise OSError(code, os.strerror(code), str(dest))

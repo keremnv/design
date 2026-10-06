@@ -87,13 +87,18 @@ class Project:
         *,
         purpose: str | Path | None = None,
     ) -> RunResult:
-        """Construct and publish a candidate World.
+        """Construct a candidate World and install this root's bundle.
 
         ``purpose=None`` is the governed path: no Purpose object or Purpose
         relation is created, and ``PURPOSE.md`` is never read implicitly.
         An explicit text-or-path request still builds the legacy Purpose
         context for old three-argument constructors; those constructors
         receive ``None`` when no purpose was requested.
+
+        Re-running against an existing root replaces that root's bundle in
+        place. That is frozen compatibility behavior, not accepted-history
+        publication: no prior revision is retained. Retained history uses
+        one fresh root per revision (see ``profiles/core_v1/build.py``).
         """
         construction_path = Path(construction) if construction else self.root / "construction.py"
 

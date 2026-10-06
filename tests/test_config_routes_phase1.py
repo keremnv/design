@@ -910,3 +910,39 @@ def test_report_is_machine_readable_json(tmp_path: Path) -> None:
         "unsupported", "validation_errors",
     ):
         assert key in payload
+
+def test_config_publication_does_not_delete_prior_staging_named_publication(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace-staging-collision"
+    workspace.mkdir()
+    software = workspace / "software.json"
+    governance = workspace / "governance.md"
+    _write_software(software, _base_routes())
+    _write_governance(
+        governance,
+        "Customer export must use the approved customer-export route.",
+        "Status checks must use an approved route.",
+    )
+
+    historical = tmp_path / "W2.sg-work"
+    first = construct_config_world(
+        software_source=software,
+        governance_source=governance,
+        output=historical,
+    )
+    assert first.succeeded, first.errors
+    before = _hash_tree(historical)
+
+    current = tmp_path / "W2"
+    second = construct_config_world(
+        software_source=software,
+        governance_source=governance,
+        output=current,
+    )
+    assert second.succeeded, second.errors
+
+    assert historical.exists()
+    assert _hash_tree(historical) == before
+    assert current.exists()
+

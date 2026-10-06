@@ -9,6 +9,7 @@ dependencies.  A constructor cannot supply the admission outcome.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sqlite3
 import uuid
@@ -35,10 +36,12 @@ from ontology_author.world.core.model import Role, RoleType
 from ontology_author.world.core.origins import ConstructionOrigin
 from ontology_author.world.core.source import AssertionGrounding, SourceObservation
 from ontology_author.world.runtime.commit import (
+    _exclusive_rename,
     _remove_tree,
     _seal_world,
     validate_contract_admission,
 )
+from ontology_author.world.runtime.publication import PublicationRef
 from ontology_author.world.runtime.world import ConstructionWorld
 
 from .construction import validate_semantic_candidate
@@ -962,21 +965,24 @@ def materialize_semantic_commitment_revision(
     )
     source_path = source_path.resolve()
     source_bundle = source_path.parent
-    target_bundle = Path(target_world_dir).resolve()
+    requested_target = Path(target_world_dir)
+    if os.path.lexists(requested_target):
+        raise SemanticPersistenceError(
+            f"target World revision already exists: {requested_target}"
+        )
+    target_bundle = requested_target.resolve(strict=False)
     if not source_path.is_file():
         raise SemanticPersistenceError(f"baseline World database is missing: {source_path}")
-    if target_bundle.exists():
-        raise SemanticPersistenceError(
-            f"target World revision already exists: {target_bundle}"
-        )
     if target_bundle == source_bundle:
         raise SemanticPersistenceError("World revision target must differ from baseline")
     target_bundle.parent.mkdir(parents=True, exist_ok=True)
     staging = target_bundle.parent / (
         f".{target_bundle.name}.staging-{uuid.uuid4().hex}"
     )
-    if staging.exists():
-        _remove_tree(staging)
+    if os.path.lexists(staging):
+        raise SemanticPersistenceError(
+            f"semantic materialization staging address already exists: {staging}"
+        )
     shutil.copytree(source_bundle, staging)
     for path in sorted(staging.rglob("*")):
         path.chmod(path.stat().st_mode | (0o700 if path.is_dir() else 0o600))
@@ -1039,7 +1045,7 @@ def materialize_semantic_commitment_revision(
         world.close()
         world = None
         _seal_world(staging)
-        staging.rename(target_bundle)
+        _exclusive_rename(staging, target_bundle)
         return {
             **persisted,
             "source_world_dir": str(source_bundle),
@@ -1048,6 +1054,7 @@ def materialize_semantic_commitment_revision(
             "candidate_snapshot_id": snapshot_id,
             "relation_schema": relation,
             "world_revision": _world_revision(target_bundle / source_path.name),
+            "publication": _publication_ref(target_bundle / source_path.name),
             "published": True,
         }
     except Exception:
@@ -1066,6 +1073,14 @@ def _world_revision(path: Path) -> int:
     try:
         rows = world.query("SELECT revision FROM _world_meta WHERE singleton = 1")
         return int(rows[0]["revision"]) if rows else 0
+    finally:
+        world.close()
+
+
+def _publication_ref(path: Path) -> dict[str, Any]:
+    world = ConstructionWorld.open(path, read_only=True)
+    try:
+        return PublicationRef.from_world(world).as_dict()
     finally:
         world.close()
 

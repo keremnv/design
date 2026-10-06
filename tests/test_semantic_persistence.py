@@ -1008,6 +1008,31 @@ def test_failed_materialization_does_not_publish_revision(tmp_path):
         new.close()
 
 
+def test_materialization_rejects_dangling_symlink_target(tmp_path):
+    old, new, _comparison, _case_value, obligation, catalog, candidate, decision = (
+        _cancellation_commitment_fixture(tmp_path)
+    )
+    try:
+        target = tmp_path / "dangling-semantic-revision"
+        target.symlink_to(tmp_path / "missing-semantic-revision", target_is_directory=True)
+
+        with pytest.raises(Exception, match="already exists"):
+            materialize_semantic_commitment_revision(
+                old,
+                target,
+                obligation,
+                candidate,
+                decision,
+                catalog,
+                snapshot_id=snapshot_id(old),
+            )
+
+        assert target.is_symlink()
+    finally:
+        old.close()
+        new.close()
+
+
 def test_materialized_commitment_is_maintained_without_transfer_or_model(tmp_path):
     old, new, comparison, _case_value, obligation, catalog, candidate, decision = (
         _cancellation_commitment_fixture(tmp_path)

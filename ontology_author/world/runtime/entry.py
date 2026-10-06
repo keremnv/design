@@ -45,7 +45,12 @@ def rebuild(
     evidence_authority: Any | None = None,
     adjudication_authority: Any | None = None,
 ) -> RunResult:
-    """Construct, validate, and replace this World's sealed bundle.
+    """Construct, validate, and install this workspace's sealed bundle.
+
+    Rebuilding an existing workspace replaces its bundle in place. That is
+    frozen compatibility behavior, not accepted-history publication: no
+    prior revision is retained. Retained history uses one fresh workspace
+    per revision (see ``profiles/core_v1/build.py``).
 
     ``purpose=None`` is the governed Purpose-free path; ``PURPOSE.md`` is
     never read implicitly.  An explicit text-or-path request builds the

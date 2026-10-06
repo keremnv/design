@@ -17,8 +17,10 @@ the publication address.
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 import sys
+import uuid
 from pathlib import Path
 
 from ontology_author.evidence.markdown import MarkdownSource
@@ -56,13 +58,19 @@ COMPLETENESS_GAP = "supplied_correspondences_only"
 
 def build_mail_profile(output: Path) -> GovernanceConstructionResult:
     publication = Path(output)
-    if publication.exists():
+    if os.path.lexists(publication):
         return GovernanceConstructionResult(
             succeeded=False,
             errors=(f"publication address already exists: {publication}",),
         )
-    staging = publication.with_name(publication.name + ".mail-spine")
-    _discard(staging)
+    staging = publication.with_name(
+        f".{publication.name}.mail-spine-{uuid.uuid4().hex}"
+    )
+    if os.path.lexists(staging):
+        return GovernanceConstructionResult(
+            succeeded=False,
+            errors=(f"mail staging address already exists: {staging}",),
+        )
     try:
         spine = build_typescript_spine(
             PROGRAM,

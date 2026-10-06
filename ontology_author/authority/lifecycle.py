@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from ontology_author.world.runtime.commit import (
-    _replace_candidate,
     discard_candidate,
     fingerprint_world,
+    publish_candidate,
     write_sidecars,
 )
 from ontology_author.world.runtime.world import ConstructionWorld, world_id_of
@@ -68,16 +70,32 @@ def construct_authority_world(
     candidate and does not modify that input. Every declared authority source
     is retained in the candidate before admission so an accepted publication
     never depends on the original workspace copy remaining available.
+    ``output`` must be a fresh address: the baseline program publication is
+    retained unchanged beside the new authority publication.
     """
 
     source = Path(program_world).resolve()
-    output_dir = Path(output).resolve()
+    requested_output = Path(output)
+    if os.path.lexists(requested_output):
+        return AuthorityConstructionResult(
+            False,
+            "publication_exists",
+            (f"publication address already exists: {requested_output}",),
+        )
+    output_dir = requested_output.resolve(strict=False)
     if not (source / "world.sqlite").exists():
         return AuthorityConstructionResult(
             False, "missing_program_world", ("program World sqlite is missing",)
         )
-    candidate = output_dir.with_name(output_dir.name + ".candidate")
-    discard_candidate(candidate)
+    candidate = output_dir.with_name(
+        f".{output_dir.name}.candidate-{uuid.uuid4().hex}"
+    )
+    if os.path.lexists(candidate):
+        return AuthorityConstructionResult(
+            False,
+            "candidate_exists",
+            (f"candidate address already exists: {candidate}",),
+        )
     try:
         make_writable_copy(source, candidate)
         world = ConstructionWorld.open(
@@ -128,7 +146,7 @@ def construct_authority_world(
             )
             write_sidecars(world)
             world.close()
-            _replace_candidate(candidate, output_dir)
+            publish_candidate(candidate, output_dir)
             return AuthorityConstructionResult(
                 True,
                 world_dir=output_dir,

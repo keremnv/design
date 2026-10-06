@@ -14,6 +14,9 @@ from ontology_author.semantic_binding import (
     compile_semantic_candidate_draft,
 )
 from ontology_author.semantic_binding.admission import _observations_for_candidate
+from ontology_author.world.core.model import Role, RoleType
+from ontology_author.world.core.origins import ConstructionOrigin
+from ontology_author.world.core.source import AssertionGrounding, SourceObservation
 from ontology_author.world.runtime.world import ConstructionWorld
 from tests.test_semantic_persistence import _alias, _case, _draft, _obligation
 
@@ -24,6 +27,7 @@ def test_program_source_record_survives_catalog_candidate_and_grounding(
     payload = b"export function openRetentionFlow() { return true; }\n"
     digest = hashlib.sha256(payload).hexdigest()
     native_handle = f"src/retention.ts@sha256:{digest}"
+    source_state = "snapshot-source-state:phase1-observation"
 
     world = ConstructionWorld.create(
         tmp_path / "world.sqlite",
@@ -33,6 +37,26 @@ def test_program_source_record_survives_catalog_candidate_and_grounding(
         inputs = world.path.parent / PROGRAM_INPUTS_DIR
         inputs.mkdir(parents=True, exist_ok=True)
         (inputs / digest).write_bytes(payload)
+        observation = SourceObservation(
+            provider="typescript",
+            native_handle=native_handle,
+            source_revision=source_state,
+            native_location=f"bytes:0:{len(payload)}",
+        )
+        world.add_referent("snapshot:s0", label="snapshot:s0")
+        world.declare_relation(
+            "program_snapshot",
+            [Role("snapshot", RoleType.REFERENT), Role("source_state", RoleType.TEXT)],
+            description="Snapshot revision contract qualifying the recorded observation.",
+        )
+        world.assert_tuple(
+            "program_snapshot",
+            {"snapshot": "snapshot:s0", "source_state": source_state},
+            origin=ConstructionOrigin.MECHANICAL,
+            grounding=AssertionGrounding(
+                (observation,), construction_method="phase1 observation fixture"
+            ),
+        )
         record = source_evidence_record(
             world=world,
             entity="program:openRetentionFlow",
@@ -43,7 +67,7 @@ def test_program_source_record_survives_catalog_candidate_and_grounding(
             observation={
                 "provider": "typescript",
                 "native_handle": native_handle,
-                "source_revision": f"sha256:{digest}",
+                "source_revision": source_state,
                 "native_location": f"bytes:0:{len(payload)}",
             },
         )
