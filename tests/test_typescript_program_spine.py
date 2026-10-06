@@ -489,23 +489,57 @@ def test_same_immutable_input_reconstructs_identical_world_facts(tmp_path):
         }
         world.close()
         world = None
-        second = build_typescript_spine(tmp_path, tmp_path / "world", boundary=boundary)
-        assert second.succeeded
-        reopened = ConstructionWorld.open(tmp_path / "world" / "world.sqlite")
+        second = build_typescript_spine(tmp_path, tmp_path / "world-second", boundary=boundary)
+        assert second.succeeded, second.errors
+        reopened = ConstructionWorld.open(tmp_path / "world-second" / "world.sqlite")
         try:
             assert first.snapshot_id == second.snapshot_id
             assert first_rows == {
                 relation: reopened.relation_rows(relation)
                 for relation in first_rows
             }
-            assert json.loads((tmp_path / "world" / "typescript.manifest.json").read_text())[
+            assert json.loads((tmp_path / "world-second" / "typescript.manifest.json").read_text())[
                 "snapshot_id"
             ] == first.snapshot_id
         finally:
             reopened.close()
+        assert (tmp_path / "world" / "world.sqlite").exists()
     finally:
         if world is not None:
             world.close()
+
+
+def test_spine_publication_requires_a_fresh_address(tmp_path):
+    _project(
+        tmp_path,
+        {"src/index.ts": "export function stable(value: string): string { return value; }\n"},
+    )[1].close()
+    before = (tmp_path / "world" / "world.sqlite").read_bytes()
+    boundary = TypeScriptBoundary(
+        workspace_roots=("src",),
+        projects=("tsconfig.json",),
+        package_roots=("src",),
+    )
+    second = build_typescript_spine(tmp_path, tmp_path / "world", boundary=boundary)
+    assert not second.succeeded
+    assert "already exists" in " ".join(second.errors)
+    assert (tmp_path / "world" / "world.sqlite").read_bytes() == before
+
+
+def test_spine_rejects_dangling_symlink_publication_address(tmp_path):
+    _result, world, boundary = _project(
+        tmp_path,
+        {"src/index.ts": "export const stable = true;\n"},
+    )
+    world.close()
+    output = tmp_path / "dangling-world"
+    output.symlink_to(tmp_path / "missing-world", target_is_directory=True)
+
+    result = build_typescript_spine(tmp_path, output, boundary=boundary)
+
+    assert not result.succeeded
+    assert "already exists" in " ".join(result.errors)
+    assert output.is_symlink()
 
 
 def test_admission_rejects_relation_endpoint_missing_from_program_universe(tmp_path):

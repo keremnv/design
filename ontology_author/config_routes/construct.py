@@ -163,7 +163,14 @@ def construct_config_world(
     staging = publication.with_name(
         publication.name + f".config-routes-{os.getpid()}-{uuid.uuid4().hex[:8]}"
     )
-    _discard(staging)
+    if os.path.lexists(staging):
+        return ConfigRoutesReport(
+            succeeded=False,
+            output=str(publication),
+            errors=(f"config-routes staging address already exists: {staging}",),
+            expected_software_revision=expected_soft,
+            expected_governance_revision=expected_gov,
+        )
     try:
         try:
             produced = producer_module.produce_routes(

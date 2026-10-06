@@ -8,7 +8,7 @@ contract for the construction boundary.
 The semantic core does not import this construction package.
 """
 
-from ontology_author.world.runtime.commit import RunResult
+from ontology_author.world.runtime.commit import RunResult, publish_candidate
 from ontology_author.world.runtime.entry import create, open_world, rebuild
 from ontology_author.world.runtime.project import Project
 from ontology_author.world.runtime.publication import PublicationRef, verify_publication_ref
@@ -30,6 +30,7 @@ __all__ = [
     "ResolutionEvaluationError",
     "Purpose",
     "RunResult",
+    "publish_candidate",
     "Source",
     "create",
     "open_world",

@@ -529,3 +529,62 @@ def test_program_delta_recovers_exact_markdown_without_migrating_heuristic_conti
     finally:
         world.close()
         new_world.close()
+
+
+def test_authority_publication_requires_a_fresh_address(tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _write(workspace, MD)
+    spine = _spine(workspace, TS_A, "program-world")
+    assert spine.world_dir is not None
+    output = tmp_path / "authority-world"
+    first = construct_authority_world(
+        spine.world_dir,
+        output,
+        _universe(workspace),
+        _build_authority,
+        construction_id="fresh-address-first",
+        purpose=PURPOSE,
+        profile=PROFILE,
+    )
+    assert first.succeeded, first.errors
+    before = (output / "world.sqlite").read_bytes()
+    baseline = program_world_fingerprint(spine.world_dir)
+
+    second = construct_authority_world(
+        spine.world_dir,
+        output,
+        _universe(workspace),
+        _build_authority,
+        construction_id="fresh-address-second",
+        purpose=PURPOSE,
+        profile=PROFILE,
+    )
+    assert not second.succeeded
+    assert "already exists" in " ".join(second.errors)
+    assert (output / "world.sqlite").read_bytes() == before
+    assert program_world_fingerprint(spine.world_dir) == baseline
+
+def test_authority_rejects_dangling_symlink_publication_address(tmp_path):
+    workspace = tmp_path / "workspace-dangling"
+    workspace.mkdir()
+    _write(workspace, MD)
+    spine = _spine(workspace, TS_A, "program-world")
+    assert spine.world_dir is not None
+    output = tmp_path / "authority-dangling"
+    output.symlink_to(tmp_path / "missing-authority", target_is_directory=True)
+
+    result = construct_authority_world(
+        spine.world_dir,
+        output,
+        _universe(workspace),
+        _build_authority,
+        construction_id="dangling-address",
+        purpose=PURPOSE,
+        profile=PROFILE,
+    )
+
+    assert not result.succeeded
+    assert "already exists" in " ".join(result.errors)
+    assert output.is_symlink()
+

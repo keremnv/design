@@ -479,7 +479,11 @@ def test_publication_failure_after_successful_construction(tmp_path, monkeypatch
     observed_candidate = []
 
     def fail_final_rename(path: Path, target: Path):
-        if path == destination.with_name("world.sg-work") and Path(target) == destination:
+        if (
+            path.parent == destination.parent
+            and path.name.startswith(f".{destination.name}.sg-work-")
+            and Path(target) == destination
+        ):
             observed_candidate.append((path / "world.sqlite").is_file())
             raise OSError("injected publication failure")
         return original_rename(path, target)
@@ -490,7 +494,7 @@ def test_publication_failure_after_successful_construction(tmp_path, monkeypatch
     assert any("injected publication failure" in error for error in result.errors)
     assert observed_candidate == [True]
     assert not destination.exists()
-    assert not destination.with_name("world.sg-work").exists()
+    assert list(destination.parent.glob(f".{destination.name}.sg-work-*")) == []
     assert _sha(source.read_bytes()) == r1
     assert _sealed_bytes(w0) == w0_bytes
 

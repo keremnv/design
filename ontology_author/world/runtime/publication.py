@@ -24,7 +24,13 @@ from ontology_author.world.runtime.world import ConstructionWorld
 
 @dataclass(frozen=True)
 class PublicationRef:
-    """Exact retained publication occurrence used by a consumer."""
+    """Exact retained publication occurrence used by a consumer.
+
+    ``revision`` is the bundle-local construction counter recorded in
+    ``_world_meta``. It is not a global publication sequence: two
+    independently retained publications may legitimately share a revision,
+    and a higher revision never means a newer or operative publication.
+    """
 
     address: str
     world_id: str

@@ -1,17 +1,24 @@
-"""Candidate World execution, fail-closed validation, and World replacement.
+"""Candidate World execution, fail-closed validation, and fresh publication.
 
 Implements World integrity and WORLD BASE SOURCE accountability for the
-construction boundary.
+construction boundary. Accepted history grows by publishing validated
+candidates at fresh retained addresses; publication never mutates,
+overwrites, or removes an already accepted bundle. Legacy in-place
+replacement survives below for frozen compatibility paths only.
 """
 
 from __future__ import annotations
 
+import errno
 import json
+import os
 import shutil
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ontology_author.world.runtime.publication import PublicationRef
 from ontology_author.world.runtime.world import ConstructionError, ConstructionWorld
 
 
@@ -117,13 +124,163 @@ def _verify_retained_evidence_closure(bundle: Path) -> None:
         )
 
 
-def _replace_candidate(candidate: Path, world: Path) -> None:
-    """Replace the current World with a sealed candidate directory.
+def publish_candidate(candidate: Path | str, destination: Path | str) -> PublicationRef:
+    """Publish a validated candidate bundle at a fresh retained address.
 
-    Replacement is legacy publication behavior retained until Phase 2. Phase
-    1 still treats this as the acceptance boundary and refuses to cross it
-    when a candidate's recorded TypeScript evidence cannot reconstruct from
-    the bytes that will actually be retained.
+    The caller owns domain admission. This boundary owns publication integrity:
+    the supplied destination must be lexically fresh, aliases may not place the
+    destination inside the candidate, retained program evidence must close over
+    the staged bytes, publication identity must be valid before commit, and the
+    sealed bundle is installed with atomic no-replace semantics.
+
+    The candidate is removed after a successful commit when cleanup succeeds.
+    Cleanup failure cannot turn an already committed publication into a failed
+    publication result. Publication order carries no semantic currentness.
+    """
+
+    candidate = Path(candidate)
+    destination = Path(destination)
+
+    # Lexical freshness matters before canonicalization: a dangling symlink is
+    # itself an occupied publication address even though Path.resolve() points
+    # at its nonexistent target.
+    if os.path.lexists(destination):
+        raise ConstructionError(f"publication address already exists: {destination}")
+    if candidate.is_symlink():
+        raise ConstructionError(f"publication candidate may not be a symlink: {candidate}")
+    if not candidate.is_dir():
+        raise ConstructionError(f"publication candidate is missing: {candidate}")
+    if not (candidate / "world.sqlite").is_file():
+        raise ConstructionError(f"publication candidate has no world.sqlite: {candidate}")
+
+    try:
+        candidate_resolved = candidate.resolve(strict=True)
+        destination_resolved = destination.resolve(strict=False)
+    except OSError as exc:
+        raise ConstructionError(f"publication address cannot be resolved: {exc}") from exc
+
+    if (
+        destination_resolved == candidate_resolved
+        or candidate_resolved in destination_resolved.parents
+    ):
+        raise ConstructionError(
+            f"publication address is inside its own candidate: {destination}"
+        )
+
+    destination_resolved.parent.mkdir(parents=True, exist_ok=True)
+    staging = destination_resolved.parent / (
+        f".{destination_resolved.name}.staging-{uuid.uuid4().hex}"
+    )
+    if os.path.lexists(staging):
+        raise ConstructionError(f"publication staging address already exists: {staging}")
+
+    prepared_ref: PublicationRef
+    try:
+        shutil.copytree(candidate_resolved, staging)
+        _verify_retained_evidence_closure(staging)
+
+        # Validate exact publication identity before the irreversible rename.
+        opened = ConstructionWorld.open(staging / "world.sqlite", read_only=True)
+        try:
+            staged_ref = PublicationRef.from_world(opened)
+        finally:
+            opened.close()
+        prepared_ref = PublicationRef(
+            address=str(destination_resolved),
+            world_id=staged_ref.world_id,
+            revision=staged_ref.revision,
+        )
+
+        _seal_world(staging)
+        try:
+            _exclusive_rename(staging, destination_resolved)
+        except FileExistsError:
+            raise ConstructionError(
+                f"publication address already exists: {destination}"
+            ) from None
+    except Exception:
+        if os.path.lexists(staging):
+            _remove_tree(staging)
+        raise
+
+    # Commit has happened. Candidate cleanup is post-commit housekeeping and
+    # must not make a valid retained publication appear to have failed.
+    try:
+        _remove_tree(candidate_resolved)
+    except OSError:
+        pass
+    return prepared_ref
+
+
+def _exclusive_rename(source: Path, dest: Path) -> None:
+    """Atomically install source at a fresh dest without overwrite.
+
+    Linux uses renameat2(RENAME_NOREPLACE). If the platform does not provide
+    an atomic no-replace primitive, fail closed rather than falling back to
+    os.rename whose directory semantics can replace a concurrent empty
+    destination.
+    """
+
+    if os.path.lexists(dest):
+        raise FileExistsError(str(dest))
+    no_replace = _rename_noreplace(source, dest)
+    if no_replace is True:
+        return
+    raise OSError(
+        errno.ENOTSUP,
+        "atomic no-replace rename is unavailable on this platform",
+        str(dest),
+    )
+
+
+def _rename_noreplace(source: Path, dest: Path) -> bool | None:
+    """Try Linux renameat2 NOREPLACE. Returns True, or None if unavailable."""
+    try:
+        import ctypes
+    except ImportError:
+        return None
+    try:
+        libc = ctypes.CDLL("libc.so.6", use_errno=True)
+    except OSError:
+        return None
+    renameat2 = getattr(libc, "renameat2", None)
+    if renameat2 is None:
+        return None
+    renameat2.argtypes = [
+        ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint,
+    ]
+    renameat2.restype = ctypes.c_int
+    ret = renameat2(
+        -100, os.fsencode(source), -100, os.fsencode(dest), 1  # RENAME_NOREPLACE
+    )
+    if ret == 0:
+        return True
+    import errno as _errno
+
+    code = ctypes.get_errno()
+    if code in (_errno.ENOSYS, _errno.EINVAL):
+        return None
+    if code == _errno.EEXIST:
+        raise FileExistsError(str(dest))
+    raise OSError(code, os.strerror(code), str(dest))
+
+
+# --- Legacy in-place rebuild (frozen compatibility, not publication) ---
+#
+# Project.run(), entry.rebuild(), and `author rebuild` against an existing
+# root replace that root's bundle. That behavior is frozen for
+# compatibility and is explicitly NOT accepted-history publication: it
+# retains no prior revision and must not be used where retained history is
+# required. New publication paths must use publish_candidate().
+
+
+def _replace_candidate(candidate: Path, world: Path) -> None:
+    """Replace one workspace bundle with a sealed candidate directory.
+
+    Legacy compatibility behavior for in-place rebuild only. This is not
+    accepted-history publication: the prior bundle is removed, not
+    retained. The Phase 1 retained-evidence closure still applies before
+    the boundary is crossed.
     """
 
     candidate = Path(candidate)
@@ -158,7 +315,7 @@ def _replace_candidate(candidate: Path, world: Path) -> None:
 
 
 def _seal_world(world: Path) -> None:
-    """Seal the World bundle while leaving its parent replaceable."""
+    """Seal the World bundle while leaving its parent directory writable."""
 
     for path in sorted(world.rglob("*"), reverse=True):
         path.chmod(path.stat().st_mode & ~0o222)
@@ -166,18 +323,45 @@ def _seal_world(world: Path) -> None:
 
 
 def _remove_tree(path: Path) -> None:
-    """Remove a sealed temporary/previous bundle after making it writable."""
+    """Remove an owned tree without following or chmodding symlink targets."""
 
-    for child in path.rglob("*"):
-        child.chmod(child.stat().st_mode | (0o700 if child.is_dir() else 0o600))
+    path = Path(path)
+    if not os.path.lexists(path):
+        return
+    if path.is_symlink():
+        path.unlink()
+        return
+    if not path.is_dir():
+        path.chmod(path.stat().st_mode | 0o600)
+        path.unlink()
+        return
+
+    for root, dirs, files in os.walk(path, topdown=False, followlinks=False):
+        root_path = Path(root)
+        # Unlinking children requires write permission on their containing
+        # directory. Make only the owned real directory writable; never chmod
+        # through symlink entries.
+        root_path.chmod(root_path.stat().st_mode | 0o700)
+        for name in files:
+            child = root_path / name
+            if child.is_symlink():
+                child.unlink()
+            else:
+                child.chmod(child.stat().st_mode | 0o600)
+                child.unlink()
+        for name in dirs:
+            child = root_path / name
+            if child.is_symlink():
+                child.unlink()
+            else:
+                child.chmod(child.stat().st_mode | 0o700)
+                child.rmdir()
     path.chmod(path.stat().st_mode | 0o700)
-    shutil.rmtree(path)
+    path.rmdir()
 
 
 def discard_candidate(candidate: Path) -> None:
-    path = Path(candidate)
-    if path.exists():
-        shutil.rmtree(path)
+    _remove_tree(Path(candidate))
 
 
 def fingerprint_world(world: Path) -> dict[str, str]:

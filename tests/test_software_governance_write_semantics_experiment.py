@@ -164,7 +164,11 @@ def test_valid_candidate_not_publication_when_final_rename_fails(tmp_path, monke
     observed_candidate = []
 
     def fail_final_rename(path: Path, target: Path):
-        if path == destination.with_name("world.sg-work") and Path(target) == destination:
+        if (
+            path.parent == destination.parent
+            and path.name.startswith(f".{destination.name}.sg-work-")
+            and Path(target) == destination
+        ):
             observed_candidate.append((path / "world.sqlite").is_file())
             raise OSError("injected publication failure")
         return original_rename(path, target)
@@ -174,7 +178,7 @@ def test_valid_candidate_not_publication_when_final_rename_fails(tmp_path, monke
         _publish(tmp_path / "w1", changed, binding=False)
     assert observed_candidate == [True]
     assert not destination.exists()
-    assert not destination.with_name("world.sg-work").exists()
+    assert list(destination.parent.glob(f".{destination.name}.sg-work-*")) == []
     assert not _source_alignment(w0, source)["source_revision_matches"]
     _same_world_bytes(w0, old_world)
 

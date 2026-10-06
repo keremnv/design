@@ -16,8 +16,10 @@ The path must not already exist.
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 import sys
+import uuid
 from pathlib import Path
 
 from ontology_author.evidence.markdown import MarkdownSource
@@ -58,13 +60,19 @@ STATUS_ID = "proposition:approved-status-route"
 
 def build_config_profile(output: Path) -> GovernanceConstructionResult:
     publication = Path(output)
-    if publication.exists():
+    if os.path.lexists(publication):
         return GovernanceConstructionResult(
             succeeded=False,
             errors=(f"publication address already exists: {publication}",),
         )
-    staging = publication.with_name(publication.name + ".config-routes")
-    _discard(staging)
+    staging = publication.with_name(
+        f".{publication.name}.config-routes-{uuid.uuid4().hex}"
+    )
+    if os.path.lexists(staging):
+        return GovernanceConstructionResult(
+            succeeded=False,
+            errors=(f"config profile staging address already exists: {staging}",),
+        )
     try:
         produced = produce_routes(staging, DOCUMENT)
         by_id = {route.route_id: route for route in produced.routes}

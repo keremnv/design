@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
@@ -19,8 +21,8 @@ from ontology_author.world.core.model import Role, RoleType
 from ontology_author.world.core.origins import ConstructionOrigin
 from ontology_author.world.core.source import AssertionGrounding, SourceObservation
 from ontology_author.world.runtime.commit import (
-    _replace_candidate,
     discard_candidate,
+    publish_candidate,
     validate_contract_admission,
     write_sidecars,
 )
@@ -1081,11 +1083,22 @@ def build_typescript_spine(
     *,
     boundary: TypeScriptBoundary,
 ) -> TypeScriptSpineResult:
-    """Extract, validate, receipt, and publish one TypeScript spine World."""
+    """Extract, validate, receipt, and publish one TypeScript spine World.
+
+    ``world_dir`` must be a fresh address: an existing bundle is never
+    overwritten, and a new snapshot does not supersede any earlier one.
+    """
 
     workspace_path = Path(workspace).resolve()
-    output = Path(world_dir).resolve()
-    candidate = output.with_name(output.name + ".candidate")
+    requested_output = Path(world_dir)
+    if os.path.lexists(requested_output):
+        return TypeScriptSpineResult(
+            False,
+            "publication_exists",
+            (f"publication address already exists: {requested_output}",),
+        )
+    output = requested_output.resolve(strict=False)
+    candidate = output.with_name(f".{output.name}.candidate-{uuid.uuid4().hex}")
     try:
         boundary_payload = boundary.payload(workspace_path)
         request = {
@@ -1120,7 +1133,8 @@ def build_typescript_spine(
             "receipt": {},
         }
         candidate.parent.mkdir(parents=True, exist_ok=True)
-        discard_candidate(candidate)
+        if os.path.lexists(candidate):
+            raise ConstructionError(f"candidate address already exists: {candidate}")
         candidate.mkdir(parents=True)
         world = ConstructionWorld.create(candidate / "world.sqlite", world_id=WORLD_ID)
         try:
@@ -1158,7 +1172,7 @@ def build_typescript_spine(
                 discard_candidate(candidate)
                 return TypeScriptSpineResult(False, "typescript_admission", tuple(errors), snapshot_id=snapshot_id, capabilities=capability_status)
             world.close()
-            _replace_candidate(candidate, output)
+            publish_candidate(candidate, output)
             return TypeScriptSpineResult(True, world_dir=output, snapshot_id=snapshot_id, capabilities=capability_status)
         except Exception:
             world.close()
