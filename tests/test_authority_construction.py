@@ -358,7 +358,7 @@ def test_receipt_and_scoped_completeness(tmp_path):
     try:
         receipt = load_receipt(tmp_path / "world-governed" / "authority.construction.receipt.json")
         assert receipt.construction_id == "checkout-authority-v0"
-        assert receipt.exploration_provenance
+        assert receipt.exploration_provenance == ()
         assert receipt.semantic_referents_created == (
             "semantic:CancellationEntryAction",
             "semantic:RetentionFlow",

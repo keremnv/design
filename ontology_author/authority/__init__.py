@@ -1,4 +1,4 @@
-"""Authoritative-source construction into a governed World that already holds a program spine."""
+"""Authoritative-source construction, with optional qualified program inputs."""
 
 from .construction import AuthorityConstructor, AuthorityUniverse, DeclaredSource
 from .schemas import (
@@ -29,7 +29,10 @@ from .governance import (
     validate_maintenance_sidecar,
 )
 from .retrieval import RecoveredAuthority, affected_program_entities, recover_authority_for_delta
-from .validation import observations_for_assertion, validate_authority_construction
+from .validation import (
+    observations_for_assertion, validate_authority_construction,
+    verify_construction_boundary, verify_authority_publication,
+)
 
 __all__ = [
     "MECHANISM_KEY",
@@ -60,6 +63,8 @@ __all__ = [
     "program_world_fingerprint",
     "recover_authority_for_delta",
     "validate_authority_construction",
+    "verify_construction_boundary",
+    "verify_authority_publication",
     "validate_case_sidecar",
     "validate_impact_sidecar",
     "validate_maintenance_sidecar",

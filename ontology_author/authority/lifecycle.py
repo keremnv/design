@@ -1,4 +1,4 @@
-"""Clone a sealed program-spine World, add authority facts, validate, and seal."""
+"""Construct source-only semantic state or extend an exact retained baseline."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import uuid
+from contextlib import closing
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,7 +18,8 @@ from ontology_author.world.runtime.commit import (
     publish_candidate,
     write_sidecars,
 )
-from ontology_author.world.runtime.world import ConstructionWorld, world_id_of
+from ontology_author.world.runtime.world import ConstructionWorld
+from ontology_author.world.runtime.publication import PublicationRef, verify_publication_ref
 
 from ontology_author.evidence import EvidenceError
 
@@ -25,6 +27,8 @@ from .construction import AuthorityConstructor, AuthorityUniverse
 from .evidence import retain_authority_sources
 from .schemas import (
     DEFAULT_PROFILE,
+    CONSTRUCTOR_ID,
+    CONSTRUCTOR_VERSION,
     AuthorityConstructionError,
     AuthorityConstructionReceipt,
 )
@@ -39,6 +43,7 @@ class AuthorityConstructionResult:
     world_dir: Path | None = None
     receipt: AuthorityConstructionReceipt | None = None
     snapshot_id: str = ""
+    publication: PublicationRef | None = None
 
 
 def make_writable_copy(source: Path, dest: Path) -> None:
@@ -53,7 +58,7 @@ def make_writable_copy(source: Path, dest: Path) -> None:
 
 
 def construct_authority_world(
-    program_world: Path | str,
+    program_world: Path | str | None,
     output: Path | str,
     universe: AuthorityUniverse,
     build: Callable[[AuthorityConstructor], None],
@@ -63,18 +68,24 @@ def construct_authority_world(
     profile: str = DEFAULT_PROFILE,
     program_universe: str = "declared_program_boundary",
     acceptance: dict[str, Any] | None = None,
+    publication_inputs: tuple[PublicationRef, ...] = (),
+    constructor_id: str = CONSTRUCTOR_ID,
+    constructor_version: str = CONSTRUCTOR_VERSION,
 ) -> AuthorityConstructionResult:
-    """Create a governed World by cloning a program spine, then adding authority facts.
+    """Build and admit semantic state, optionally cloning an exact baseline.
 
-    The sealed program World is an immutable input. Failure discards the
+    Pass ``None`` for a fresh source-only candidate. The historical positional
+    name ``program_world`` also accepts a semantic-only retained baseline.
+    The sealed baseline World is an immutable input. Failure discards the
     candidate and does not modify that input. Every declared authority source
     is retained in the candidate before admission so an accepted publication
     never depends on the original workspace copy remaining available.
-    ``output`` must be a fresh address: the baseline program publication is
-    retained unchanged beside the new authority publication.
+    ``output`` must be a fresh address: any baseline publication is retained
+    unchanged beside the new authority publication. Explicit publication inputs
+    are qualified and checked before construction, without semantic inheritance.
     """
 
-    source = Path(program_world).resolve()
+    source = Path(program_world).resolve() if program_world is not None else None
     requested_output = Path(output)
     if os.path.lexists(requested_output):
         return AuthorityConstructionResult(
@@ -83,7 +94,7 @@ def construct_authority_world(
             (f"publication address already exists: {requested_output}",),
         )
     output_dir = requested_output.resolve(strict=False)
-    if not (source / "world.sqlite").exists():
+    if source is not None and not (source / "world.sqlite").exists():
         return AuthorityConstructionResult(
             False, "missing_program_world", ("program World sqlite is missing",)
         )
@@ -97,12 +108,22 @@ def construct_authority_world(
             (f"candidate address already exists: {candidate}",),
         )
     try:
-        make_writable_copy(source, candidate)
-        world = ConstructionWorld.open(
-            candidate / "world.sqlite",
-            world_id=world_id_of(candidate / "world.sqlite"),
-            read_only=False,
-        )
+        baseline = None
+        if source is not None:
+            with closing(ConstructionWorld.open(source / "world.sqlite", read_only=True)) as opened:
+                baseline = PublicationRef.from_world(opened)
+        inputs = tuple(dict.fromkeys((*publication_inputs, *((baseline,) if baseline else ()))))
+        for reference in inputs:
+            with closing(ConstructionWorld.open(Path(reference.address) / "world.sqlite", read_only=True)) as opened:
+                mismatches = verify_publication_ref(opened, reference)
+                if mismatches:
+                    raise AuthorityConstructionError("construction publication input: " + "; ".join(mismatches))
+        if source is not None:
+            make_writable_copy(source, candidate)
+            world = ConstructionWorld.open(candidate / "world.sqlite", read_only=False)
+        else:
+            candidate.mkdir(parents=True)
+            world = ConstructionWorld.create(candidate / "world.sqlite", world_id=construction_id)
         constructor: AuthorityConstructor | None = None
         try:
             constructor = AuthorityConstructor(
@@ -113,10 +134,16 @@ def construct_authority_world(
                 profile=profile,
                 program_universe=program_universe,
                 acceptance=acceptance,
+                publication_inputs=inputs,
+                candidate_baseline=baseline,
+                constructor_id=constructor_id,
+                constructor_version=constructor_version,
             )
             build(constructor)
             receipt = constructor.finish()
             retain_authority_sources(candidate, constructor.markdown)
+            receipt_path = candidate / "authority.construction.receipt.json"
+            receipt.write(receipt_path)
             errors = validate_authority_construction(constructor, receipt)
             if errors:
                 world.close()
@@ -127,14 +154,16 @@ def construct_authority_world(
                     tuple(errors),
                     snapshot_id=constructor._snapshot_id,
                 )
-            receipt_path = candidate / "authority.construction.receipt.json"
-            receipt.write(receipt_path)
             manifest = {
                 "construction_id": construction_id,
                 "purpose": purpose,
                 "profile": profile,
                 "program_snapshot_id": constructor._snapshot_id,
-                "program_world": str(source),
+                "program_world": str(source) if source else None,
+                "admission": {
+                    "contract": receipt.construction_contract["id"],
+                    "outcome": "PASS",
+                },
                 "receipt": {
                     "path": receipt_path.name,
                     "sha256": hashlib.sha256(receipt_path.read_bytes()).hexdigest(),
@@ -146,12 +175,13 @@ def construct_authority_world(
             )
             write_sidecars(world)
             world.close()
-            publish_candidate(candidate, output_dir)
+            publication = publish_candidate(candidate, output_dir)
             return AuthorityConstructionResult(
                 True,
                 world_dir=output_dir,
                 receipt=receipt,
                 snapshot_id=constructor._snapshot_id,
+                publication=publication,
             )
         except Exception:
             try:
