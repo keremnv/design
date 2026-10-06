@@ -96,3 +96,31 @@ def test_program_reconstruction_rejects_revision_outside_snapshot_contract(
         assert reconstruct_program_observation(world, forged) == ("", "FAILED")
     finally:
         world.close()
+
+def test_program_reconstruction_rejects_snapshotless_revision_claim(
+    tmp_path: Path,
+) -> None:
+    payload = b"export const retained = true;\n"
+    digest = hashlib.sha256(payload).hexdigest()
+    observation = SourceObservation(
+        provider="typescript",
+        native_handle=f"src/example.ts@sha256:{digest}",
+        source_revision="arbitrary-garbage",
+        native_location=f"bytes:0:{len(payload)}",
+    )
+    world = ConstructionWorld.create(
+        tmp_path / "snapshotless.sqlite",
+        world_id="snapshotless-program-revision-test",
+    )
+    try:
+        directory = world.path.parent / PROGRAM_INPUTS_DIR
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / digest).write_bytes(payload)
+
+        assert reconstruct_program_observation(world, _mapping(observation)) == (
+            "",
+            "FAILED",
+        )
+    finally:
+        world.close()
+
