@@ -18,6 +18,7 @@ from ontology_author.world.core.origins import ConstructionOrigin
 from ontology_author.world.core.source import AssertionGrounding, SourceObservation
 from ontology_author.world.runtime.world import ConstructionWorld
 from ontology_author.construction_boundary import ConstructionBasis, SupportPath
+from ontology_author.program_backend import ProgramBackend
 from ontology_author.world.runtime.publication import PublicationRef
 
 from .schemas import (
@@ -105,6 +106,7 @@ class AuthorityConstructor:
     acceptance: Mapping[str, Any] | None = None
     publication_inputs: tuple[PublicationRef, ...] = ()
     candidate_baseline: PublicationRef | None = None
+    program_backend: ProgramBackend | None = None
 
     def __post_init__(self) -> None:
         self.markdown: dict[str, MarkdownSource] = {}
@@ -557,25 +559,15 @@ class AuthorityConstructor:
         label: str | None = None,
         descriptor_contains: str | None = None,
     ) -> list[str]:
-        kinds = {
-            str(row["entity"]): str(row["kind"])
-            for row in optional_program_rows(self.world, "program_entity_kind")
-        }
-        labels = _labels(self.world)
-        descriptors = {
-            str(row["entity"]): str(row["descriptor"])
-            for row in optional_program_rows(self.world, "program_identity_descriptor")
-        }
-        output = []
-        for entity, entity_kind in kinds.items():
-            if kind is not None and entity_kind != kind:
-                continue
-            if label is not None and labels.get(entity) != label:
-                continue
-            if descriptor_contains is not None and descriptor_contains not in descriptors.get(entity, ""):
-                continue
-            output.append(entity)
-        return output
+        if self.program_backend is None:
+            return []
+        if kind is None and label is None and descriptor_contains is None:
+            return list(self.program_backend.members())
+        return list(
+            self.program_backend.discover(
+                kind=kind, label=label, descriptor_contains=descriptor_contains
+            )
+        )
 
     def call_site_invoking(self, target_label: str) -> str:
         targets = self.program_entities(kind="callable", label=target_label)
@@ -583,7 +575,7 @@ class AuthorityConstructor:
             raise AuthorityConstructionError(f"callable {target_label!r} is not unique: {targets}")
         matches = [
             str(row["call_site"])
-            for row in optional_program_rows(self.world, "program_invokes")
+            for row in self._invocation_rows()
             if row["target"] == targets[0]
         ]
         if len(matches) != 1:
@@ -591,9 +583,11 @@ class AuthorityConstructor:
         return matches[0]
 
     def structural_context(self, entity: str) -> list[str]:
+        if self.program_backend is None:
+            raise AuthorityConstructionError("structural context needs a governed program snapshot")
         parents = {
             str(row["child"]): str(row["parent"])
-            for row in self.world.relation_rows("structural_context")
+            for row in self.program_backend.containment()
         }
         chain = [entity]
         current = entity
@@ -608,9 +602,19 @@ class AuthorityConstructor:
     def invoked_targets(self, call_site: str) -> list[str]:
         return [
             str(row["target"])
-            for row in optional_program_rows(self.world, "program_invokes")
+            for row in self._invocation_rows()
             if row["call_site"] == call_site
         ]
+
+    def _invocation_rows(self) -> tuple[dict[str, str], ...]:
+        if self.program_backend is None:
+            return ()
+        return self.program_backend.invocations()
+
+    def _resolution_rows(self) -> tuple[dict[str, str], ...]:
+        if self.program_backend is None:
+            return ()
+        return self.program_backend.resolutions()
 
     def finish(self) -> AuthorityConstructionReceipt:
         self._materialize_completeness()
@@ -618,19 +622,12 @@ class AuthorityConstructor:
         return receipt
 
     def _load_snapshot(self) -> None:
-        rows = optional_program_rows(self.world, "program_snapshot")
-        if not rows:
-            if optional_program_rows(self.world, "program_entity"):
-                raise AuthorityConstructionError("program entities require a qualified program snapshot")
+        if self.program_backend is None:
+            self._snapshot_ref = ""
+            self._snapshot_id = ""
             return
-        if len(rows) != 1:
-            raise AuthorityConstructionError("governed World must contain exactly one program snapshot")
-        self._snapshot_ref = str(rows[0]["snapshot"])
-        assertion = self.world.query(
-            "SELECT assertion_id FROM _world_assertions WHERE relation_name='program_snapshot'"
-        )
-        extra = _grounding_extra(self.world, str(assertion[0]["assertion_id"])) if assertion else {}
-        self._snapshot_id = str(extra.get("snapshot_id") or self._snapshot_ref)
+        self._snapshot_ref = self.program_backend.snapshot()
+        self._snapshot_id = self.program_backend.snapshot_id()
 
     def _load_markdown(self) -> None:
         for declared in self.universe.sources:
@@ -690,7 +687,7 @@ class AuthorityConstructor:
                     "status": row["status"],
                     "capability": row["capability"],
                 }
-                for row in optional_program_rows(self.world, "program_resolution")
+                for row in self._resolution_rows()
                 if row["subject"] == entity
             ],
             "relation_support": support.value,
@@ -713,9 +710,6 @@ class AuthorityConstructor:
         snapshot = str(record.get("program_snapshot_id") or self._snapshot_id)
         if snapshot != self._snapshot_id:
             raise AuthorityConstructionError("attachment warrant snapshot does not match the governed program snapshot")
-        entity_snapshot = self._entity_snapshot(program_entity)
-        if entity_snapshot and entity_snapshot != self._snapshot_ref:
-            raise AuthorityConstructionError("program attachment endpoint belongs to a different snapshot")
         inserted = self._assert(
             "authority_attachment_warrant",
             {
@@ -847,10 +841,9 @@ class AuthorityConstructor:
         return output
 
     def _entity_kind(self, entity: str) -> str:
-        for row in optional_program_rows(self.world, "program_entity_kind"):
-            if str(row["entity"]) == entity:
-                return str(row["kind"] or "")
-        return ""
+        if self.program_backend is None:
+            return ""
+        return self.program_backend.kind(entity) or ""
 
     def _materialize_completeness(self) -> None:
         derived = {
@@ -1120,13 +1113,9 @@ class AuthorityConstructor:
         return any(row["entity"] == referent_id for row in self.world.relation_rows("semantic_entity"))
 
     def _is_program_entity(self, referent_id: str) -> bool:
-        return any(row["entity"] == referent_id for row in optional_program_rows(self.world, "program_entity"))
-
-    def _entity_snapshot(self, entity: str) -> str:
-        for row in optional_program_rows(self.world, "program_entity"):
-            if row["entity"] == entity:
-                return str(row["snapshot"])
-        return ""
+        if self.program_backend is None:
+            return False
+        return self.program_backend.is_member(referent_id)
 
 
 def optional_program_rows(world: ConstructionWorld, relation: str) -> list[dict[str, Any]]:
@@ -1201,10 +1190,6 @@ def _declare_authority_relations(world: ConstructionWorld) -> None:
         world.declare_relation(name, roles, description="Authority-construction application relation.")
 
 
-def _labels(world: ConstructionWorld) -> dict[str, str]:
-    return {str(row["id"]): str(row["label"]) for row in world.query("SELECT id, label FROM _world_referents")}
-
-
 def _locator_from_observation(observation: SourceObservation) -> dict[str, Any]:
     if not observation.payload:
         return {}
@@ -1213,12 +1198,3 @@ def _locator_from_observation(observation: SourceObservation) -> dict[str, Any]:
     except json.JSONDecodeError:
         return {}
     return payload if isinstance(payload, dict) else {}
-
-
-def _grounding_extra(world: ConstructionWorld, assertion_id: str) -> dict[str, Any]:
-    warrant = world.warrant_for_assertion(assertion_id)
-    for base in warrant.get("bases") or []:
-        detail = base.get("detail")
-        if isinstance(detail, dict) and isinstance(detail.get("extra"), dict):
-            return dict(detail["extra"])
-    return {}

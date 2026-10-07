@@ -22,6 +22,8 @@ from ontology_author.world.runtime.world import ConstructionWorld
 from ontology_author.world.runtime.publication import PublicationRef, verify_publication_ref
 
 from ontology_author.evidence import EvidenceError
+from ontology_author.program_backend import BackendError, NotAProgramOccurrence
+from ontology_author.program_backend.native import open_native_occurrence
 
 from .construction import AuthorityConstructor, AuthorityUniverse
 from .evidence import retain_authority_sources
@@ -107,6 +109,7 @@ def construct_authority_world(
             "candidate_exists",
             (f"candidate address already exists: {candidate}",),
         )
+    backend = None
     try:
         baseline = None
         if source is not None:
@@ -118,6 +121,13 @@ def construct_authority_world(
                 mismatches = verify_publication_ref(opened, reference)
                 if mismatches:
                     raise AuthorityConstructionError("construction publication input: " + "; ".join(mismatches))
+        if source is not None:
+            try:
+                backend = open_native_occurrence(source)
+            except NotAProgramOccurrence:
+                backend = None
+            except BackendError as exc:
+                return AuthorityConstructionResult(False, "authority_construction", (str(exc),))
         if source is not None:
             make_writable_copy(source, candidate)
             world = ConstructionWorld.open(candidate / "world.sqlite", read_only=False)
@@ -138,6 +148,7 @@ def construct_authority_world(
                 candidate_baseline=baseline,
                 constructor_id=constructor_id,
                 constructor_version=constructor_version,
+                program_backend=backend,
             )
             build(constructor)
             receipt = constructor.finish()
@@ -198,6 +209,12 @@ def construct_authority_world(
         return AuthorityConstructionResult(
             False, "authority_construction", (f"{type(exc).__name__}: {exc}",)
         )
+    finally:
+        if backend is not None:
+            try:
+                backend.close()
+            except Exception:
+                pass
 
 
 def program_world_fingerprint(program_world: Path | str) -> dict[str, str]:
