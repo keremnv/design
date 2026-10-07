@@ -136,6 +136,12 @@ revision qualification, declared observation scope and producer/capability
 meaning sufficient to interpret the reads. The state token qualifies facts;
 the source revision qualifies observations. Neither is historical occurrence
 identity. Do not impose a cryptographic digest algorithm or ordering/currentness.
+Keep the logical distinction exact historical occurrence / observed-state
+qualification / source revision / entity local token without over-objectifying
+it: no separately globally unique snapshot object, separate SourceState class
+or snapshot-bearing entity ID is required. One opaque backend handle/context
+may encode several distinctions as long as contradictory supplied
+qualification cannot be silently accepted.
 
 Phase 4 records a warrant snapshot and checks source observation revisions.
 Without this, valid source bytes could be attached to the wrong observed state.
@@ -148,7 +154,11 @@ Given an opaque entity token and opened snapshot context, establish whether it
 is a member of that observed universe and, if so, return its declared mechanical
 kind. Facts/evidence for nonmembers must not be returned as local facts. Tokens
 remain stable within retained state. IDs need not encode state, language, path,
-AST or name. Display labels are optional metadata, never identity.
+AST or name. Display labels are optional metadata, never identity. Membership +
+kind is core because production Phase 4 relevance construction consumes kind;
+display label / label discovery stays optional. No universal cross-language
+kind ontology is required; backend adapters may need to expose declared
+mechanical category semantics adequate for the consumer or refuse the use.
 
 Phase 4 receives a selected E and constructs kind-based application relevance
 rules. Without this, E1 can bind in P2 merely because a label matches. Native:
@@ -171,6 +181,11 @@ Native: `structural_context`, `relation_schema`, typed rows, `program_invokes`
 and `program_resolution`. Core requires the containment capability used by this
 slice. It does **not** require all backends to extract calls/types/imports or
 produce the native descriptor; additional produced facts must be honest.
+Containment production is the core demonstrated capability; invocation /
+resolution / imports / types / calls production is not universally mandatory.
+If invocation/resolution are exposed or consumed, their capability, scope and
+unresolved semantics must remain honest. Do not promote them into mandatory
+production families.
 
 ### R5 — Source observation access and exact reconstruction
 
@@ -179,26 +194,47 @@ reconstruct its demonstrated source occurrence. Each identifies source,
 revision and backend-interpretable bounded location (or whole-input extent).
 Reconstruction verifies qualification and observed material, or explicitly
 fails. Reading changed live material as retained evidence is forbidden.
+R5 promises qualified reconstruction, not omniscient entity-manifestation
+proof: reconstruction establishes revision, retained material and requested
+valid extent under the declared evidence association. It does not
+independently prove that any arbitrarily substituted valid extent is the
+entity's true manifestation. A syntactically valid alternate extent within
+the same retained revision (for example `bytes:0:6`) may reconstruct
+successfully; that is a valid locator whose association to an entity depends
+on the producer's declared evidence guarantee, distinct from an
+invalid/unreconstructible locator which must fail.
 
 Phase 4 reconstructs E1/E2 after workspaces disappear. Without this, the binding
 has only a pointer-shaped program endpoint. Native: `SourceObservation`-shaped
 records from referent SOURCE groundings and digest-checked retained bytes.
 No universal requirement that every external stub or synthetic fact have a
 contiguous body; its actual evidence extent and limitations must be declared.
+No universal source-coordinate authentication mechanism is required.
 
 ### R6 — Capability, scope and completeness honesty
 
 Expose produced/not-produced capability status, stable capability meaning,
 covered scope, completeness basis and known gaps. Incomplete analysis,
 boundary-only entities, unavailable inputs and unresolved outcomes must remain
-inspectable when relevant. Unsupported or not-produced cannot become a bare
-empty supported result. Missing declarations confer no closure.
+inspectable when relevant. The semantic requirement is
+unsupported/not-produced ≠ supported-empty. It does not mandate a universal
+serialization such as `rows = None`: an honest `rows = []` with
+`NOT_PRODUCED` and no closure/complete interpretation is permitted. Only a
+supported + complete + empty presentation (or any closure claim) for an
+unproduced relation is dishonest. Missing declarations confer no closure.
+Behavioral qualification must distinguish supported complete, supported
+incomplete, unsupported/not-produced and known gaps/out-of-scope where
+relevant, without universally requiring native `completeness_receipt_refs`,
+`descriptor.inputs` or `descriptor.losses` to be nonempty. Supported-empty
+(supported capability, declared scope/completeness, zero rows) remains valid
+and semantically distinct from incomplete-empty and unresolved.
 
 Phase 4's empty invocation/resolution views must mean only what was observed;
 they cannot imply semantic failure or universal absence. Without this, an
 adapter silently strengthens a bounded observation into falsehood. Native:
 `program_capability`, construction receipt, input dispositions, entity boundary,
-resolution outcomes and known losses. Exact status names are not universal.
+resolution outcomes and known losses. Exact status names, enums and schemas
+are not universal; test vocabulary projects backend signals into shared cases.
 
 ### R7 — Independent history and verification of declared evidence guarantees
 
@@ -292,6 +328,12 @@ descriptor or fact result. Verification can compose opening, descriptor checks
 and reconstruction instead of being a backend method. Typed views may have
 separate schemas, and snapshot context may qualify whole results rather than
 every tuple inline. No universal method count or exceptions are settled here.
+`read_facts`, `Descriptor`, `EntityView` and `FactView` remain notation, not
+committed interface types or production classes. Minimality classifications:
+OccurrenceReference KEEP; OpenedOccurrence, Descriptor, EntityView, FactView,
+capability declaration and verification outcome FOLD; Observation KEEP;
+discovery and comparison OPTIONAL; producer contract SEPARATE/OPTIONAL for
+the reader. One opaque handle may encode several folded distinctions.
 
 Each distinction has a concrete falsifier:
 
@@ -324,13 +366,16 @@ States are semantic outcomes, not mandatory enums or separate exception classes.
 | --- | --- | --- |
 | Occurrence unavailable | Explicit failure to open exact retained input | Latest or equivalent copy silently substituted |
 | Occurrence qualification mismatch | Reject exact-input qualification | Accept because content/snapshot token matches |
+| Entity snapshot/occurrence qualification mismatch | Reject/not-member; no facts/observations for contradictory qualification | Accept because native token exists somewhere |
 | Entity absent from opened universe | Not-member; reject its local facts/evidence | Resolve same label elsewhere; assert global nonexistence |
-| Capability unsupported / not produced | Disclose absence of production and no closure claim | Supported empty fact set |
+| Capability unsupported / not produced | Disclose absence of production and no closure claim; `rows=[]` with `NOT_PRODUCED` and no closure is honest | Supported + complete + empty, or any closure claim |
 | Supported capability, fact not observed | Qualified empty result with scope/basis/gaps | Unqualified falsehood |
 | Analysis incomplete / input unreadable | Disclose gaps and restrict closure | Complete universe |
 | Resolution unknown / unresolved / multiple candidates | Preserve outcome/candidates when exposed; no selected target inferred | No invocation, or guessed unique target |
 | Source/entity outside scope | Disclose boundary or lack of coverage; no in-scope exhaustive claim | Fully analyzed source |
 | Evidence unavailable or corrupt | Reconstruction unverified/failed; closure verification fails | Live-source fallback or verified empty material |
+| Invalid/unreconstructible locator | Fail reconstruction | Return other material as verified |
+| Valid locator, entity association via producer guarantee | Reconstruct requested valid extent under declared association; association honesty is producer's guarantee | Claim omniscient entity-manifestation authentication |
 | Observation revision/location mismatch | Fail reconstruction | Return another revision or extent |
 | Comparison unsupported | Explicit unsupported result/service absence; core reads remain usable | Empty delta meaning no change |
 | Comparison incompatible | Refuse or expose which claims/capabilities cannot be compared | Unqualified continuity/no change |
@@ -358,7 +403,13 @@ behavior. `STATIC_COMPLETE` calls means recognized static call sites have
 resolution outcomes; an unresolved site is not proof it invokes nobody.
 `INCOMPLETE` records diagnostics/unreadable inputs as gaps. Receipt-only
 `NOT_PRODUCED` has no completeness references. Missing capability declaration
-provides no basis for negative conclusions.
+provides no basis for negative conclusions. Nonempty
+`completeness_receipt_refs`, `descriptor.inputs` and `descriptor.losses` are
+native shapes, not universal requirements: a valid backend may have no known
+losses, encode completeness without a receipt reference, or represent
+effective input/scope metadata differently, provided behavioral checks still
+distinguish supported complete, supported incomplete, unsupported/not-produced
+and known gaps/out-of-scope where relevant.
 
 Scope evidence includes declared boundary, effective input dispositions and
 analysis/readability details, entity boundary markers and known losses. The
@@ -385,10 +436,13 @@ and interpretable extent are load-bearing; provider/path/digest spelling is not.
 A whole-input occurrence is an extent too. The backend/evidence adapter owns
 coordinate interpretation. Consumers need no UTF-8/UTF-16 arithmetic.
 
-Selected source-backed entities must satisfy R5. More generally, verification
-covers the backend's **declared** reconstructibility guarantees. Native promises
-retain every emitted TypeScript identity/assertion SOURCE observation; its
-closure verifier scans those provider-scoped groundings. This is not a universal
+Selected source-backed entities must satisfy R5. A valid observation API must
+not be reachable through an incorrectly qualified entity merely because the
+native token exists somewhere: wrong-qualified entity yields no observations,
+correct-qualified yields observations. More generally, verification covers the
+backend's **declared** reconstructibility guarantees. Native promises retain
+every emitted TypeScript identity/assertion SOURCE observation; its closure
+verifier scans those provider-scoped groundings. This is not a universal
 promise of a unique source range for every imaginable program fact, nor a new
 per-fact witness interface. Native malformed/unrecognized grounding records are
 not all authenticated by that closure helper alone; typed producer validation
@@ -453,20 +507,39 @@ matching can still emit heuristic candidates/claims under that explicitly
 incompatible context; it does not universally refuse the comparison. Individual
 incomparable capabilities are reported even if other comparison remains useful.
 
-Native rename correspondence is `HEURISTIC`, with mechanical supporting rules,
-changes and the limitation that heuristic correspondence is not mechanically
-entailed identity continuity. `CONTINUED` never aliases E1/E2. Duplicate candidates
-remain ambiguous, rather than a deterministic tie-break becoming truth. No scalar
-confidence is required. Native identity/manifestation/relation/maintenance deltas
-are extras except the bounded change information Case G actually reads.
+Transferable optional comparison semantics (backend-neutral) require only
+that a comparison service operates over exact caller-qualified old/new
+occurrences, declares compatibility/refusal honestly, exposes the epistemic
+basis it actually claims, preserves ambiguity when its own result is ambiguous,
+does not collapse correspondence into identity, and does not mutate historical
+occurrences. A valid future backend need not manufacture `HEURISTIC /
+CONTINUED / RENAME` if it supports only different justified
+correspondence/change evidence.
+
+Native comparison regression (algorithm-specific, still tested): native rename
+correspondence is `HEURISTIC`, with mechanical supporting rules, changes and
+the limitation that heuristic correspondence is not mechanically entailed
+identity continuity. `CONTINUED` never aliases E1/E2. Duplicate candidates
+remain ambiguous, rather than a deterministic tie-break becoming truth. The
+specific rename heuristic, two-candidate ambiguous scenario and native
+compatibility behavior are native regression expectations, not universal
+contract requirements. No scalar confidence is required. Native
+identity/manifestation/relation/maintenance deltas are extras except the
+bounded change information Case G actually reads.
 
 Native comparison receipts qualify snapshot tokens, not exact publication
 addresses. Therefore a caller must retain the exact opened pair as context;
 the test-local fixture verifies those inputs and carries their serialized
 references alongside the native result. This supplies missing *context*, not
 stronger correspondence evidence. A context-free native comparison sidecar
-alone cannot distinguish equivalent copied occurrences. Phase 5B must preserve
-this qualification without treating the native receipt as a universal schema.
+alone cannot distinguish equivalent copied occurrences. The native result need
+not itself duplicate full exact occurrence identity, provided invocation is
+over exact verified contexts and the result remains associated with that pair:
+`compare(P1-original, P2)` and `compare(P1-copy, P2)` retain distinct
+caller-qualified occurrence context even with identical snapshot/entity tokens
+and bytes. No persistent cross-snapshot identity is required. Phase 5B must
+preserve this qualification without treating the native receipt as a universal
+schema.
 
 ## N. Native Program Spine mapping
 
@@ -503,21 +576,25 @@ remain the actual implementations under test.
 | Executable case (`test_` prefix omitted) | Dishonest behavior rejected |
 | --- | --- |
 | `exact_occurrence_is_not_content_equivalence` | Collapse copied occurrences; accept wrong local revision or unavailable occurrence; mismatch opened copy/reference; fail serializable exact-reference round trip |
-| `historical_reads_and_entity_membership_do_not_follow_latest` | Resolve old reads to latest; substitute same-label E; ignore snapshot in facts/evidence; reconstruct new state from old observation; depend on deleted workspace |
+| `wrong_snapshot_qualification_is_rejected` | Accept correct occurrence + wrong snapshot + valid token in inspect/facts/observations; reach observations through wrong-qualified entity |
+| `copied_occurrence_does_not_accept_original_qualified_entity` | Accept original-qualified entity in an equivalent copy sharing snapshot/entity tokens and bytes; collapse EntityToken into QualifiedEntityOccurrence |
+| `historical_reads_and_entity_membership_do_not_follow_latest` | Resolve old descriptor/membership/facts/capability/fresh observations/reconstruction to latest; substitute same-label E; depend on deleted workspace |
 | `duplicate_labels_do_not_merge_entity_identity` | Treat display label as unique identity |
 | `evidence_verifies_qualification_and_retained_closure` (missing/corrupt) | Accept wrong evidence revision; use live workspace to replace missing/tampered retained bytes; claim closure without reconstruction |
-| `capability_not_produced_is_not_supported_empty` | Translate not-produced into supported empty; omit scope/basis/completeness context |
-| `optional_produced_call_capability_can_be_empty` | Treat a supported empty call view as unproduced or omit its qualification |
-| `typed_mechanical_facts_preserve_roles_and_snapshot` | Reverse containment roles or omit its observed-state qualification |
+| `capability_not_produced_is_not_supported_empty` | Translate not-produced into supported + complete + empty or other closure claim; omit behavioral scope/basis qualification |
+| `optional_produced_call_capability_can_be_empty` | Treat a supported empty call view as unproduced or omit its qualification; collapse supported-empty into unsupported/incomplete/unresolved |
+| `typed_mechanical_facts_preserve_roles_and_snapshot` | Reverse containment roles, omit observed-state qualification, or lose the demonstrated ancestor source/module/context chain |
 | `optional_produced_relations_preserve_entity_and_literal_roles` | Reverse invocation roles; flatten entity/text types; omit resolution qualification |
 | `unresolved_and_incomplete_do_not_establish_negative_calls` | Erase unresolved outcomes/gaps while exposing empty invocation facts |
 | `core_reads_do_not_require_comparison` | Couple core membership/context/evidence verification to comparison service availability |
-| `optional_comparison_is_qualified_heuristic_and_read_only` | Unqualified old/new pair; convert deterministic heuristic to entailed identity; lose changes/evidence/limitations; mutate input history |
-| `optional_comparison_preserves_ambiguity` | Select one continuation under duplicate candidates |
-| `optional_comparison_declares_incompatible_capability` (capability/representation) | Silently compare mismatched capability or extractor versions |
-| `discriminating_assertions_reject_dishonest_empty_and_collapsed_copy` | Negative controls show the absence/copy assertions actually fail against dishonest projected answers |
+| `optional_comparison_is_qualified_heuristic_and_read_only` (native regression) | Unqualified old/new pair; convert deterministic heuristic to entailed identity; lose changes/evidence/limitations; mutate input history |
+| `optional_comparison_transferable_semantics_are_qualified_and_honest` | Unqualified pair; dishonest compatibility; hidden basis; correspondence-into-identity collapse; historical mutation; lost ambiguity |
+| `optional_comparison_preserves_exact_occurrence_context_for_copies` | Collapse `compare(P1-original, P2)` and `compare(P1-copy, P2)` caller context despite distinct exact occurrences |
+| `optional_comparison_preserves_ambiguity` (native regression) | Select one continuation under duplicate candidates |
+| `optional_comparison_declares_incompatible_capability` (capability/representation; native regression) | Silently compare mismatched capability or extractor versions |
+| `discriminating_assertions_reject_dishonest_empty_and_collapsed_copy` | Negative controls: honest `NOT_PRODUCED` accepts `None`/`[]` without closure; supported + complete + empty and collapsed copies fail |
 
-There are 16 executed cases (evidence and compatibility each have two
+There are 20 executed cases (evidence and compatibility each have two
 parameters). Core cases do not call comparison. Optional comparison cases skip for a fixture declaring
 unsupported comparison, while core cases still run. Native tests additionally
 exercise produced invocation/resolution as typed/honesty witnesses; these do
@@ -527,6 +604,31 @@ declares them unsupported. Core cases receive an explicitly selected entity
 from fixture setup; they do not require backend label discovery. The fixture
 wraps local tokens with occurrence/snapshot context, allowing other backends
 to reuse opaque token spellings across snapshots without creating identity.
+A test-only `misqualify`/`forge_entity` constructor builds intentionally
+inconsistent qualified references; production never forges. Native comparison
+algorithm expectations (`RENAME`/`HEURISTIC`/`CONTINUED`, two-candidate
+ambiguity, native compatibility) are classified as native regression; the
+transferable optional contract requires only qualified invocation, honest
+compatibility, exposed basis, preserved ambiguity, no identity collapse and
+no mutation.
+
+Closure status for the adversarial dishonest-backend matrix (all claimed
+discriminators are executed above unless marked optional-service):
+
+| Dishonest behavior | Must now reject? | Executable discriminator |
+| --- | --- | --- |
+| old reference opens latest wholesale | yes | `exact_occurrence_is_not_content_equivalence` |
+| historical facts follow latest | yes | strengthened `historical_reads_and_entity_membership_do_not_follow_latest` |
+| historical capability context follows latest | yes | same strengthened historical case |
+| historical fresh observation lookup follows latest | yes | same strengthened historical case (fresh `observations` + successor locality) |
+| copied occurrence collapsed | yes | `exact_occurrence_is_not_content_equivalence` + `copied_occurrence_does_not_accept_original_qualified_entity` |
+| original-qualified entity accepted in copy | yes | `copied_occurrence_does_not_accept_original_qualified_entity` |
+| entity lookup ignores snapshot | yes | `wrong_snapshot_qualification_is_rejected` |
+| unsupported becomes supported-empty | yes | `capability_not_produced_is_not_supported_empty` + discriminating controls |
+| incomplete becomes complete | yes | `unresolved_and_incomplete_do_not_establish_negative_calls` |
+| evidence reads mutable workspace | yes | `evidence_verifies_qualification_and_retained_closure` + historical workspace deletion |
+| wrong evidence revision accepted | yes | `evidence_verifies_qualification_and_retained_closure` |
+| comparison ambiguity arbitrarily collapsed | optional-service semantic test | transferable comparison case + native ambiguity regression |
 
 The default gate includes the new cases. Existing focused spine/comparison,
 Phase 1 evidence and Phase 4 slice tests retain native-specific coverage,
@@ -544,15 +646,26 @@ Validation on this branch (counts overlap):
 ```text
 uv sync --locked --extra dev                         PASS
 npm ci --prefix frontend                            PASS
-new ProgramBackend conformance cases                 16 passed
+new ProgramBackend conformance cases                 20 passed
 focused comparison + Phase 1 evidence + Phase 4
-  + new conformance cases                            53 passed
-default repository gate (includes native TS spine)   152 passed
+  + new conformance cases                            57 passed
+default repository gate (includes native TS spine)   156 passed
 Core v1 acceptance command                           18 passed
+conformance with comparison disabled                 14 passed, 6 skipped
+conformance with discovery disabled                  19 passed, 1 skipped
+Mutant A (ignore snapshot + latest facts)            3 failed, 17 passed (caught)
+Mutant B (no envelope guard + latest facts)          4 failed, 16 passed (caught)
 npm run build --prefix frontend                      PASS; no generated asset diff
 uv build                                            PASS; sdist and wheel
 git diff --check                                     PASS
 ```
+
+Adversarial closure mutants (temporary `/tmp` monkeypatches, not committed):
+Mutant A fails `wrong_snapshot_qualification_is_rejected`,
+`historical_reads_and_entity_membership_do_not_follow_latest` and
+`core_reads_do_not_require_comparison`. Mutant B additionally fails
+`copied_occurrence_does_not_accept_original_qualified_entity`. Both mutants
+passed the pre-closure 16-case suite; neither passes the 20-case suite.
 
 Focused command:
 
@@ -577,6 +690,11 @@ warrant loses its structural basis; without observation/reconstruction, Case J
 loses exact source evidence; without declarations, empty reads become dishonest;
 without verification/history guarantees, retained closure/stability is merely
 asserted. These dependencies force R1–R7, not seven production methods.
+Kept review deletion result: OccurrenceReference KEEP; OpenedOccurrence,
+Descriptor, EntityView, FactView, capability declaration and verification
+outcome FOLD; Observation KEEP; discovery and comparison OPTIONAL; producer
+contract SEPARATE/OPTIONAL for the reader. The language-neutral logical sketch
+is not turned into production classes.
 
 Candidates removed from required core during derivation:
 
@@ -603,11 +721,17 @@ Candidates removed from required core during derivation:
 Overconstraint falsifier: opaque IDs with external snapshot context, revisioned
 indexed source instead of blobs, logical retained databases instead of bundles,
 and typed views instead of SQLite rows all preserve R1–R7. None is excluded.
-Underconstraint falsifiers are exercised by cases in §O: wrong snapshot reads,
-latest substitution, live workspace evidence fallback, unsupported-empty
-translation, heuristic identity and copied-occurrence collapse cannot pass.
+Honest `rows = []` with `NOT_PRODUCED` and no closure, empty losses, and
+completeness without receipt references are permitted; only supported +
+complete + empty for unproduced relations is rejected. Underconstraint
+falsifiers are exercised by cases in §O: wrong snapshot/occurrence reads,
+copied-occurrence token collision, historical fact/capability/fresh-observation
+following latest, live workspace evidence fallback, unsupported-empty
+translation, heuristic identity collapse and ancestor-context loss cannot pass.
 The test projection does not certify every native API independently; it shows
 the existing production outputs contain the required information/behavior.
+Every normalized value remains a mechanical projection of native production
+state; the fixture was not made smarter merely to pass tests.
 
 ## Q. Glean questions generated by the contract
 

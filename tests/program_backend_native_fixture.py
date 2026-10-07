@@ -59,6 +59,12 @@ class NativeRead:
         # backend whose local tokens do not embed snapshot/occurrence identity.
         return (self.reference, self.snapshot["snapshot"], token)
 
+    def forge_entity(self, occurrence, snapshot, token):
+        # Test-only intentionally inconsistent qualified-entity constructor.
+        # Production never forges; cases use this to prove contradictory
+        # supplied qualification cannot be silently accepted.
+        return (occurrence, snapshot, token)
+
     def inspect(self, entity):
         if entity[:2] != (self.reference, self.snapshot["snapshot"]):
             return None
@@ -122,6 +128,24 @@ class NativeFixture:
     def supports(self, kind):
         # Test-scenario capabilities, not a proposed production API.
         return kind in RELATIONS and kind != "unproduced"
+
+    def misqualify(self, entity, occurrence=None, snapshot=None):
+        # Test-only: replace envelope qualification while preserving the
+        # native token, to construct contradictory supplied qualification.
+        occ, snap, token = entity
+        return (occurrence if occurrence is not None else occ,
+                snapshot if snapshot is not None else snap,
+                token)
+
+    def native_token(self, entity):
+        # Test-only accessor for the opaque local token inside the envelope.
+        return entity[2]
+
+    def snapshot_of(self, entity):
+        return entity[1]
+
+    def occurrence_of(self, entity):
+        return entity[0]
 
     def select(self, read, label):
         # Fixture setup supplies the explicit endpoint to core cases. Native
