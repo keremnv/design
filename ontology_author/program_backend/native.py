@@ -9,7 +9,7 @@ do not have to. It invents no semantic information.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Hashable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -73,11 +73,14 @@ class NativeProgramBackend(ProgramBackend):
                     "governed World must contain exactly one program snapshot"
                 )
             self._snapshot = str(snapshot_rows[0]["snapshot"])
-            self._snapshot_id = self._recorded_snapshot_id()
+            if not self._snapshot or not snapshot_rows[0].get("source_state"):
+                raise OccurrenceQualificationError("program snapshot lacks state qualification")
+            self._state = self._recorded_snapshot_id()
             self._members = tuple(
                 str(row["entity"]) for row in entity_rows
                 if str(row["snapshot"]) == self._snapshot
             )
+            self._member_set = frozenset(self._members)
             self._kinds = {
                 str(row["entity"]): str(row["kind"] or "")
                 for row in self._rows("program_entity_kind")
@@ -116,6 +119,8 @@ class NativeProgramBackend(ProgramBackend):
                 self._receipt = load_receipt(address / "spine.construction.receipt.json")
             except (OSError, ValueError):
                 self._receipt = None
+            if self._receipt is not None and self._receipt.snapshot.get("id") != self._state:
+                raise OccurrenceQualificationError("recorded program state disagrees with receipt")
         except Exception:
             self._world.close()
             raise
@@ -144,54 +149,70 @@ class NativeProgramBackend(ProgramBackend):
         return self._snapshot
 
     def snapshot(self) -> str:
-        return self._snapshot
+        return self._state
 
-    def snapshot_id(self) -> str:
-        return self._snapshot_id
+    def is_member(self, entity: Hashable) -> bool:
+        return entity in self._member_set
 
-    def members(self) -> tuple[str, ...]:
-        return self._members
-
-    def kind(self, entity: str) -> str | None:
-        if entity not in self._members:
+    def kind(self, entity: Hashable) -> str | None:
+        if not self.is_member(entity):
             return None
         return self._kinds.get(entity)
 
-    def containment(self) -> tuple[dict[str, str], ...]:
-        return self._containment
+    def containment(self, entity: Hashable) -> tuple[dict[str, Hashable], ...]:
+        if not self.is_member(entity):
+            return ()
+        parents = {row["child"]: row["parent"] for row in self._containment}
+        edges = []
+        seen = {entity}
+        while entity in parents and parents[entity] not in seen:
+            parent = parents[entity]
+            edges.append({"parent": parent, "child": entity})
+            seen.add(parent)
+            entity = parent
+        return tuple(reversed(edges))
 
-    def invocations(self) -> tuple[dict[str, str], ...]:
-        return self._invocations
+    def invocations(self, call_site: Hashable) -> tuple[dict[str, Hashable], ...]:
+        if not self.is_member(call_site):
+            return ()
+        return tuple(dict(row) for row in self._invocations if row["call_site"] == call_site)
 
-    def resolutions(self) -> tuple[dict[str, str], ...]:
-        return self._resolutions
+    def resolutions(self, subject: Hashable) -> tuple[dict[str, Hashable], ...]:
+        if not self.is_member(subject):
+            return ()
+        return tuple(dict(row) for row in self._resolutions if row["subject"] == subject)
 
-    def capabilities(self) -> Mapping[str, Capability]:
+    def capability(self, family: str) -> Capability:
         if self._receipt is None:
             raise OccurrenceQualificationError(
                 "program occurrence lacks a readable construction receipt"
             )
-        by_id = {str(item.get("id")): item for item in self._receipt.capabilities}
-        declared: dict[str, Capability] = {}
-        for family, capability_id in _FAMILY_CAPABILITIES.items():
-            item = by_id.get(capability_id)
-            if item is None:
-                raise OccurrenceQualificationError(
-                    f"program occurrence receipt omits capability: {capability_id}"
-                )
-            declared[family] = _project_capability(item)
-        for capability_id, item in by_id.items():
-            if capability_id not in _FAMILY_CAPABILITIES.values():
-                declared[capability_id] = _project_capability(item)
-        return declared
+        capability_id = _FAMILY_CAPABILITIES.get(family, family)
+        for item in self._receipt.capabilities:
+            if item.get("id") == capability_id:
+                return _project_capability(item)
+        # An absent declaration licenses no negative conclusion. Do not turn
+        # missing required native metadata into a fabricated complete result.
+        raise OccurrenceQualificationError(
+            f"program occurrence receipt omits capability: {capability_id}"
+        )
 
-    def observations(self, entity: str) -> tuple[dict[str, str], ...]:
+    def observations(self, entity: Hashable) -> tuple[object, ...]:
+        if not self.is_member(entity):
+            return ()
         return tuple(
             dict(observation)
             for observation in program_source_observations(self._world, entity)
         )
 
-    def reconstruct(self, observation: Mapping[str, str]) -> tuple[str, bool]:
+    def reconstruct(self, observation: object) -> tuple[str, bool]:
+        # Native observations remain native mappings. Other adapters can use
+        # any opaque handle; there is no coercion at the production boundary.
+        if not isinstance(observation, Mapping) or any(
+            not isinstance(observation.get(key), str)
+            for key in ("provider", "native_handle", "source_revision", "native_location")
+        ):
+            return "", False
         text, status = reconstruct_program_observation(self._world, observation)
         return (text, status == "OK")
 
@@ -229,17 +250,29 @@ class NativeProgramBackend(ProgramBackend):
 
 
 def _project_capability(item: Mapping[str, Any]) -> Capability:
+    native_status = str(item.get("status"))
+    statuses = {
+        "COMPLETE": CapabilityStatus.COMPLETE,
+        "STATIC_COMPLETE": CapabilityStatus.COMPLETE,
+        "PARTIAL": CapabilityStatus.INCOMPLETE,
+        "INCOMPLETE": CapabilityStatus.INCOMPLETE,
+        "UNKNOWN": CapabilityStatus.INCOMPLETE,
+        "NOT_PRODUCED": CapabilityStatus.NOT_PRODUCED,
+    }
     try:
-        status = CapabilityStatus(str(item.get("status")))
-    except ValueError as exc:
+        status = statuses[native_status]
+    except KeyError as exc:
         raise OccurrenceQualificationError(
             f"program occurrence receipt has an invalid capability status: {item.get('status')}"
         ) from exc
     gaps = item.get("known_gaps") or []
+    basis = str(item.get("completeness_basis") or "")
+    if native_status in {"STATIC_COMPLETE", "PARTIAL", "UNKNOWN"}:
+        basis = f"{basis}; native qualification: {native_status}"
     return Capability(
         status=status,
         scope=str(item.get("scope") or ""),
-        basis=str(item.get("completeness_basis") or ""),
+        basis=basis,
         gaps=tuple(str(gap) for gap in gaps),
     )
 

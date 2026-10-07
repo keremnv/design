@@ -107,6 +107,9 @@ class AuthorityConstructor:
     publication_inputs: tuple[PublicationRef, ...] = ()
     candidate_baseline: PublicationRef | None = None
     program_backend: ProgramBackend | None = None
+    # Native lifecycle supplies the copied artifact's referent for basis and
+    # retained-format validation. Program decisions use backend.snapshot().
+    candidate_snapshot_ref: str | None = None
 
     def __post_init__(self) -> None:
         self.markdown: dict[str, MarkdownSource] = {}
@@ -552,6 +555,10 @@ class AuthorityConstructor:
         if statement and statement not in self.known_losses:
             self.known_losses.append(statement)
 
+    def is_program_entity(self, entity: str) -> bool:
+        """Exact selected-entity membership without discovery/enumeration."""
+        return self._is_program_entity(entity)
+
     def program_entities(
         self,
         *,
@@ -561,8 +568,6 @@ class AuthorityConstructor:
     ) -> list[str]:
         if self.program_backend is None:
             return []
-        if kind is None and label is None and descriptor_contains is None:
-            return list(self.program_backend.members())
         return list(
             self.program_backend.discover(
                 kind=kind, label=label, descriptor_contains=descriptor_contains
@@ -575,7 +580,8 @@ class AuthorityConstructor:
             raise AuthorityConstructionError(f"callable {target_label!r} is not unique: {targets}")
         matches = [
             str(row["call_site"])
-            for row in self._invocation_rows()
+            for site in self.program_entities(kind="call_site")
+            for row in self._invocation_rows(site)
             if row["target"] == targets[0]
         ]
         if len(matches) != 1:
@@ -587,7 +593,7 @@ class AuthorityConstructor:
             raise AuthorityConstructionError("structural context needs a governed program snapshot")
         parents = {
             str(row["child"]): str(row["parent"])
-            for row in self.program_backend.containment()
+            for row in self.program_backend.containment(entity)
         }
         chain = [entity]
         current = entity
@@ -602,19 +608,19 @@ class AuthorityConstructor:
     def invoked_targets(self, call_site: str) -> list[str]:
         return [
             str(row["target"])
-            for row in self._invocation_rows()
+            for row in self._invocation_rows(call_site)
             if row["call_site"] == call_site
         ]
 
-    def _invocation_rows(self) -> tuple[dict[str, str], ...]:
+    def _invocation_rows(self, call_site: str) -> tuple[dict[str, Any], ...]:
         if self.program_backend is None:
             return ()
-        return self.program_backend.invocations()
+        return self.program_backend.invocations(call_site)
 
-    def _resolution_rows(self) -> tuple[dict[str, str], ...]:
+    def _resolution_rows(self, subject: str) -> tuple[dict[str, Any], ...]:
         if self.program_backend is None:
             return ()
-        return self.program_backend.resolutions()
+        return self.program_backend.resolutions(subject)
 
     def finish(self) -> AuthorityConstructionReceipt:
         self._materialize_completeness()
@@ -626,8 +632,8 @@ class AuthorityConstructor:
             self._snapshot_ref = ""
             self._snapshot_id = ""
             return
-        self._snapshot_ref = self.program_backend.snapshot()
-        self._snapshot_id = self.program_backend.snapshot_id()
+        self._snapshot_id = self.program_backend.snapshot()
+        self._snapshot_ref = self.candidate_snapshot_ref or self._snapshot_id
 
     def _load_markdown(self) -> None:
         for declared in self.universe.sources:
@@ -687,7 +693,7 @@ class AuthorityConstructor:
                     "status": row["status"],
                     "capability": row["capability"],
                 }
-                for row in self._resolution_rows()
+                for row in self._resolution_rows(entity)
                 if row["subject"] == entity
             ],
             "relation_support": support.value,

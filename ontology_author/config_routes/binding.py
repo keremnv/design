@@ -102,7 +102,7 @@ def construct_config_binding(
     )
 
     def build(constructor):
-        if program_entity not in constructor.program_entities():
+        if not constructor.is_program_entity(program_entity):
             raise AuthorityConstructionError(
                 f"selected program entity is not in the governed snapshot: {program_entity}"
             )

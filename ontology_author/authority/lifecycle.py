@@ -25,7 +25,7 @@ from ontology_author.evidence import EvidenceError
 from ontology_author.program_backend import BackendError, NotAProgramOccurrence
 from ontology_author.program_backend.native import open_native_occurrence
 
-from .construction import AuthorityConstructor, AuthorityUniverse
+from .construction import AuthorityConstructor, AuthorityUniverse, optional_program_rows
 from .evidence import retain_authority_sources
 from .schemas import (
     DEFAULT_PROFILE,
@@ -112,9 +112,13 @@ def construct_authority_world(
     backend = None
     try:
         baseline = None
+        candidate_snapshot_ref = None
         if source is not None:
             with closing(ConstructionWorld.open(source / "world.sqlite", read_only=True)) as opened:
                 baseline = PublicationRef.from_world(opened)
+                snapshots = optional_program_rows(opened, "program_snapshot")
+                if len(snapshots) == 1:
+                    candidate_snapshot_ref = str(snapshots[0]["snapshot"])
         inputs = tuple(dict.fromkeys((*publication_inputs, *((baseline,) if baseline else ()))))
         for reference in inputs:
             with closing(ConstructionWorld.open(Path(reference.address) / "world.sqlite", read_only=True)) as opened:
@@ -149,6 +153,7 @@ def construct_authority_world(
                 constructor_id=constructor_id,
                 constructor_version=constructor_version,
                 program_backend=backend,
+                candidate_snapshot_ref=candidate_snapshot_ref,
             )
             build(constructor)
             receipt = constructor.finish()

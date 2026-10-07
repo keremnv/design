@@ -1,276 +1,299 @@
 # Target Architecture v0 — Phase 5B: ProgramBackend extraction
 
-Status: draft for review. Phase 5A (merged) derived the minimum
-backend-independent mechanical contract forced by the Phase 4 consumers.
-Phase 5B extracts the smallest production boundary for that contract,
-proves the native Program Spine conforms through a real adapter, and
-migrates one end-to-end vertical consumer to it.
+Status: corrected draft for one final Phase 5B closure review. PR #6 started
+at merged Phase 5A `8f296bbc`; the reviewed pre-correction head was
+`1a152b71`. Phase 5A R1–R7 and its behavioral cases are unchanged. No Glean
+inspection/integration, kernel change, publication redesign, or merge occurs.
 
-Governing question: what is the smallest production boundary that lets a
-real Ontology Author consumer depend on the demonstrated mechanical
-contract rather than native Program Spine storage details?
+The extraction remains:
 
 ```text
-before:  semantic consumer -> native spine storage details
-after:   semantic consumer -> ProgramBackend -> native adapter -> native spine
+AuthorityConstructor -> ProgramBackend -> native adapter -> native Program Spine
 ```
 
-## A. Merged Phase 5A starting point
+The adversarial review confirmed real constructor decoupling, but rejected
+mandatory whole-universe/family enumeration, six native capability spellings,
+string-valued evidence, and two public state representations. It also found
+nonmember evidence access and adapter regressions hidden by test qualification.
+This correction changes those demonstrated issues without reopening Phase 5A.
 
-Branch `phase5b/program-backend-extraction` starts at merged `main`
-`8f296bbc` (Phase 5A squash-merge PR #5). No Phase 5A branch content is
-used. R1–R7 are unchanged; the Phase 5A requirements document and its 22
-executable conformance cases are the source of truth. No Glean, Code
-Explorer, discovery-engine, or Semantic World redesign work is included.
+## A. Forcing consumer and deletion
 
-## B. Selected forcing consumer
+The forcing production path is `construct_config_binding` through
+`AuthorityConstructor` and `construct_authority_world`, exercised by the
+Phase 4 W1/W2 vertical slice. The caller supplies E explicitly. Binding now
+uses `constructor.is_program_entity(E)`, not enumeration followed by membership.
+Filtered/unfiltered `program_entities()` remains optional discovery behavior.
 
-One real path: `construct_config_binding`
-(`ontology_author/config_routes/binding.py`) through
-`AuthorityConstructor` (`ontology_author/authority/construction.py`) and
-`construct_authority_world` (`ontology_author/authority/lifecycle.py`),
-exercised end-to-end by the Phase 4 vertical slice
-(`W0 + P1 + E1 -> W1`, `W0 + P2 + E2 -> W2`). `binding.py` itself is
-unchanged; its constructor read surface was migrated. No other consumer
-was migrated.
+Constructor program-content reads still use only ProgramBackend. Removed native
+knowledge remains removed: program membership/kind tables, label/descriptor
+joins, snapshot grounding, relation storage and snapshot filters, the entity
+snapshot accessor, and its redundant cross-snapshot check. Generic candidate
+World writes and semantic referent integrity reads remain application work.
 
-## C. Pre-extraction native coupling audit
+Two durable migration regressions discriminate the source of decisions:
 
-All program reads below were served from the candidate World, which
-`construct_authority_world` seeds as a byte clone of the exact program
-baseline. Classification:
+- Candidate has no program rows: backend reads still work.
+- Candidate has correct native rows: differing backend membership, kind,
+  context, invocation, and resolution answers control the constructor/default
+  warrant. Native candidate rows do not repair backend answers.
 
-| Native knowledge | Used by | Class |
-| --- | --- | --- |
-| `program_snapshot` row + `program_snapshot` assertion grounding extra (`snapshot_id`) | `_load_snapshot` | required mechanical (R2) |
-| `program_entity_kind` enumeration | `program_entities()` unfiltered | required mechanical (R3) |
-| `program_entity_kind` kind filter | `program_entities(kind=...)` | required mechanical (R3) |
-| `_world_referents` labels | `program_entities(label=...)`, `call_site_invoking` | optional discovery |
-| `program_identity_descriptor` | `program_entities(descriptor_contains=...)` | optional discovery |
-| `structural_context` rows + hand walk | `structural_context` | required mechanical (R4) |
-| `program_invokes` rows | `invoked_targets`, `call_site_invoking`, warrants | optional production (R4/R6) |
-| `program_resolution` rows | `_default_warrant` | optional production (R4/R6) |
-| `program_entity` membership/snapshot | `_is_program_entity`, `_entity_snapshot`, warrants | required mechanical (R2/R3) |
-| `program_entity_kind` single kind | `_entity_kind`, relevance defaults | required mechanical (R3) |
-| `ConstructionWorld.open` + `PublicationRef.from_world` + `verify_publication_ref` on the baseline | lifecycle basis recording | required occurrence mechanics (R1/R7); receipt shape stays native |
-| whole-bundle byte clone | candidate seeding | retention, kept as-is (producer concern) |
-| candidate `program_*` rows in admission validation | `validation.py` warrant/endpoint/scope/snapshot checks | retained-artifact verification, deliberately not migrated (see N) |
-| `verify_retained_program_inputs` on the candidate | admission + publication verification | retention verification, kept native |
+## B. Corrected production API choice
 
-## D. Minimal production boundary
-
-New package `ontology_author/program_backend/`. The boundary
-(`__init__.py`) is one abstract class plus two tiny value types and
-errors. No other production types were introduced.
+`ontology_author/program_backend/__init__.py` has seven core reader operations
+plus a convenient composed verification operation. Entity tokens are opaque
+hashable local values; native tokens remain strings, while the lazy fake uses
+integers. Qualification is the opened handle plus token, not token spelling.
 
 ```text
-ProgramBackend (ABC, handle scoped to one exact opened occurrence)
-  snapshot() -> str                      opaque observed-state token
-  snapshot_id() -> str                   opaque recorded state identity
-  members() -> tuple[str, ...]           opaque entity tokens
-  is_member(entity) -> bool              concrete via members()
-  kind(entity) -> str | None             mechanical kind, None if not member
-  containment() -> tuple[{parent, child}]
-  invocations() -> tuple[{call_site, target}]
-  resolutions() -> tuple[{subject, status, capability}]
-  capabilities() -> Mapping[str, Capability]
-  observations(entity) -> tuple[dict, ...]   opaque qualified observations
-  reconstruct(observation) -> (str, bool)    fail-closed retained material
-  verify() -> tuple[str, ...]                retained-guarantee violations
-  discover(label, kind, descriptor_contains) optional; raises if unsupported
-  close() + context-manager protocol
+snapshot() -> str                         one observed-state token
+is_member(E) -> bool                      exact local membership
+kind(E) -> str | None                     declared mechanical kind
+containment(E) -> parent/child rows       E's ancestor edges only
+capability(family) -> Capability          requested-family qualification
+observations(E) -> tuple[object, ...]     opaque backend-owned evidence handles
+reconstruct(handle) -> (material, verified)
+verify() -> tuple[str, ...]               convenient composed guarantee checks
+
+optional invocations(C) -> call_site/target rows
+optional resolutions(S) -> subject/status/capability rows
+optional discover(label, kind, descriptor_contains) -> local candidates
+close() and context-manager protocol
 ```
 
-`Capability` is a frozen `(status, scope, basis, gaps)` record;
-`CapabilityStatus` enumerates the six production states. Errors are
-`BackendError` with `NotAProgramOccurrence` (no program plane:
-lifecycle maps to source-only mode), `OccurrenceQualificationError`
-(malformed plane: fail closed), and `OptionalUnsupported` (optional
-refusal). Fact rows are plain dicts keyed by role name; observations are
-opaque mappings; both avoid new row/observation classes.
+There is no `members()`, `snapshot_id()`, or capability inventory operation.
+No core relation read dumps a full family. Fixed role names preserve the
+Phase 5A entity/literal distinction without a graph engine or query language.
+Parent/child/call_site/target/subject values are local entity tokens;
+resolution status and capability attribution are text.
 
-## E. Representation choices deliberately not made
+`containment(E)` returns relevant ancestor edges, sufficient for the demonstrated
+chain and preserving parent/child direction. The constructor still performs its
+ordinary ancestor walk. Its default warrant requests outgoing invocations for
+one endpoint and resolution outcomes for that subject. The optional
+`call_site_invoking(label)` compatibility helper discovers candidate sites and
+queries each site; reverse whole-family enumeration is not added to core.
 
-No production `OpenedOccurrence`, `Descriptor`, `EntityView`,
-`FactView`, `ProgramCapabilities`, `VerificationOutcome`, or `ProgramRef`
-classes: qualification is handle scoping, rows are dicts, capability is
-one record, verification is an error tuple, and occurrence addressing for
-receipts stays with the native `PublicationRef` record. No universal kind
-ontology (one opaque mechanical kind per member), no graph API (one edge
-list per demonstrated family), no comparison on the core reader, no core
-discovery, no producer/indexing surface, no universal error enum, and no
-per-entity state accessor (`snapshot_of` was prototyped, found to have no
-demonstrated consumer once handle scoping made the warrant cross-snapshot
-check vacuous, and deleted).
+Invocation/resolution production is optional. The base implementations return
+empty results with NOT_PRODUCED; a backend declaring production without
+implementing the read fails explicitly. A backend can implement membership,
+kind, containment, and evidence without extracting calls. Qualified empty rows
+never imply unsupported analysis was complete.
 
-## F. Native adapter mapping
+## C. Capability normalization
 
-`NativeProgramBackend` (`native.py`), opened with
-`open_native_occurrence(address)`, projects a sealed native bundle:
+`Capability` remains one frozen `(status, scope, basis, gaps)` record. The
+normalized states have demonstrated consequences:
 
-| Boundary | Native source |
+| Production state | Meaning |
 | --- | --- |
-| open gates | `program_snapshot`/`program_entity` row presence; exact legacy messages preserved |
-| `snapshot` / `snapshot_id` | snapshot row token; `program_snapshot` assertion grounding extra or token |
-| `members` / `is_member` | `program_entity` rows filtered to the governed snapshot |
-| `kind` | `program_entity_kind` rows (native kind; identical to identity kind in the current extractor) |
-| `containment` / `invocations` / `resolutions` | same-named rows filtered to the snapshot, native order, role keys only |
-| `observations` / `reconstruct` | `program_source_observations` / `reconstruct_program_observation`; `(text, status == "OK")` |
-| `verify` | `validate_typescript_spine` + `verify_retained_program_inputs` over the bundle manifest |
-| `discover` | kind rows + referent labels + identity descriptors |
-| `capabilities` | receipt projection (see G), loaded lazily so `open` never depends on it |
+| COMPLETE | Supported complete within its declared scope/basis, not universal program behavior |
+| INCOMPLETE | Supported but incomplete/partial, or completeness uncertain; no exhaustive absence conclusion |
+| NOT_PRODUCED | Family not produced; no absence conclusion |
 
-Reads are cached at open; the underlying world is read-only. The adapter
-invents no semantic information.
+The native mapping is explicit:
 
-## G. Capability/completeness mapping
+| Native receipt state | Production state | Preserved qualification |
+| --- | --- | --- |
+| COMPLETE | COMPLETE | Original scope, basis, known gaps |
+| STATIC_COMPLETE | COMPLETE | Original static scope/basis plus native qualification in basis |
+| INCOMPLETE | INCOMPLETE | Original scope, basis, known gaps |
+| PARTIAL | INCOMPLETE | Original metadata plus native qualification in basis |
+| UNKNOWN | INCOMPLETE | Original metadata plus native qualification in basis |
+| NOT_PRODUCED | NOT_PRODUCED | Original metadata; never closure |
 
-Neutral families map to native receipt ids exactly as in Phase 5A:
-`containment -> spine.code_structure`, `invocation`/`resolution ->
-spine.calls`. Each projects `(status, scope, completeness_basis,
-known_gaps)`; receipt references, inputs, and losses are never exposed.
-Further receipt capabilities are declared under their native ids
-(e.g. `spine.component_usage`, which the R6 production case uses as its
-honest `NOT_PRODUCED` witness). A missing receipt fails `capabilities()`
-closed without affecting `open`; the migrated constructor never consults
-capabilities, preserving its row-absence behavior while the boundary now
-makes production state inspectable.
+Native spellings in explanatory basis text are adapter metadata, not required
+enum values for another backend. Static coverage of resolution outcomes is not
+proof that unresolved sites invoke nobody. Resolution outcomes retain their
+own RESOLVED/UNRESOLVED semantics.
 
-## H. Evidence mapping
+`capability(family)` maps containment to `spine.code_structure` and invocation /
+resolution to `spine.calls`; other native ids are optional native vocabulary.
+The native component-usage NOT_PRODUCED declaration is a test witness, not a
+required core family. A missing/unreadable receipt or omitted requested native
+declaration fails qualification. Mechanical content reads may still work with
+no receipt, but cannot establish capability-qualified completeness.
 
-Observations pass through as opaque dicts; `reconstruct` returns
-`(material, verified)` with `("", False)` for every native `FAILED`
-(missing/corrupt blob, revision mismatch, bad locator). No paths,
-digests, offsets, coordinates, or observation classes cross the
-boundary. `verify()` returns the combined native spine + retained-input
-violations as plain strings.
+The migrated constructor does not infer exhaustive absence or consult the
+capability operation. Its existing empty-warrant behavior is preserved; it is
+not claimed to persist an additional capability-qualified negative conclusion.
 
-## I. Historical identity mapping
+## D. Evidence and source revision ownership
 
-Exact occurrence identity is the opened handle: all reads are filtered
-to the opened snapshot, and equivalent retained copies are distinct
-handles that never share state. `EntityToken != QualifiedEntityOccurrence`
-holds: tokens are opaque strings, qualification is the handle. The native
-`PublicationRef` remains the occurrence mechanism inside the adapter's
-neighborhood (lifecycle basis recording and receipts keep their exact
-shapes and values); the consumer no longer depends on it for program
-content. Snapshot gates reproduce the legacy constructor messages
-verbatim.
+The boundary passes opaque `object` handles unchanged into `reconstruct`.
+It requires neither a mapping nor string-valued metadata, a source-coordinate
+format, an evidence class, paths, digest algorithms, nor descriptor objects.
+Native handles remain dictionaries; the native adapter alone validates and
+interprets their provider/handle/revision/location fields.
 
-## J. Migrated consumer path
+Native observations check membership before grounding lookup. The snapshot
+referent and arbitrary program-looking nonmembers return no observations.
+Member observations reconstruct from retained digest-checked program inputs.
+Native reconstruction verifies `source_revision` against the opened native
+snapshot's `source_state`, validates the locator, and reads retained bytes;
+wrong revision, damaged retention, or live-source substitution cannot verify.
+Thus source revision qualification lives in the opaque evidence handle plus
+backend reconstruction verification, not a universal descriptor accessor.
 
-`construct_authority_world` now opens a native backend on a program
-baseline (mapping "no program plane" to source-only mode and
-qualification failures to construction failure), passes it to
-`AuthorityConstructor(program_backend=...)`, and closes it after
-admission validation. The constructor serves membership, kind, snapshot,
-structural context, invocation, and resolution reads exclusively through
-the boundary; `binding.py` is byte-identical. W1/W2 construction,
-receipts, warrants, relevance scopes, evidence retention, and independent
-histories are behaviorally unchanged, as the untouched Phase 4 slice
-proves.
+`(material, verified)` is the retained simple API choice. Native failure returns
+`("", False)`; a valid empty extent returns `("", True)`. Consumers must check
+verification. Suppressing all unverified material is not claimed as a universal
+security primitive or evidence class requirement.
 
-## K. Conformance results
+## E. One state token; native basis adaptation
 
-Production conformance (`tests/test_program_backend_production.py`,
-added to the default gate) re-runs all 22 Phase 5A cases through the
-real adapter — content reads via the boundary, envelopes/metadata
-test-side — plus two migration regression tests:
+`snapshot()` now returns the native recorded snapshot id (grounding extra,
+legacy referent fallback if no recorded id), not a second public referent token.
+The native opener rejects absent source-state qualification and disagreement
+between the recorded state and an available receipt. Direct tests compare the
+state with the producer manifest, not the constructor or another backend getter.
 
-```text
-Phase 5A conformance (unchanged file)          22 passed
-production adapter conformance                 24 passed (22 + 2 migration)
-default repository gate                        182 passed
-Core v1 acceptance                              18 passed
-Phase 4 vertical slice                          17 passed
-phase3 boundary + authority construction        25 passed
-authority maintenance + config routes 1-3      156 passed
-checkout/design binding-adjacent suites         48 passed
-spine + program evidence suites                 55 passed
-npm run build / uv build / git diff --check    PASS
-```
+The constructor uses this single token for warrant/receipt observed-state
+qualification. The native lifecycle separately supplies `candidate_snapshot_ref`
+from its already-open native baseline for the existing copied-artifact basis and
+validation fields. That is native publication adaptation, not another backend
+state obligation. Existing native basis/receipt layouts and values are retained.
 
-Disposable `/tmp` probes through the production path (not committed):
-false-ancestor adapter mutant fails exactly
-`test_typed_mechanical_facts_preserve_roles_and_snapshot` (1 failed, 23
-passed); an invocation/resolution-`NOT_PRODUCED` backend passes core
-history (3 conditional skips; only the native-behavior migration test
-fails, as a native regression should); latest-substitution fails 8
-cases including historical reads, wrong-snapshot qualification, and
-evidence closure.
+Exact occurrence identity is different from observed-state qualification.
+Native `PublicationRef`, exact address opening, and reference verification live
+at composition. Copies may share local tokens and state tokens while retaining
+distinct exact references. Direct raw-token membership in an equivalent copy
+is true; a qualified entity from the original is not the copy's qualified
+entity. A future non-filesystem factory can supply a different exact reference
+and the same scoped reader behavior without a universal ProgramOccurrenceRef.
 
-Pre-existing, unrelated: `test_maintenance_dependency_conformance.py`
-reports 6 setup errors identically with and without this branch (verified
-via stash); it is outside the default gate.
+## F. What production conformance actually covers
 
-## L. Deleted direct coupling
+The 22 Phase 5A functions are reused without edits. `ProductionRead` remains a
+test projection: optional native discovery aggregates scoped reads when old
+test views request an unscoped family. This does not require production core
+enumeration. Native receipt descriptors, labels/boundaries, occurrence envelopes,
+and comparison remain explicitly test-side/native composition.
 
-From `AuthorityConstructor`: all `program_snapshot` / `program_entity` /
-`program_entity_kind` / `program_identity_descriptor` /
-`structural_context` / `program_invokes` / `program_resolution` reads,
-the `_world_referents` label join, the `_world_assertions`
-snapshot-grounding lookup, the now-dead `_labels` and `_grounding_extra`
-helpers, and the vacuous cross-snapshot warrant check (with its
-`_entity_snapshot` accessor). No `program_*` storage reads remain in the
-constructor; `optional_program_rows` stays only as the generic helper
-retained-artifact validation imports.
+| Requirement | ProgramBackend-owned behavior | Surrounding composition / fixture |
+| --- | --- | --- |
+| R1 exact occurrence | Scoped reads from the opened handle | Exact reference/factory, serialization, PublicationRef qualification |
+| R2 observed state | One state token; evidence revision verified on reconstruction; requested scope/basis | Native descriptor inputs/losses/boundary; copied-artifact snapshot referent adaptation |
+| R3 membership/kind | Direct local membership and mechanical kind; nonmember reads/evidence empty | Qualified-entity envelope rejects contradictory occurrence/state context |
+| R4 context/facts | Scoped ancestor/site/subject reads with fixed roles and capability access | Test role-schema projection; optional discovery aggregation for old global test views |
+| R5 evidence | Member-only opaque handles, retained reconstruction, explicit verification failure | Native producer supplies evidence; test fixture damages retained inputs |
+| R6 honesty | Requested-family status/scope/basis/gaps; optional production distinguished from complete-empty | Native test witness family, optional descriptor/boundary disclosures |
+| R7 history/verification | Stable reopened scoped facts, capabilities, observations; reconstruction and verify | Exact reopening/retention, publication qualification, fingerprints, optional native comparison |
 
-## M. Native extras left outside core
+These are conformance of the reader plus its declared composition, not a claim
+that the ABC wholly implements R1–R7. Direct adapter tests bypass inherited
+`NativeRead.inspect` and check foreign/fabricated tokens, equivalent-copy local
+membership, producer-recorded state, invalid state qualification, nonmember
+evidence, historical scoped reads, requested capability, wrong revision,
+retained corruption, and missing-receipt qualification.
 
-Comparison (`compare_spines` and friends), imports/types/extends
-relations, resolution candidates, receipt/input/loss shapes, snapshot
-grounding rules, display labels as anything but optional discovery
-input, relevance-scope spine relation vocabulary, and all producer
-machinery (extractor, `build_typescript_spine`, manifests) remain native
-and unmigrated. No native implementation was deleted.
+Eight durable dishonest-adapter controls require behavioral assertions to
+reject occurrence-insensitive membership, incorrect state identity, nonmember
+evidence leakage, signature-as-module ancestor, unsupported-as-complete,
+latest substitution, ignored revision, and mutable-live evidence fallback.
 
-## N. Remaining extraction pressure
+## G. Alternative-backend falsifier
 
-1. `validation.py` and `verify_construction_boundary` still read
-   candidate `program_*` rows: deliberate retained-artifact
-   verification, not decision coupling. A future backend-native
-   retention format would revisit this.
-2. Unmigrated native readers outside the binding path (`case.py`,
-   `impact.py`, `maintenance.py`, `retrieval.py`, `evaluate.py`,
-   `semantic_binding`, `governance`, relevance `COMPARABLE_RELATIONS`)
-   keep working unchanged; each is a future forcing consumer, none was
-   migrated for completeness.
-3. `identityKind` vs `nativeKind`: identical in the current extractor;
-   the boundary exposes one mechanical kind. A divergence would force an
-   explicit contract choice.
-4. Lifecycle still opens the baseline natively for `PublicationRef`
-   basis recording; receipts require that native record shape.
+`tests/program_backend_lazy_fixture.py` supplies exact non-filesystem occurrence
+handles, integer local IDs, keyed-only member/context indexes, per-family
+qualification, and structured evidence containing integer revisions, nested
+source ids, extents, and binary content handles. Index enumeration raises.
+There is no discovery or comparison. Both the core-only version (default
+NOT_PRODUCED call reads) and optional produced scoped-call version pass the
+core tests. Closure verification checks its declared retained source directly;
+it does not enumerate a repository. This proves representational freedom,
+not real Glean conformance, scalability, or a new production implementation.
 
-## O. Glean questions now enabled
+## H. Mandatory deletion audit
 
-Can a Glean-backed occurrence supply: exact open + snapshot qualification;
-opaque members + one mechanical kind; parent/child containment edges with
-honest direction; optional invocation/resolution with declared
-production; opaque observations with fail-closed reconstruction; a
-`verify()` violation list; and a family capability table distinguishing
-`NOT_PRODUCED` from supported-complete-empty? Any "no" is evidence about
-Glean or the contract, to be settled in Phase 6.
-
-## P. Deletion/minimality audit
-
-| Introduced | Forced by | If removed | Foldable? |
+| Remaining production method/type | Demonstrated forcing consumer / behavior | Further scope/fold? | Alternative backend |
 | --- | --- | --- | --- |
-| `ProgramBackend` ABC | migrated constructor reads | consumer reverts to native storage reads | no: the boundary is the phase |
-| `Capability` + `CapabilityStatus` | R6 honesty through the adapter (production conformance) | `NOT_PRODUCED` vs complete becomes unrepresentable | no: one record, one enum |
-| `BackendError` + 3 subclasses | lifecycle must distinguish absent plane / malformed plane / optional refusal | silent-empty vs fail-closed collapse | no: handling differs per case |
-| `NativeProgramBackend` + `open_native_occurrence` | adapter over existing spine state | no production implementation | no |
-| row dicts / opaque observation dicts | role-named facts without new classes | new row classes (worse) | n/a: already minimal |
-| `discover` (optional) | existing filtered `program_entities` API + `call_site_invoking` | downstream discovery tests break | no: default raises |
-| `verify()` | R7 retained-guarantee checks through the adapter | conformance cannot exercise retention honesty | no |
+| ProgramBackend | Constructor mechanical read dependency | Keep handle-scoped boundary; no producer/export API | Natural opened query handle |
+| snapshot | Warrant/basis observed-state qualification | Second accessor removed | One stable state token |
+| is_member | Explicit config selection, endpoints, warrant/relevance checks | Already one entity; enumeration deleted | Keyed membership |
+| kind | Selected-entity relevance defaults | Already one entity; no universal kind ontology | Declared adequate category |
+| containment | Constructor ancestor context | Already E's ancestors; roles cannot fold away without losing direction | Scoped ancestor query |
+| invocations | Default warrant/invoked_targets; optional call-site helper | Optional production; site-scoped | Scoped outgoing query or NOT_PRODUCED |
+| resolutions | Default warrant subject outcomes | Optional production; subject-scoped | Scoped outcome query or NOT_PRODUCED |
+| capability | R4/R6 qualification of requested facts | Already one family; inventory deleted | Per-family declaration |
+| Capability | R6 status/scope/basis/gaps | One compact record; no receipt hierarchy | Natural metadata |
+| CapabilityStatus | Complete/incomplete/not-produced falsifiers | Six native states folded to three | No native spellings required |
+| observations | R5 selected-entity evidence | Already one member; object handle | Native structured/opaque handle |
+| reconstruct | R5 exact qualified material or failure | Single handle; no coordinates exposed | Provider-owned reconstruction |
+| verify | R7 mechanical verification, production conformance | Convenient composed operation retained; not forced by constructor; no subsystem | Provider closure/consistency checks |
+| discover | Existing program_entities/call_site_invoking compatibility | Optional extension; descriptor_contains is native-compatible only | May refuse entirely |
+| close / context manager | Lifecycle owns an opened resource | No-op close allowed; no new lifecycle objects | Natural or no-op |
+| BackendError | Common native adapter failure handling | Convenience superclass, not an epistemic requirement | Ordinary explicit failure |
+| NotAProgramOccurrence | Source-only lifecycle differs from malformed program state | Distinction cannot collapse into generic empty program | Factory-specific absence signal |
+| OccurrenceQualificationError | Malformed/missing requested qualification must fail | Named subclass retained for current compatibility; no extra recovery policy | Ordinary qualification failure |
+| OptionalUnsupported | Discovery/read service refusal differs from successful empty lookup | Optional extension/default-read signaling only | Explicit refusal |
+| NativeProgramBackend / __init__ | Production native implementation and opening gates | Native caches/eagerness remain local, not contract | Different adapter/factory |
+| open_native_occurrence | Native lifecycle exact opener | Filesystem reference deliberately localized | Different exact-reference factory |
+| _rows / _recorded_snapshot_id / _project_capability | Native tables, grounding, receipt normalization | Private native implementation, no universal obligation | Not required |
+| candidate_snapshot_ref | Existing native copied-artifact basis/validation | Composition input; not reader state/accessor | Different basis adapter later |
 
-Net: the constructor lost ~40 lines of storage joins; the consumer's
-program knowledge is now 13 boundary methods instead of 7 relation
-schemas plus kernel tables. `snapshot_of`, `_entity_snapshot`, one
-vacuous warrant check, and two dead helpers were prototyped or present
-and deleted.
+## I. Remaining extraction pressure
 
-## Q. Final verdict
+The native lifecycle still takes paths, opens `world.sqlite`, records
+PublicationRef bases, clones the full program bundle, and admits/verifies the
+candidate's native program rows and retained blobs. Other program readers,
+comparison, maintenance, and native relevance relation vocabulary are not
+migrated. These are explicit composition/application dependencies, not fallback
+program-content reads in AuthorityConstructor. A fully non-native end-to-end
+publication needs separate basis/retention/validation adaptation later.
+
+The future simplification remains semantic publication plus an exact external
+program occurrence/evidence basis, rather than necessarily cloning a full
+Program World. No such publication change occurs here. The reader now requires
+neither universe nor full relation enumeration, making that future deletion
+possible without satisfying a new export obligation.
+
+## J. Validation and verdict
+
+Correction validation (counts overlap; this is not the entire historical suite):
+
+| Check | Result |
+| --- | --- |
+| Production backend conformance | 45 passed: unchanged 22-case replay, 2 original migration cases, 21 corrective/direct/fake/mutant cases |
+| Phase 5A behavioral conformance | 22 passed, file unchanged |
+| Phase 4 vertical slice | 17 passed |
+| Combined reader / Phase 5A / Phase 4 command | 84 passed |
+| Authority/config, native spine/comparison, program/evidence regressions below | 225 passed |
+| Default gate | 203 passed, no skips |
+| Core acceptance separately | 18 passed |
+| Honest lazy core-only / produced-call variants | Both passed, with enumeration unavailable and discovery refused |
+| Dishonest adapter controls | All 8 rejected by direct behavioral assertions |
+| Frontend build / package build / diff whitespace | PASS; frontend build produced no tracked asset diff |
+
+Reproduction:
+
+```sh
+uv sync --locked --extra dev
+npm ci --prefix frontend
+uv run --extra dev pytest -q tests/test_program_backend_production.py \
+  tests/test_program_backend_conformance.py tests/test_phase4_vertical_slice.py
+uv run --extra dev pytest -q tests/test_authority_construction.py \
+  tests/test_authority_maintenance.py tests/test_config_routes_phase1.py \
+  tests/test_config_routes_phase2.py tests/test_config_routes_phase3.py \
+  tests/test_phase3_construction_boundary.py tests/test_typescript_program_spine.py \
+  tests/test_program_spine_comparison.py tests/test_phase1_program_observation_conformance.py \
+  tests/test_phase1_program_capture_conformance.py tests/test_phase1_evidence_conformance.py
+uv run --extra dev pytest
+uv run --extra dev pytest -q tests/test_core_v1_acceptance.py
+npm run build --prefix frontend
+uv build
+git diff --check
+```
+
+Implementation verdict supported by this corrected surface, direct negative
+controls, and the honest alternative fixture:
 
 ```text
-YES — PRODUCTION PROGRAMBACKEND EXTRACTED; NATIVE BACKEND CONFORMS; READY FOR GLEAN CONFORMANCE
+YES — MINIMAL PRODUCTION PROGRAMBACKEND EXTRACTED;
+NATIVE BACKEND CONFORMS;
+READY FOR GLEAN CONFORMANCE
 ```
+
+This is readiness to test another backend, not a claim about Glean's architecture
+or conformance. The PR remains draft and unmerged for one final independent
+Phase 5B closure review. Native end-to-end composition debt in §I remains.

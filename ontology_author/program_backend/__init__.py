@@ -1,4 +1,4 @@
-"""Minimal production read boundary over an exact retained program occurrence.
+"""Scoped mechanical reads over an exact opened program occurrence.
 
 A ProgramBackend exposes only mechanically observed program information
 under declared qualification/capability/evidence semantics. It establishes
@@ -7,23 +7,24 @@ no business meaning, requirement satisfaction, authority, or currentness.
 Conventions forced by the migrated authority consumer and the Phase 5A
 conformance contract:
 
-- The handle is scoped to one exact opened occurrence. Entity tokens are
-  opaque local strings; a (handle, token) pair is the qualified identity.
-  Tokens never encode snapshot, occurrence, language, path, or position.
+- The backend-specific factory qualifies the exact retained occurrence.
+  Entity tokens are opaque local hashable values; a (handle, token) pair
+  is the qualified identity. Tokens need not encode any state or location.
 - Read methods are total: unknown entities yield ``None``/empty results,
   never silently cross occurrences. Consumers check membership explicitly.
 - Fact rows are plain dicts whose keys name the relation roles
   (``parent``/``child``, ``call_site``/``target``,
   ``subject``/``status``/``capability``). No row classes are introduced.
-- Observations are opaque backend-defined mappings round-tripped through
-  :meth:`reconstruct`. Reconstruction is fail-closed: unverified material
-  is never returned as usable.
+- Observations are opaque backend-owned objects round-tripped unchanged
+  through :meth:`reconstruct`; consumers do not interpret their structure.
+- Capability qualification is requested per family. Optional call reads
+  may be empty with NOT_PRODUCED, which never licenses absence inference.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Hashable
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -45,13 +46,10 @@ class OptionalUnsupported(BackendError):
 
 
 class CapabilityStatus(StrEnum):
-    """Production/reporting state of one declared capability family."""
+    """COMPLETE is scoped; INCOMPLETE includes partial/uncertain coverage."""
 
     COMPLETE = "COMPLETE"
-    STATIC_COMPLETE = "STATIC_COMPLETE"
-    PARTIAL = "PARTIAL"
     INCOMPLETE = "INCOMPLETE"
-    UNKNOWN = "UNKNOWN"
     NOT_PRODUCED = "NOT_PRODUCED"
 
 
@@ -59,8 +57,8 @@ class CapabilityStatus(StrEnum):
 class Capability:
     """Declared honesty metadata for one capability family.
 
-    ``NOT_PRODUCED`` with empty gaps/references licenses no absence
-    inference; only a supported + complete declaration scopes negative
+    ``NOT_PRODUCED`` licenses no absence inference; only a supported +
+    complete declaration with scope and basis qualifies negative
     conclusions. Native receipt shapes are never required here.
     """
 
@@ -71,7 +69,7 @@ class Capability:
 
 
 class ProgramBackend(ABC):
-    """Smallest production read surface forced by the binding consumer."""
+    """Selected-entity reads, without entity or relation-universe enumeration."""
 
     def __enter__(self) -> ProgramBackend:
         return self
@@ -84,59 +82,71 @@ class ProgramBackend(ABC):
 
     @abstractmethod
     def snapshot(self) -> str:
-        """Opaque token of the governed observed state."""
+        """Stable opaque observed-state token, not exact occurrence identity."""
 
     @abstractmethod
-    def snapshot_id(self) -> str:
-        """Opaque recorded identity of the observed state."""
-
-    @abstractmethod
-    def members(self) -> tuple[str, ...]:
-        """Opaque entity tokens in this observed state."""
-
-    def is_member(self, entity: str) -> bool:
+    def is_member(self, entity: Hashable) -> bool:
         """Whether the token is a member of this observed state."""
-        return entity in self.members()
 
     @abstractmethod
-    def kind(self, entity: str) -> str | None:
+    def kind(self, entity: Hashable) -> str | None:
         """Mechanical kind of a member, else ``None``."""
 
     @abstractmethod
-    def containment(self) -> tuple[dict[str, str], ...]:
-        """Containment edges as ``{"parent": ..., "child": ...}`` rows."""
+    def containment(self, entity: Hashable) -> tuple[dict[str, Hashable], ...]:
+        """Ancestor edges for this entity, with parent/child roles preserved.
+
+        Return enough qualified edges to recover the demonstrated ancestor
+        chain, not unrelated repository containment. A nonmember yields ().
+        """
+
+    def invocations(self, call_site: Hashable) -> tuple[dict[str, Hashable], ...]:
+        """Optional outgoing edges for a site, with call_site/target roles.
+
+        Production is optional; NOT_PRODUCED plus () is honest. A declared
+        produced capability without an implementation must fail explicitly.
+        """
+        if not self.is_member(call_site):
+            return ()
+        if self.capability("invocation").status != CapabilityStatus.NOT_PRODUCED:
+            raise OptionalUnsupported("produced invocation reads are not implemented")
+        return ()
+
+    def resolutions(self, subject: Hashable) -> tuple[dict[str, Hashable], ...]:
+        """Optional subject/status/capability outcomes for one subject."""
+        if not self.is_member(subject):
+            return ()
+        if self.capability("resolution").status != CapabilityStatus.NOT_PRODUCED:
+            raise OptionalUnsupported("produced resolution reads are not implemented")
+        return ()
 
     @abstractmethod
-    def invocations(self) -> tuple[dict[str, str], ...]:
-        """Invocation edges as ``{"call_site": ..., "target": ...}`` rows."""
+    def capability(self, family: str) -> Capability:
+        """Qualification for the requested family; no inventory is required.
 
-    @abstractmethod
-    def resolutions(self) -> tuple[dict[str, str], ...]:
-        """Resolution outcomes as ``{"subject", "status", "capability"}`` rows."""
-
-    @abstractmethod
-    def capabilities(self) -> Mapping[str, Capability]:
-        """Declared honesty metadata by capability family.
-
-        The ``containment``/``invocation``/``resolution`` families are
-        always declared; further keys are backend-declared vocabulary.
+        Missing/unsupported families cannot confer completeness. Return an
+        honest NOT_PRODUCED declaration or explicitly fail qualification.
         """
 
     @abstractmethod
-    def observations(self, entity: str) -> tuple[dict[str, str], ...]:
-        """Opaque qualified source observations for an entity token."""
+    def observations(self, entity: Hashable) -> tuple[object, ...]:
+        """Opaque revision-qualified evidence handles; () for a nonmember."""
 
     @abstractmethod
-    def reconstruct(self, observation: Mapping[str, str]) -> tuple[str, bool]:
+    def reconstruct(self, observation: object) -> tuple[str, bool]:
         """Reconstruct retained material as ``(material, verified)``.
 
-        Unverified observations yield ``("", False)``; no partial or
-        unqualified material is returned as usable.
+        The verification flag distinguishes failure from verified empty
+        material. Never represent mutable/unqualified material as verified.
         """
 
     @abstractmethod
     def verify(self) -> tuple[str, ...]:
-        """Violations of the declared retained-evidence guarantees."""
+        """Convenient composition of declared retained-guarantee checks.
+
+        R7 forces verification behavior; the migrated constructor does not
+        force this particular operation. Return violations, empty on success.
+        """
 
     def discover(
         self,
@@ -144,10 +154,12 @@ class ProgramBackend(ABC):
         label: str | None = None,
         kind: str | None = None,
         descriptor_contains: str | None = None,
-    ) -> tuple[str, ...]:
-        """Optional candidate lookup over display/identity metadata.
+    ) -> tuple[Hashable, ...]:
+        """Optional native-compatible discovery extension, outside core reads.
 
         Labels and descriptors are not identity. Backends without this
         service raise :class:`OptionalUnsupported` instead of guessing.
+        descriptor_contains is native compatibility vocabulary, not a core
+        backend requirement. Even unfiltered enumeration is optional.
         """
         raise OptionalUnsupported("label/identity discovery is not supported")
