@@ -1,7 +1,7 @@
 # Target Architecture v0 — Phase 5B: ProgramBackend extraction
 
-Status: corrected draft for one final Phase 5B closure review. PR #6 started
-at merged Phase 5A `8f296bbc`; the reviewed pre-correction head was
+Status: corrected draft with the final focused association closure patch.
+PR #6 started at merged Phase 5A `8f296bbc`; the reviewed pre-correction head was
 `1a152b71`. Phase 5A R1–R7 and its behavioral cases are unchanged. No Glean
 inspection/integration, kernel change, publication redesign, or merge occurs.
 
@@ -16,6 +16,10 @@ mandatory whole-universe/family enumeration, six native capability spellings,
 string-valued evidence, and two public state representations. It also found
 nonmember evidence access and adapter regressions hidden by test qualification.
 This correction changes those demonstrated issues without reopening Phase 5A.
+The final independent review found two remaining conformance gaps: valid
+evidence returned for the wrong member and valid qualification returned for
+the wrong family. The native paths already associated both correctly; this
+patch adds executable discriminators and controls without production changes.
 
 ## A. Forcing consumer and deletion
 
@@ -114,6 +118,14 @@ required core family. A missing/unreadable receipt or omitted requested native
 declaration fails qualification. Mechanical content reads may still work with
 no receipt, but cannot establish capability-qualified completeness.
 
+`CapabilityRead(F)` must qualify the requested family F. A valid COMPLETE
+declaration for another family does not satisfy that request. Native-adapter
+tests independently read `spine.code_structure` and `spine.calls` declarations
+from the producer receipt and compare normalized status, scope, basis and gaps.
+The scenario's qualifications differ despite both normalizing to COMPLETE;
+substitution in either direction is rejected. Native receipt IDs remain test
+setup vocabulary, not obligations of another backend.
+
 The migrated constructor does not infer exhaustive absence or consult the
 capability operation. Its existing empty-warrant behavior is preserved; it is
 not claimed to persist an additional capability-qualified negative conclusion.
@@ -134,6 +146,15 @@ snapshot's `source_state`, validates the locator, and reads retained bytes;
 wrong revision, damaged retention, or live-source substitution cannot verify.
 Thus source revision qualification lives in the opaque evidence handle plus
 backend reconstruction verification, not a universal descriptor accessor.
+
+`EvidenceRead(E)` must return evidence associated with the selected program
+manifestation E under the declared producer/evidence semantics. Valid retained
+evidence for another member is insufficient. A native-adapter test compares
+target and caller reconstruction with independently known source fragments
+from fixture setup. Their manifestations are distinguishable, and substituting
+the caller's verified evidence for the target fails the same assertion. The
+test passes handles unchanged to reconstruction and inspects no locator fields;
+it requires no evidence entity ID or new schema.
 
 `(material, verified)` is the retained simple API choice. Native failure returns
 `("", False)`; a valid empty extent returns `("", True)`. Consumers must check
@@ -176,8 +197,8 @@ and comparison remain explicitly test-side/native composition.
 | R2 observed state | One state token; evidence revision verified on reconstruction; requested scope/basis | Native descriptor inputs/losses/boundary; copied-artifact snapshot referent adaptation |
 | R3 membership/kind | Direct local membership and mechanical kind; nonmember reads/evidence empty | Qualified-entity envelope rejects contradictory occurrence/state context |
 | R4 context/facts | Scoped ancestor/site/subject reads with fixed roles and capability access | Test role-schema projection; optional discovery aggregation for old global test views |
-| R5 evidence | Member-only opaque handles, retained reconstruction, explicit verification failure | Native producer supplies evidence; test fixture damages retained inputs |
-| R6 honesty | Requested-family status/scope/basis/gaps; optional production distinguished from complete-empty | Native test witness family, optional descriptor/boundary disclosures |
+| R5 evidence | Opaque handles associated with the selected member, retained reconstruction, explicit verification failure | Native producer supplies evidence; fixture independently specifies expected fragments and damages retained inputs |
+| R6 honesty | Status/scope/basis/gaps associated with the requested family; optional production distinguished from complete-empty | Independent native producer declarations, optional descriptor/boundary disclosures |
 | R7 history/verification | Stable reopened scoped facts, capabilities, observations; reconstruction and verify | Exact reopening/retention, publication qualification, fingerprints, optional native comparison |
 
 These are conformance of the reader plus its declared composition, not a claim
@@ -187,10 +208,32 @@ membership, producer-recorded state, invalid state qualification, nonmember
 evidence, historical scoped reads, requested capability, wrong revision,
 retained corruption, and missing-receipt qualification.
 
-Eight durable dishonest-adapter controls require behavioral assertions to
+The production proof distinguishes four dimensions of qualification:
+
+| Dimension | Required association |
+| --- | --- |
+| Occurrence/state/member qualification | The opened occurrence, recorded state and local member |
+| Structural association | The requested entity's context, call site or resolution subject |
+| Evidence association | The selected member's independently expected manifestation |
+| Capability association | The requested family's producer qualification |
+
+Individually valid returned values can still be wrong for the request. The
+last two dimensions add no public machinery and leave Phase 5A unchanged.
+
+Ten durable dishonest-adapter behaviors require assertions to
 reject occurrence-insensitive membership, incorrect state identity, nonmember
 evidence leakage, signature-as-module ancestor, unsupported-as-complete,
-latest substitution, ignored revision, and mutable-live evidence fallback.
+latest substitution, ignored revision, mutable-live evidence fallback,
+wrong-member valid evidence, and wrong-family valid qualification. There are
+eleven control cases because the final family substitution runs both directions.
+
+| Final association control | Durable rejecting discriminator |
+| --- | --- |
+| `observations(target)` returns the caller's valid retained evidence | `test_native_selected_member_evidence_matches_producer_manifestation`: reconstructed material equals the independent target fragment |
+| `capability(containment)` returns invocation qualification, or the inverse | `test_native_requested_family_capability_matches_producer_declaration`: full normalized qualification equals the requested producer declaration |
+
+The durable controls first establish that the substituted values are valid,
+then require those same behavioral assertions to reject the wrong association.
 
 ## G. Alternative-backend falsifier
 
@@ -250,20 +293,24 @@ possible without satisfying a new export obligation.
 
 ## J. Validation and verdict
 
-Correction validation (counts overlap; this is not the entire historical suite):
+Final focused closure validation (counts overlap; this is not the entire historical suite):
 
 | Check | Result |
 | --- | --- |
-| Production backend conformance | 45 passed: unchanged 22-case replay, 2 original migration cases, 21 corrective/direct/fake/mutant cases |
+| Production backend conformance | 50 passed: unchanged 22-case replay, 2 original migration cases, 26 corrective/direct/fake/mutant cases |
 | Phase 5A behavioral conformance | 22 passed, file unchanged |
 | Phase 4 vertical slice | 17 passed |
-| Combined reader / Phase 5A / Phase 4 command | 84 passed |
+| Combined reader / Phase 5A / Phase 4 command | 89 passed |
 | Authority/config, native spine/comparison, program/evidence regressions below | 225 passed |
-| Default gate | 203 passed, no skips |
+| Default gate | 208 passed, no skips |
 | Core acceptance separately | 18 passed |
 | Honest lazy core-only / produced-call variants | Both passed, with enumeration unavailable and discovery refused |
-| Dishonest adapter controls | All 8 rejected by direct behavioral assertions |
+| Dishonest adapter controls | All 10 behaviors rejected in 11 durable cases, including valid evidence/qualification associated with the wrong request |
+| Scoped review controls | Missing required ancestor, wrong call-site rows and wrong resolution subject still rejected by the direct historical-read assertions |
 | Frontend build / package build / diff whitespace | PASS; frontend build produced no tracked asset diff |
+
+Parallel local runs reported pytest temporary-directory cleanup warnings;
+the assertions passed.
 
 Reproduction:
 
@@ -295,5 +342,5 @@ READY FOR GLEAN CONFORMANCE
 ```
 
 This is readiness to test another backend, not a claim about Glean's architecture
-or conformance. The PR remains draft and unmerged for one final independent
-Phase 5B closure review. Native end-to-end composition debt in §I remains.
+or conformance. The PR remains draft and unmerged. Native end-to-end composition
+debt in §I remains.

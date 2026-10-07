@@ -24,7 +24,7 @@ from ontology_author.authority.construction import AuthorityConstructor
 from ontology_author.authority.lifecycle import make_writable_copy
 from ontology_author.evidence.program_source import program_source_observations
 from ontology_author.program_backend import (
-    CapabilityStatus, OccurrenceQualificationError, OptionalUnsupported, ProgramBackend,
+    Capability, CapabilityStatus, OccurrenceQualificationError, OptionalUnsupported, ProgramBackend,
 )
 from ontology_author.program_backend.native import NativeProgramBackend, _project_capability, open_native_occurrence
 from ontology_author.world.runtime.world import ConstructionWorld
@@ -340,6 +340,106 @@ def _assert_nonmember_evidence(reader, token):
 def _assert_not_produced(reader, family):
     capability = reader.capability(family)
     assert capability.status == CapabilityStatus.NOT_PRODUCED
+
+
+# Independent expected declaration extents from NativeFixture's "relations"
+# source setup. Never derive these from the observation/locator being tested.
+_NATIVE_RELATIONS_MATERIAL = {
+    "target": "function target(): void {}",
+    "caller": "export function caller(): void { target(); }",
+}
+
+
+def _assert_selected_member_evidence(reader, entity, expected_material):
+    observations = reader.observations(entity)
+    assert observations
+    reconstructed = tuple(reader.reconstruct(handle) for handle in observations)
+    assert all(verified for _, verified in reconstructed)
+    assert reconstructed == ((expected_material, True),), "evidence belongs to another member"
+    return reconstructed
+
+
+def _native_family_expectations(reference):
+    # Native-adapter test setup only: independently read the producer receipt,
+    # without calling capability() or the adapter's _project_capability helper.
+    receipt = json.loads((Path(reference.address) / "spine.construction.receipt.json").read_text())
+    declarations = {item["id"]: item for item in receipt["capabilities"]}
+    expected = {}
+    for family, native_id in (
+        ("containment", "spine.code_structure"),
+        ("invocation", "spine.calls"),
+    ):
+        declaration = declarations[native_id]
+        # This scenario produces complete structure and static-complete calls.
+        # The other normalized states retain their existing separate tests.
+        assert declaration["status"] in {"COMPLETE", "STATIC_COMPLETE"}
+        basis = declaration["completeness_basis"]
+        if declaration["status"] == "STATIC_COMPLETE":
+            basis += "; native qualification: STATIC_COMPLETE"
+        expected[family] = Capability(
+            CapabilityStatus.COMPLETE,
+            declaration["scope"],
+            basis,
+            tuple(declaration["known_gaps"]),
+        )
+    assert expected["containment"] != expected["invocation"]
+    return expected
+
+
+def _assert_requested_family_capability(reader, family, expected):
+    assert reader.capability(family) == expected, "qualification belongs to another family"
+
+
+def test_native_selected_member_evidence_matches_producer_manifestation(direct_occurrences):
+    producer, first, _, _, _ = direct_occurrences
+    target = _native_selected(producer, first, "target")
+    caller = _native_selected(producer, first, "caller")
+    assert target != caller
+    with open_native_occurrence(first.address) as reader:
+        assert reader.is_member(target) and reader.is_member(caller)
+        target_material = _assert_selected_member_evidence(reader, target, _NATIVE_RELATIONS_MATERIAL["target"])
+        caller_material = _assert_selected_member_evidence(reader, caller, _NATIVE_RELATIONS_MATERIAL["caller"])
+        assert target_material != caller_material
+
+
+def test_native_requested_family_capability_matches_producer_declaration(direct_occurrences):
+    _, first, _, _, _ = direct_occurrences
+    expected = _native_family_expectations(first)
+    with open_native_occurrence(first.address) as reader:
+        for family, qualification in expected.items():
+            _assert_requested_family_capability(reader, family, qualification)
+
+
+def test_native_evidence_association_rejects_valid_other_member(direct_occurrences, monkeypatch):
+    producer, first, _, _, _ = direct_occurrences
+    target = _native_selected(producer, first, "target")
+    caller = _native_selected(producer, first, "caller")
+    with open_native_occurrence(first.address) as reader:
+        assert reader.is_member(target) and reader.is_member(caller)
+        target_material = _assert_selected_member_evidence(reader, target, _NATIVE_RELATIONS_MATERIAL["target"])
+        caller_material = _assert_selected_member_evidence(reader, caller, _NATIVE_RELATIONS_MATERIAL["caller"])
+        assert target_material != caller_material
+        original = reader.observations
+        monkeypatch.setattr(reader, "observations", lambda entity: original(caller if entity == target else entity))
+        # The substituted evidence is valid and verified; only association is wrong.
+        assert tuple(reader.reconstruct(handle) for handle in reader.observations(target)) == caller_material
+        with pytest.raises(AssertionError, match="evidence belongs to another member"):
+            _assert_selected_member_evidence(reader, target, _NATIVE_RELATIONS_MATERIAL["target"])
+
+
+@pytest.mark.parametrize("family", ["containment", "invocation"])
+def test_native_capability_association_rejects_valid_other_family(direct_occurrences, monkeypatch, family):
+    _, first, _, _, _ = direct_occurrences
+    expected = _native_family_expectations(first)
+    other = "invocation" if family == "containment" else "containment"
+    with open_native_occurrence(first.address) as reader:
+        for requested, qualification in expected.items():
+            _assert_requested_family_capability(reader, requested, qualification)
+        original = reader.capability
+        monkeypatch.setattr(reader, "capability", lambda requested: original(other if requested == family else requested))
+        assert reader.capability(family) == expected[other]
+        with pytest.raises(AssertionError, match="qualification belongs to another family"):
+            _assert_requested_family_capability(reader, family, expected[family])
 
 
 def test_direct_membership_is_local_and_copies_share_only_local_tokens(direct_occurrences):
