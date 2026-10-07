@@ -3,9 +3,10 @@
 Reuses the production authority binding seam (``realized_by`` +
 SEMANTIC_PROGRAM + attachment warrant + relevance scope) over an exact
 program-spine baseline. The selected requirement must already be present
-with identical content in an exact semantic requirement publication; that
-occurrence is recorded in the construction basis. Program-entity selection
-is an explicit bounded construction decision, never automatic discovery.
+as an identical complete tuple in an exact semantic requirement
+publication; that occurrence is recorded in the construction basis.
+Program-entity selection is an explicit bounded construction decision,
+never automatic discovery.
 """
 
 from __future__ import annotations
@@ -29,19 +30,40 @@ from .semantic import materialize_requirements
 BINDING_METHOD = "config.routes.binding/v1:explicit-selected-realization"
 
 
-def _requirement_statements(reference: PublicationRef) -> dict[str, str]:
-    """Read requirement statements from one exact semantic publication."""
+def _selected_config_requirement(
+    reference: PublicationRef, selected: str
+) -> tuple[str, str, str, str]:
+    """Read one unambiguous selected requirement tuple from an exact publication.
+
+    Bounded ``config_routes`` rule: the selected requirement must appear as
+    exactly one ``config_requirement`` row. Same-ID duplicates fail closed.
+    """
     database = Path(reference.address) / "world.sqlite"
     try:
         with closing(ConstructionWorld.open(database, read_only=True)) as world:
-            return {
-                str(row["requirement"]): str(row["statement"])
-                for row in world.relation_rows("config_requirement")
-            }
+            matches = [
+                row for row in world.relation_rows("config_requirement")
+                if str(row["requirement"]) == selected
+            ]
     except Exception as exc:
         raise AuthorityConstructionError(
             f"semantic requirement publication is not readable as config requirements: {exc}"
         ) from exc
+    if not matches:
+        raise AuthorityConstructionError(
+            "selected requirement does not match the semantic requirement publication"
+        )
+    if len(matches) != 1:
+        raise AuthorityConstructionError(
+            "ambiguous selected requirement: multiple config_requirement rows share the selected ID"
+        )
+    row = matches[0]
+    return (
+        str(row["requirement"]),
+        str(row["statement"]),
+        str(row["domain_relation"]),
+        str(row["requested_route"]),
+    )
 
 
 def construct_config_binding(
@@ -58,8 +80,11 @@ def construct_config_binding(
     ``program_entity`` must already exist in the supplied program baseline's
     governed snapshot. ``semantic_inputs`` names exact requirement
     publications consumed as construction inputs; the first must contain the
-    selected requirement with identical statement text. When ``requirement``
-    is omitted, the source must materialize exactly one requirement.
+    selected requirement as exactly one ``config_requirement`` row with an
+    identical complete tuple (requirement, statement, domain_relation,
+    requested_route), compared by exact application-level equality. When
+    ``requirement`` is omitted, the source must materialize exactly one
+    requirement.
     """
     path = Path(governance_source)
     try:
@@ -99,12 +124,26 @@ def construct_config_binding(
                 )
             selected = requirement
         _, observation = by_semantic[selected]
-        statements = _requirement_statements(semantic_inputs[0])
-        expected = constructor.world.relation_rows("config_requirement")
-        statement = next(
-            row["statement"] for row in expected if row["requirement"] == selected
+        expected = [
+            row for row in constructor.world.relation_rows("config_requirement")
+            if str(row["requirement"]) == selected
+        ]
+        if not expected:
+            raise AuthorityConstructionError(
+                "selected requirement does not match the semantic requirement publication"
+            )
+        if len(expected) != 1:
+            raise AuthorityConstructionError(
+                "ambiguous requirement selection: re-materialized requirement is not unique"
+            )
+        source_tuple = (
+            str(expected[0]["requirement"]),
+            str(expected[0]["statement"]),
+            str(expected[0]["domain_relation"]),
+            str(expected[0]["requested_route"]),
         )
-        if statements.get(selected) != statement:
+        published_tuple = _selected_config_requirement(semantic_inputs[0], selected)
+        if published_tuple != source_tuple:
             raise AuthorityConstructionError(
                 "selected requirement does not match the semantic requirement publication"
             )

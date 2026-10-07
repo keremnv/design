@@ -135,21 +135,43 @@ fresh PublicationRef at a fresh address
 
 New code is one thin caller, `construct_config_binding`, plus sharing the
 requirement materialization helper with the Phase 3 entrypoint. The
-constructor additionally requires the selected requirement to be present
-with identical statement text in the first exact semantic input (W0),
-which makes "judgment over W0" load-bearing at construction time while
+constructor additionally requires the selected requirement to match the
+first exact semantic input (W0) as a complete application tuple by exact
+equality:
+
+```text
+R_W0 = (requirement, statement, domain_relation, requested_route)
+R_binding-source = (requirement, statement, domain_relation, requested_route)
+construction proceeds only when R_W0 = R_binding-source
+```
+
+The selected requirement must appear as exactly one `config_requirement`
+row in the semantic input; same-ID duplicates fail closed. No fuzzy
+equivalence or semantic inference is used. This bounded `config_routes`
+rule makes "judgment over W0" load-bearing at construction time while
 keeping the retained bundle self-contained: support stays W1-local, and
 the basis entry grants no support (Phase 3 invariant preserved, Case L).
+
+Content equivalence and occurrence identity stay distinct: independently
+published equivalent W0s and equivalent copied W0s at other addresses are
+accepted when their selected tuple is exactly equivalent, while the
+consumed occurrence is still recorded through its own exact
+`PublicationRef(address, world_id, revision)`. Additional exact
+publications beyond the first semantic input remain admitted
+ConstructionBasis material only; basis membership does not become
+semantic support.
 
 ## F. Historical behavior
 
 W1 is built over the P1 baseline with W0 as an exact publication input;
 W2 is built fresh over the P2 baseline with W0 as input — never by copying
-W1 and swapping an id. Fingerprint comparisons prove W0, P1 and W1 are
-byte-identical after every later stage, W1 still binds E1 after W2 exists,
-and W2 binds E2. Neither binding publication asserts supersession,
-correction, obsolescence or currentness (relation-name sweeps in Cases C,
-H, I, K). W1 and W2 coexist as independent judgments:
+W1 and swapping an id, and never with W1 as a dependency (Case Q builds
+W2 while W1 is moved away; the W2 basis is exactly [W0, P2]).
+Fingerprint plus test-local recursive bundle-hash comparisons prove W0,
+P1 and W1 are byte-identical after every later stage, W1 still binds E1
+after W2 exists, and W2 binds E2. Neither binding publication asserts
+supersession, correction, obsolescence or currentness (relation-name
+sweeps in Cases C, H, I, K). W1 and W2 coexist as independent judgments:
 `W1 = judgment over W0 + P1`, `W2 = judgment over W0 + P2`.
 
 ## G. Program change behavior
@@ -169,9 +191,10 @@ reconsideration." It explicitly did NOT establish: that W1 is invalid,
 that E1 and E2 are identical, that W1 must be rebound, or that W2 exists.
 Comparison is a pure read: P1/P2/W1 fingerprints are unchanged by it, no
 correspondence is written into any world, and W1 still verifies (Case G).
-`affected ≠ relevant ≠ invalid ≠ false` is preserved: before W2 exists,
-the state is exactly "W1 judges P1; P2 exists; no W2 judgment published"
-(Case K).
+It is a demonstrated optional reconsideration capability, not required
+to construct W2. `affected ≠ relevant ≠ invalid ≠ false` is preserved:
+before W2 exists, the state is exactly "W1 judges P1; P2 exists; no W2
+judgment published" (Case K).
 
 ## H. Provenance/reconstruction
 
@@ -205,17 +228,23 @@ not an interface.
    Qualification: fresh address; receipt names snapshot id and digests.
 
 2. Open an exact retained publication and read its identity.
-   Why: qualify W0/P1/P2 occurrences; read W0 requirement content.
+   Why: qualify W0/P1/P2 occurrences as exact publication inputs.
    Surface: ConstructionWorld.open(read_only) + PublicationRef.from_world /
    verify_publication_ref + relation_rows.
    Qualification: (address, world_id, revision) triple; P1/P2 share
    world_id/revision, so address is load-bearing.
+   Boundary: the future ProgramBackend demand is opening/qualifying an
+   exact program publication. Reading W0's config_requirement tuple is
+   semantic/application work, not a ProgramBackend responsibility.
 
 3. Enumerate program entities with kind and mechanical label.
    Why: discover the E1/E2 callable without manufacturing ids.
    Surface: program_entity_kind rows + _world_referents labels;
    constructor-side AuthorityConstructor.program_entities(kind, label).
    Qualification: rows are snapshot-local; ids embed the snapshot id.
+   Boundary: entity membership/lookup is the demonstrated demand;
+   label-based discovery is optional — an externally supplied exact
+   entity id could avoid it.
 
 4. Read one snapshot's identity and revision.
    Why: bind and verify against an exact snapshot, not "the program".
@@ -242,18 +271,25 @@ not an interface.
    (outcome/basis_class/continuity/changes/limitations) + program_delta.
    Qualification: correspondence is HEURISTIC, qualified per claim, and
    explicitly not identity; E1 ≠ E2 always.
+   Boundary: demonstrated optional reconsideration capability; not
+   required to construct W2.
 
 8. Verify retained program evidence closure of a bundle.
    Why: admission and retained verification of P1/P2/W1/W2.
    Surface: evidence.program_source.verify_retained_program_inputs.
    Qualification: every TypeScript SOURCE grounding must reconstruct
    from that bundle's own blobs.
+   Boundary: retained SOURCE evidence closure does not imply arbitrary
+   attachment-warrant semantic/internal-consistency verification.
 ```
 
 ## J. Architectural pressure discovered
 
-No actual blockers. The slice ran entirely on existing production
-surfaces. Two observations for future optimization (not gaps):
+The slice ran entirely on existing production surfaces. Adversarial
+review found one material Phase 4 blocker — semantic qualification
+compared only (requirement, statement) — fixed by the complete-tuple
+rule in §E with regressions in §K. Two observations for future
+optimization (not gaps):
 
 ```text
 - Retained-world entity discovery hand-joins program_entity_kind with
@@ -265,6 +301,20 @@ surfaces. Two observations for future optimization (not gaps):
   construction_id and the (address, world_id, revision) triple do.
   Observed behavior, worked without confusion. Not a problem to solve.
 ```
+
+Inherited verification-coverage limitation (not a Phase 4 regression,
+not fixed here): a manually supplied inconsistent attachment warrant
+can be accepted/verified in cases such as a nonexistent
+`structural_context` entity, or a claim endpoint recorded
+AGENT_RESOLVED while the warrant endpoint resolution is UNRESOLVED.
+This reproduces on both base `main` and the Phase 4 head. The Phase 4
+config-routes caller uses the existing generated default warrant, and
+the review found its generated W1/W2 warrants internally consistent.
+The reused authority seam is therefore NOT claimed to mechanically
+verify every possible caller-supplied warrant field; retained SOURCE
+evidence closure does not imply arbitrary warrant
+semantic/internal-consistency verification. No new warrant engine or
+ProgramWitness is introduced.
 
 Nothing in the slice required teaching the spine business concepts,
 adding explorer/SQL APIs, or generalizing any engine.
@@ -280,15 +330,30 @@ B  P1 mechanical-only          real callable; evidence reconstructs; no semantic
 C  W1 exact binding            basis [W0,P1]; warrant names snapshot/E1; both sides reconstruct
 D  substitution rejected       wrong entity/snapshot, wrong W0 revision, mismatched W0
                                content fail closed; copied bytes identify the copy
-E  P2 fresh/distinguishable    P1 unchanged; E1≠E2; address distinguishes occurrences
-F  W1 does not move            fingerprint stable; still binds E1; no P2 content appears
+E  P2 fresh/distinguishable    P1 unchanged (captured before P2); E1≠E2; address distinguishes
+F  W1 does not move            fingerprint + recursive bundle hash stable across P2,
+                               comparison and W2; still binds E1; no P2 content appears
 G  mechanical signal            RENAME/HEURISTIC/CONTINUED read; nothing created or invalidated
 H  W2 fresh binding            basis [W0,P2]; binds E2; W1 still binds E1; both verify
 I  read matrix                  all five open independently with exact meanings
-J  workspace deletion           all reconstruction promises hold; P1/P2 bundles optional
+J  workspace deletion           all reconstruction promises hold (non-empty observations);
+                               P1/P2 bundles optional
 K  no absence inference         P2-without-W2 changes nothing about W1; no negative semantics
 L  basis≠binding                unselected callable/paragraph never become binding support
+M  wrong domain_relation       same ID/statement + changed domain_relation fails closed
+N  wrong requested_route       same ID/statement + changed requested_route fails closed
+O  duplicate selected row      same ID + conflicting second row fails closed
+P  equivalent W0 accepted      ordinary, independently published, and copied W0 succeed
+Q  W2 without W1               W0+P2 build W2 while W1 is moved; basis has no W1
 ```
+
+Cases E, F, G, J and K were strengthened after adversarial review:
+P1/W1 immutability is captured before the later stage and checked with a
+test-local recursive bundle hash; comparison asserts CONTINUED;
+reconstruction asserts non-empty observations before `all(...)`; W2
+independence is proven with W1 moved away. Cases M–O use production
+authority APIs to publish adversarial semantic inputs and verify no
+output or candidate residue survives.
 
 ## L. Scope exclusions
 
@@ -308,15 +373,16 @@ workflow / reconsideration / case orchestration engines
 ```
 
 The change is one config-routes caller (`construct_config_binding`), one
-shared materialization helper, twelve integration tests, and this report.
+shared materialization helper, seventeen integration tests, and this report.
 The coupled `construct_config_world` path and all historical
 config-routes/governance experiments are untouched. No abstraction was
-added that the slice did not demonstrate necessary.
+added that the slice did not demonstrate necessary. This remains a
+capability-demand ledger, not a ProgramBackend protocol.
 
 ## M. Final verdict
 
 > Does the repository now demonstrate one complete production-backed flow in which semantic information exists before code, is later bound to exact mechanically observed program state, survives program evolution as historical judgment, and can be freshly reconstructed against a new program snapshot without mutation, implicit currentness or automatic semantic inference?
 
 ```text
-YES — VERTICAL SLICE COMPLETE; READY TO EXTRACT PROGRAMBACKEND CONTRACT
+YES — VERTICAL SLICE COMPLETE; READY TO EXTRACT PROGRAMBACKEND REQUIREMENTS
 ```

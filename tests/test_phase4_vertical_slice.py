@@ -2,15 +2,27 @@
 
 from __future__ import annotations
 
+import hashlib
 import shutil
 from contextlib import closing
 from dataclasses import replace
 from pathlib import Path
 
-from ontology_author.authority import load_receipt, verify_authority_publication
+from ontology_author.authority import (
+    AuthorityUniverse,
+    ClaimKind,
+    DeclaredSource,
+    ReferentResolution,
+    RelationSupport,
+    SourceStanding,
+    construct_authority_world,
+    load_receipt,
+    verify_authority_publication,
+)
 from ontology_author.authority import observations_for_assertion
 from ontology_author.authority.evidence import reconstruct_authority_observation
 from ontology_author.config_routes import construct_config_binding, construct_config_requirements
+from ontology_author.config_routes.rules import PROFILE_ID, PROFILE_VERSION
 from ontology_author.construction_boundary import support_paths_for_assertion
 from ontology_author.evidence.program_source import (
     program_source_observations,
@@ -18,6 +30,7 @@ from ontology_author.evidence.program_source import (
     verify_retained_program_inputs,
 )
 from ontology_author.program_spine import compare_spines
+from ontology_author.world.core.model import Role, RoleType
 from ontology_author.world.runtime.commit import fingerprint_world
 from ontology_author.world.runtime.publication import PublicationRef, verify_publication_ref
 from ontology_author.world.runtime.world import ConstructionWorld
@@ -130,6 +143,92 @@ def _bundle_bytes(bundle: Path) -> bytes:
     return b"".join(
         path.read_bytes() for path in sorted(bundle.rglob("*")) if path.is_file()
     )
+
+
+def _hash_tree(root: Path) -> dict[str, str]:
+    """Test-local recursive bundle hash covering nested retained evidence."""
+    return {
+        str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(p for p in root.rglob("*") if p.is_file())
+    }
+
+
+def _assert_no_output(root: Path, output: Path) -> None:
+    assert not output.exists()
+    assert not list(root.glob(f".{output.name}.candidate-*"))
+    assert not list(root.glob(".*.candidate-*"))
+
+
+def _adversarial_requirement_world(
+    root: Path,
+    output_name: str,
+    rows: list[tuple[str, str, str, str]],
+    *,
+    gov_name: str = "gov-adv",
+) -> PublicationRef:
+    """Publish a semantic W0-shaped world through production authority APIs.
+
+    Each row is (requirement, statement, domain_relation, requested_route).
+    All rows share the governance paragraph observation so the publication
+    passes retained verification; content may still be adversarial.
+    """
+    gov = root / gov_name
+    gov.mkdir(parents=True, exist_ok=True)
+    (gov / "policy.md").write_text(REQUIREMENT + "\n")
+    path = gov / "policy.md"
+    universe = AuthorityUniverse(
+        universe_id="config.routes/requirements/v1",
+        workspace=gov,
+        sources=(DeclaredSource(path.name, path, SourceStanding.AUTHORITATIVE),),
+    )
+
+    def build(constructor):
+        source = constructor.source(path.name)
+        observation = source.observe(source.paragraphs()[0])
+        created: set[str] = set()
+        for requirement, statement, domain_relation, requested_route in rows:
+            if requirement not in created:
+                constructor.create_semantic_referent(
+                    requirement, label=statement, observations=(observation,)
+                )
+                created.add(requirement)
+            constructor.persist_claim(
+                "config_requirement",
+                {
+                    "requirement": requirement,
+                    "statement": statement,
+                    "domain_relation": domain_relation,
+                    "requested_route": requested_route,
+                },
+                roles=(
+                    Role("requirement", RoleType.REFERENT),
+                    Role("statement", RoleType.TEXT),
+                    Role("domain_relation", RoleType.TEXT),
+                    Role("requested_route", RoleType.TEXT),
+                ),
+                claim_kind=ClaimKind.SOURCE_PROPOSITION,
+                support=RelationSupport.SOURCE_EXPLICIT,
+                endpoint_resolution={"requirement": ReferentResolution.SOURCE_DEFINED},
+                observations=(observation,),
+                construction_method="config.routes.proposition/v1:specific",
+            )
+
+    result = construct_authority_world(
+        None,
+        root / output_name,
+        universe,
+        build,
+        construction_id="config.routes/requirements/v1",
+        purpose="config requirements",
+        profile=PROFILE_ID,
+        constructor_id="config.routes.requirements",
+        constructor_version=PROFILE_VERSION,
+    )
+    assert result.succeeded, result.errors
+    with closing(ConstructionWorld.open(root / output_name / "world.sqlite")) as world:
+        assert verify_authority_publication(world) == []
+    assert result.publication is not None
+    return result.publication
 
 
 def test_case_a_w0_is_semantic_only(tmp_path):
@@ -263,9 +362,12 @@ def test_case_d_exact_substitution_fails_closed(tmp_path):
 
 
 def test_case_e_p2_is_fresh_and_distinguishable(tmp_path):
-    built = _build_slice(tmp_path, through="P2")
-    before = fingerprint_world(tmp_path / "P1")
-    assert fingerprint_world(tmp_path / "P1") == before
+    built = _stage_w1(tmp_path)
+    p1_fingerprint_before = fingerprint_world(tmp_path / "P1")
+    p1_tree_before = _hash_tree(tmp_path / "P1")
+    _stage_p2(tmp_path, built)
+    assert fingerprint_world(tmp_path / "P1") == p1_fingerprint_before
+    assert _hash_tree(tmp_path / "P1") == p1_tree_before
     assert built["P1"].address != built["P2"].address
     assert built["E1"] != built["E2"]
     with closing(ConstructionWorld.open(tmp_path / "P1" / "world.sqlite")) as old:
@@ -281,9 +383,16 @@ def test_case_e_p2_is_fresh_and_distinguishable(tmp_path):
 def test_case_f_w1_does_not_move(tmp_path):
     built = _stage_w1(tmp_path)
     before = fingerprint_world(tmp_path / "W1")
+    tree_before = _hash_tree(tmp_path / "W1")
     _stage_p2(tmp_path, built)
+    assert fingerprint_world(tmp_path / "W1") == before
+    assert _hash_tree(tmp_path / "W1") == tree_before
+    compare_spines(tmp_path / "P1", tmp_path / "P2")
+    assert fingerprint_world(tmp_path / "W1") == before
+    assert _hash_tree(tmp_path / "W1") == tree_before
     _stage_w2(tmp_path, built)
     assert fingerprint_world(tmp_path / "W1") == before
+    assert _hash_tree(tmp_path / "W1") == tree_before
     with closing(ConstructionWorld.open(tmp_path / "W1" / "world.sqlite")) as world:
         assert world.relation_rows("realized_by")[0]["program"] == built["E1"]
         assert verify_authority_publication(world) == []
@@ -295,6 +404,9 @@ def test_case_g_mechanical_reconsideration_signal(tmp_path):
     before = {
         name: fingerprint_world(tmp_path / name) for name in ("P1", "P2", "W1")
     }
+    trees_before = {
+        name: _hash_tree(tmp_path / name) for name in ("P1", "P2", "W1")
+    }
     result = compare_spines(tmp_path / "P1", tmp_path / "P2")
     payload = result.to_dict()
     rename = [
@@ -305,12 +417,15 @@ def test_case_g_mechanical_reconsideration_signal(tmp_path):
     assert rename[0]["new_entity"] == built["E2"]
     assert rename[0]["outcome"] == "RENAME"
     assert rename[0]["basis_class"] == "HEURISTIC"
+    assert rename[0]["continuity"] == "CONTINUED"
     assert rename[0]["limitations"]
     assert rename[0]["old_entity"] != rename[0]["new_entity"]
     for claim in payload["correspondence_claims"]:
         assert claim["outcome"] not in {"INVALID", "FALSE", "SUPERSEDED", "REBOUND"}
     for name, fingerprint in before.items():
         assert fingerprint_world(tmp_path / name) == fingerprint
+    for name, tree in trees_before.items():
+        assert _hash_tree(tmp_path / name) == tree
     with closing(ConstructionWorld.open(tmp_path / "W1" / "world.sqlite")) as world:
         assert world.relation_rows("realized_by")[0]["program"] == built["E1"]
         assert verify_authority_publication(world) == []
@@ -383,15 +498,19 @@ def test_case_j_reconstruction_after_workspace_deletion(tmp_path):
         )[0].strip() == REQUIREMENT
     with closing(ConstructionWorld.open(tmp_path / "P1" / "world.sqlite")) as world:
         assert verify_retained_program_inputs(world) == []
+        p1_obs = program_source_observations(world, built["E1"])
+        assert p1_obs
         assert all(
             reconstruct_program_observation(world, item)[1] == "OK"
-            for item in program_source_observations(world, built["E1"])
+            for item in p1_obs
         )
     with closing(ConstructionWorld.open(tmp_path / "P2" / "world.sqlite")) as world:
         assert verify_retained_program_inputs(world) == []
+        p2_obs = program_source_observations(world, built["E2"])
+        assert p2_obs
         assert all(
             reconstruct_program_observation(world, item)[1] == "OK"
-            for item in program_source_observations(world, built["E2"])
+            for item in p2_obs
         )
     for name, entity in (("W1", built["E1"]), ("W2", built["E2"])):
         with closing(ConstructionWorld.open(tmp_path / name / "world.sqlite")) as world:
@@ -405,9 +524,11 @@ def test_case_j_reconstruction_after_workspace_deletion(tmp_path):
             assert reconstruct_authority_observation(
                 world, observations_for_assertion(world, aid)[0]
             )[0].strip() == REQUIREMENT
+            binding_obs = program_source_observations(world, entity)
+            assert binding_obs
             assert all(
                 reconstruct_program_observation(world, item)[1] == "OK"
-                for item in program_source_observations(world, entity)
+                for item in binding_obs
             )
     # Program publications are also unnecessary for binding verification.
     shutil.move(str(tmp_path / "P1"), str(tmp_path / "P1.moved"))
@@ -415,17 +536,21 @@ def test_case_j_reconstruction_after_workspace_deletion(tmp_path):
     for name, entity in (("W1", built["E1"]), ("W2", built["E2"])):
         with closing(ConstructionWorld.open(tmp_path / name / "world.sqlite")) as world:
             assert verify_authority_publication(world) == []
+            moved_obs = program_source_observations(world, entity)
+            assert moved_obs
             assert all(
                 reconstruct_program_observation(world, item)[1] == "OK"
-                for item in program_source_observations(world, entity)
+                for item in moved_obs
             )
 
 
 def test_case_k_no_absence_inference_before_w2(tmp_path):
     built = _stage_w1(tmp_path)
     before = fingerprint_world(tmp_path / "W1")
+    tree_before = _hash_tree(tmp_path / "W1")
     _stage_p2(tmp_path, built)
     assert fingerprint_world(tmp_path / "W1") == before
+    assert _hash_tree(tmp_path / "W1") == tree_before
     with closing(ConstructionWorld.open(tmp_path / "W1" / "world.sqlite")) as world:
         assert world.relation_rows("realized_by")[0]["program"] == built["E1"]
         assert verify_authority_publication(world) == []
@@ -463,3 +588,147 @@ def test_case_l_basis_does_not_become_binding(tmp_path):
         assert reconstruct_authority_observation(world, flat[0])[0].strip() == REQUIREMENT
         gaps = world.relation_rows("authority_unresolved")
         assert len(gaps) == 1 and gaps[0]["kind"] == "UNBOUND_REGION"
+
+
+def test_semantic_tuple_wrong_domain_relation_fails_closed(tmp_path):
+    built = _stage_w1(tmp_path)
+    gov_policy = built["gov"] / "policy.md"
+    adversarial = _adversarial_requirement_world(
+        tmp_path,
+        "W0adv",
+        [(SEMANTIC_ID, REQUIREMENT, "audit_log_route", "customer-export")],
+        gov_name="gov-adv-domain",
+    )
+    bad = construct_config_binding(
+        gov_policy,
+        tmp_path / "P1",
+        tmp_path / "BAD_DOMAIN",
+        program_entity=built["E1"],
+        semantic_inputs=(adversarial,),
+    )
+    assert not bad.succeeded
+    _assert_no_output(tmp_path, tmp_path / "BAD_DOMAIN")
+
+
+def test_semantic_tuple_wrong_requested_route_fails_closed(tmp_path):
+    built = _stage_w1(tmp_path)
+    gov_policy = built["gov"] / "policy.md"
+    adversarial = _adversarial_requirement_world(
+        tmp_path,
+        "W0adv",
+        [(SEMANTIC_ID, REQUIREMENT, "customer_export_route", "audit-log")],
+        gov_name="gov-adv-route",
+    )
+    bad = construct_config_binding(
+        gov_policy,
+        tmp_path / "P1",
+        tmp_path / "BAD_ROUTE",
+        program_entity=built["E1"],
+        semantic_inputs=(adversarial,),
+    )
+    assert not bad.succeeded
+    _assert_no_output(tmp_path, tmp_path / "BAD_ROUTE")
+
+
+def test_semantic_tuple_conflicting_duplicate_fails_closed(tmp_path):
+    built = _stage_w1(tmp_path)
+    gov_policy = built["gov"] / "policy.md"
+    adversarial = _adversarial_requirement_world(
+        tmp_path,
+        "W0adv",
+        [
+            (SEMANTIC_ID, REQUIREMENT, "customer_export_route", "customer-export"),
+            (SEMANTIC_ID, REQUIREMENT, "customer_export_route", "audit-log"),
+        ],
+        gov_name="gov-adv-dup",
+    )
+    with closing(ConstructionWorld.open(tmp_path / "W0adv" / "world.sqlite")) as world:
+        assert len(world.relation_rows("config_requirement")) == 2
+    bad = construct_config_binding(
+        gov_policy,
+        tmp_path / "P1",
+        tmp_path / "BAD_DUP",
+        program_entity=built["E1"],
+        semantic_inputs=(adversarial,),
+    )
+    assert not bad.succeeded
+    _assert_no_output(tmp_path, tmp_path / "BAD_DUP")
+
+
+def test_semantic_tuple_equivalent_publications_accepted(tmp_path):
+    built = _stage_w1(tmp_path)
+    gov_policy = built["gov"] / "policy.md"
+    # Ordinary Phase 3 W0 already backed W1 above; re-bind to confirm.
+    _bind(gov_policy, tmp_path / "P1", tmp_path / "W1again", built["E1"], built["W0"].publication)
+    # Independently published equivalent W0 from the same bytes.
+    second_gov = tmp_path / "gov-second"
+    second_gov.mkdir()
+    (second_gov / "policy.md").write_text(REQUIREMENT + "\n")
+    second_w0 = construct_config_requirements(second_gov / "policy.md", tmp_path / "W0second")
+    assert second_w0.succeeded, second_w0.errors
+    assert second_w0.publication.address != built["W0"].publication.address
+    with closing(ConstructionWorld.open(tmp_path / "W0second" / "world.sqlite")) as world:
+        assert world.relation_rows("config_requirement") == [
+            {
+                "requirement": SEMANTIC_ID,
+                "statement": REQUIREMENT,
+                "domain_relation": "customer_export_route",
+                "requested_route": "customer-export",
+            }
+        ]
+    _bind(gov_policy, tmp_path / "P1", tmp_path / "W1second", built["E1"], second_w0.publication)
+    second_record = load_receipt(tmp_path / "W1second" / "authority.construction.receipt.json")
+    assert second_w0.publication.as_dict() in second_record.construction_basis["publications"]
+    # Equivalent copied W0 at another exact address.
+    shutil.copytree(tmp_path / "W0", tmp_path / "W0copy")
+    for path in (tmp_path / "W0copy", *(tmp_path / "W0copy").rglob("*")):
+        path.chmod(path.stat().st_mode | (0o700 if path.is_dir() else 0o600))
+    with closing(ConstructionWorld.open(tmp_path / "W0copy" / "world.sqlite")) as world:
+        copy_ref = PublicationRef.from_world(world)
+    assert copy_ref.address != built["W0"].publication.address
+    assert (copy_ref.world_id, copy_ref.revision) == (
+        built["W0"].publication.world_id,
+        built["W0"].publication.revision,
+    )
+    _bind(gov_policy, tmp_path / "P1", tmp_path / "W1copy", built["E1"], copy_ref)
+    copy_record = load_receipt(tmp_path / "W1copy" / "authority.construction.receipt.json")
+    assert copy_ref.as_dict() in copy_record.construction_basis["publications"]
+    with closing(ConstructionWorld.open(tmp_path / "W1copy" / "world.sqlite")) as world:
+        assert verify_authority_publication(world) == []
+        assert world.relation_rows("realized_by") == [
+            {"requirement": SEMANTIC_ID, "program": built["E1"]}
+        ]
+
+
+def test_w2_without_w1_available(tmp_path):
+    built = _stage_w1(tmp_path)
+    _stage_p2(tmp_path, built)
+    gov_policy = built["gov"] / "policy.md"
+    shutil.move(str(tmp_path / "W1"), str(tmp_path / "W1.moved"))
+    assert not (tmp_path / "W1").exists()
+    result = construct_config_binding(
+        gov_policy,
+        tmp_path / "P2",
+        tmp_path / "W2",
+        program_entity=built["E2"],
+        semantic_inputs=(built["W0"].publication,),
+    )
+    assert result.succeeded, result.errors
+    record = load_receipt(tmp_path / "W2" / "authority.construction.receipt.json")
+    assert sorted(
+        (pub["address"], pub["world_id"], pub["revision"])
+        for pub in record.construction_basis["publications"]
+    ) == sorted([
+        (built["W0"].publication.address, built["W0"].publication.world_id, built["W0"].publication.revision),
+        (built["P2"].address, built["P2"].world_id, built["P2"].revision),
+    ])
+    assert "W1" not in "".join(pub["address"] for pub in record.construction_basis["publications"])
+    with closing(ConstructionWorld.open(tmp_path / "W2" / "world.sqlite")) as world:
+        assert verify_authority_publication(world) == []
+        assert world.relation_rows("realized_by") == [
+            {"requirement": SEMANTIC_ID, "program": built["E2"]}
+        ]
+    with closing(ConstructionWorld.open(tmp_path / "W1.moved" / "world.sqlite")) as world:
+        assert world.relation_rows("realized_by") == [
+            {"requirement": SEMANTIC_ID, "program": built["E1"]}
+        ]
