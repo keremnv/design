@@ -278,7 +278,7 @@ def test_added_and_removed_identities_are_delta_membership(tmp_path):
         _close(old_world, new_world)
 
     _, _, _, old_world, new_world = _pair(
-        tmp_path,
+        tmp_path / "removed",
         {"src/index.ts": "export function oldHelper(): void {}\n"},
         {"src/index.ts": "export function replacement(): number { return 1; }\n"},
     )
