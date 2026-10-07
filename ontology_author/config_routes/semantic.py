@@ -13,10 +13,52 @@ from ontology_author.authority import (
     ClaimKind, DeclaredSource, ReferentResolution, RelationSupport,
     SourceStanding, UnresolvedKind, construct_authority_world,
 )
+from ontology_author.evidence.markdown import MarkdownSource
 from ontology_author.world.core.model import Role, RoleType
+from ontology_author.world.core.source import SourceObservation
 
 from .construct import _acquire_governance
 from .rules import PROFILE_ID, PROFILE_VERSION, extract_propositions
+
+
+def materialize_requirements(constructor, source: MarkdownSource) -> dict[str, tuple[str, SourceObservation]]:
+    """Persist config requirements and unresolved records from one source.
+
+    Returns ``proposition_id -> (semantic_id, support observation)`` so later
+    bindings can select an explicitly materialized requirement. A source with
+    no representable requirements fails closed.
+    """
+    regions = source.paragraphs()
+    paragraphs = [(source.reconstruct(region).strip(), index) for index, region in enumerate(regions)]
+    propositions, unsupported = extract_propositions(paragraphs)
+    if not propositions:
+        raise AuthorityConstructionError("representational gap: no supported config.routes/v1 requirement")
+    observations = {text: source.observe(regions[index]) for text, index in paragraphs}
+    materialized: dict[str, tuple[str, SourceObservation]] = {}
+    for item in propositions:
+        observation = observations[item.statement]
+        semantic_id = "semantic:" + item.proposition_id
+        constructor.create_semantic_referent(
+            semantic_id, label=item.statement, observations=(observation,),
+        )
+        constructor.persist_claim(
+            "config_requirement",
+            {"requirement": semantic_id, "statement": item.statement,
+             "domain_relation": item.domain_relation, "requested_route": item.route_id or ""},
+            roles=(Role("requirement", RoleType.REFERENT), Role("statement", RoleType.TEXT),
+                   Role("domain_relation", RoleType.TEXT), Role("requested_route", RoleType.TEXT)),
+            claim_kind=ClaimKind.SOURCE_PROPOSITION, support=RelationSupport.SOURCE_EXPLICIT,
+            endpoint_resolution={"requirement": ReferentResolution.SOURCE_DEFINED},
+            observations=(observation,), construction_method=item.establishment_rule,
+        )
+        materialized[item.proposition_id] = (semantic_id, observation)
+    for item in unsupported:
+        index = int(item["paragraph_index"])
+        constructor.persist_unresolved(
+            f"config.routes:unsupported:{index}", kind=UnresolvedKind.UNBOUND_REGION,
+            observation=source.observe(regions[index]), detail=item["reason"],
+        )
+    return materialized
 
 
 def construct_config_requirements(
@@ -40,35 +82,7 @@ def construct_config_requirements(
     )
 
     def build(constructor):
-        source = constructor.source(path.name)
-        regions = source.paragraphs()
-        paragraphs = [(source.reconstruct(region).strip(), index) for index, region in enumerate(regions)]
-        propositions, unsupported = extract_propositions(paragraphs)
-        if not propositions:
-            raise AuthorityConstructionError("representational gap: no supported config.routes/v1 requirement")
-        observations = {text: source.observe(regions[index]) for text, index in paragraphs}
-        for item in propositions:
-            observation = observations[item.statement]
-            semantic_id = "semantic:" + item.proposition_id
-            constructor.create_semantic_referent(
-                semantic_id, label=item.statement, observations=(observation,),
-            )
-            constructor.persist_claim(
-                "config_requirement",
-                {"requirement": semantic_id, "statement": item.statement,
-                 "domain_relation": item.domain_relation, "requested_route": item.route_id or ""},
-                roles=(Role("requirement", RoleType.REFERENT), Role("statement", RoleType.TEXT),
-                       Role("domain_relation", RoleType.TEXT), Role("requested_route", RoleType.TEXT)),
-                claim_kind=ClaimKind.SOURCE_PROPOSITION, support=RelationSupport.SOURCE_EXPLICIT,
-                endpoint_resolution={"requirement": ReferentResolution.SOURCE_DEFINED},
-                observations=(observation,), construction_method=item.establishment_rule,
-            )
-        for item in unsupported:
-            index = int(item["paragraph_index"])
-            constructor.persist_unresolved(
-                f"config.routes:unsupported:{index}", kind=UnresolvedKind.UNBOUND_REGION,
-                observation=source.observe(regions[index]), detail=item["reason"],
-            )
+        materialize_requirements(constructor, constructor.source(path.name))
 
     return construct_authority_world(
         None, output, universe, build,
