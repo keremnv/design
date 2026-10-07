@@ -507,14 +507,17 @@ matching can still emit heuristic candidates/claims under that explicitly
 incompatible context; it does not universally refuse the comparison. Individual
 incomparable capabilities are reported even if other comparison remains useful.
 
-Transferable optional comparison semantics (backend-neutral) require only
-that a comparison service operates over exact caller-qualified old/new
-occurrences, declares compatibility/refusal honestly, exposes the epistemic
-basis it actually claims, preserves ambiguity when its own result is ambiguous,
-does not collapse correspondence into identity, and does not mutate historical
-occurrences. A valid future backend need not manufacture `HEURISTIC /
-CONTINUED / RENAME` if it supports only different justified
-correspondence/change evidence.
+Transferable optional comparison semantics (backend-neutral) allow a service
+to return qualified correspondence OR explicitly declare correspondence
+unsupported/refused, provided it remains honest: old/new exact contexts stay
+known; compatibility/refusal is explicit; mechanical changes are qualified if
+exposed; correspondence basis is exposed if correspondence is claimed;
+correspondence never becomes identity; service-reported ambiguity is preserved;
+unsupported/refused correspondence is never translated to "no change"; and
+neither historical occurrence is mutated. A valid future backend need not
+manufacture `HEURISTIC / CONTINUED / RENAME`, discover ambiguity, or produce
+any correspondence claim; honest `UNSUPPORTED` and nonunique-refusal results
+are conformant.
 
 Native comparison regression (algorithm-specific, still tested): native rename
 correspondence is `HEURISTIC`, with mechanical supporting rules, changes and
@@ -583,34 +586,52 @@ remain the actual implementations under test.
 | `evidence_verifies_qualification_and_retained_closure` (missing/corrupt) | Accept wrong evidence revision; use live workspace to replace missing/tampered retained bytes; claim closure without reconstruction |
 | `capability_not_produced_is_not_supported_empty` | Translate not-produced into supported + complete + empty or other closure claim; omit behavioral scope/basis qualification |
 | `optional_produced_call_capability_can_be_empty` | Treat a supported empty call view as unproduced or omit its qualification; collapse supported-empty into unsupported/incomplete/unresolved |
-| `typed_mechanical_facts_preserve_roles_and_snapshot` | Reverse containment roles, omit observed-state qualification, or lose the demonstrated ancestor source/module/context chain |
+| `typed_mechanical_facts_preserve_roles_and_snapshot` | Reverse containment roles, omit qualification, or substitute a false outer ancestor (`signature` for `module`) while preserving shape/length/capability |
 | `optional_produced_relations_preserve_entity_and_literal_roles` | Reverse invocation roles; flatten entity/text types; omit resolution qualification |
 | `unresolved_and_incomplete_do_not_establish_negative_calls` | Erase unresolved outcomes/gaps while exposing empty invocation facts |
 | `core_reads_do_not_require_comparison` | Couple core membership/context/evidence verification to comparison service availability |
 | `optional_comparison_is_qualified_heuristic_and_read_only` (native regression) | Unqualified old/new pair; convert deterministic heuristic to entailed identity; lose changes/evidence/limitations; mutate input history |
-| `optional_comparison_transferable_semantics_are_qualified_and_honest` | Unqualified pair; dishonest compatibility; hidden basis; correspondence-into-identity collapse; historical mutation; lost ambiguity |
-| `optional_comparison_preserves_exact_occurrence_context_for_copies` | Collapse `compare(P1-original, P2)` and `compare(P1-copy, P2)` caller context despite distinct exact occurrences |
+| `optional_comparison_transferable_semantics_are_qualified_and_honest` | Unqualified pair; dishonest compatibility/refusal; hidden basis when claimed; correspondence-into-identity collapse; historical mutation; service-reported ambiguity lost |
+| `optional_comparison_correspondence_unsupported_is_valid` | Reject an honest changes-plus-`UNSUPPORTED`-correspondence service as nonconformant |
+| `optional_comparison_nonunique_refusal_is_valid` | Require native ambiguity structure instead of accepting explicit nonunique refusal |
+| `optional_comparison_preserves_exact_occurrence_context_for_copies` | Collapse `compare(P1-original, P2)` and `compare(P1-copy, P2)` caller context despite distinct exact occurrences; require correspondence to prove context |
 | `optional_comparison_preserves_ambiguity` (native regression) | Select one continuation under duplicate candidates |
 | `optional_comparison_declares_incompatible_capability` (capability/representation; native regression) | Silently compare mismatched capability or extractor versions |
 | `discriminating_assertions_reject_dishonest_empty_and_collapsed_copy` | Negative controls: honest `NOT_PRODUCED` accepts `None`/`[]` without closure; supported + complete + empty and collapsed copies fail |
 
-There are 20 executed cases (evidence and compatibility each have two
-parameters). Core cases do not call comparison. Optional comparison cases skip for a fixture declaring
-unsupported comparison, while core cases still run. Native tests additionally
-exercise produced invocation/resolution as typed/honesty witnesses; these do
-not promote their production into required capabilities for all backends.
-Discovery and extra relation-production cases explicitly skip when the fixture
+There are 22 executed cases (evidence and compatibility each have two
+parameters). Classification: backend-neutral conformance (exact occurrence,
+wrong snapshot/occurrence qualification, copy collision, core history,
+evidence closure, R6 honesty, typed containment roles/ancestor meaning,
+transferable comparison honesty, copy occurrence context, refusal validity);
+conditional backend-neutral conformance (duplicate-label discovery,
+produced-call emptiness, produced invocation/resolution roles, unresolved/
+incomplete honesty — skipped when the fixture declares the capability
+unsupported); native Program Spine regression (rename heuristic, two-candidate
+ambiguity, native capability incompatibility); fixture/setup controls
+(core-without-comparison service check, discriminating assertion controls).
+Core history assertions depend only on descriptor, membership/kind,
+containment, core capability qualification, observations and reconstruction;
+invocation/resolution rows are captured and compared only when produced.
+Core cases do not call comparison. Optional comparison cases skip for a fixture declaring
+unsupported comparison, while core cases still run. Produced invocation/
+resolution are typed/honesty witnesses where exposed; their production is not
+a universal core requirement. Discovery cases explicitly skip when the fixture
 declares them unsupported. Core cases receive an explicitly selected entity
 from fixture setup; they do not require backend label discovery. The fixture
 wraps local tokens with occurrence/snapshot context, allowing other backends
 to reuse opaque token spellings across snapshots without creating identity.
 A test-only `misqualify`/`forge_entity` constructor builds intentionally
-inconsistent qualified references; production never forges. Native comparison
-algorithm expectations (`RENAME`/`HEURISTIC`/`CONTINUED`, two-candidate
-ambiguity, native compatibility) are classified as native regression; the
-transferable optional contract requires only qualified invocation, honest
-compatibility, exposed basis, preserved ambiguity, no identity collapse and
-no mutation.
+inconsistent qualified references; production never forges. A test-only
+`compare_refused` projection keeps native mechanical changes/compatibility
+while declaring correspondence `UNSUPPORTED`/`REFUSED_NONUNIQUE` without
+fabricating claims. Native comparison algorithm expectations (`RENAME`/
+`HEURISTIC`/`CONTINUED`, two-candidate ambiguity, native compatibility) are
+native regression; the transferable optional contract requires only qualified
+old/new contexts, explicit compatibility/refusal, qualified changes if
+exposed, exposed basis if correspondence is claimed, no identity collapse,
+preserved service-reported ambiguity, honest refusal without a "no change"
+implication, and no mutation.
 
 Closure status for the adversarial dishonest-backend matrix (all claimed
 discriminators are executed above unless marked optional-service):
@@ -618,17 +639,19 @@ discriminators are executed above unless marked optional-service):
 | Dishonest behavior | Must now reject? | Executable discriminator |
 | --- | --- | --- |
 | old reference opens latest wholesale | yes | `exact_occurrence_is_not_content_equivalence` |
-| historical facts follow latest | yes | strengthened `historical_reads_and_entity_membership_do_not_follow_latest` |
-| historical capability context follows latest | yes | same strengthened historical case |
-| historical fresh observation lookup follows latest | yes | same strengthened historical case (fresh `observations` + successor locality) |
-| copied occurrence collapsed | yes | `exact_occurrence_is_not_content_equivalence` + `copied_occurrence_does_not_accept_original_qualified_entity` |
-| original-qualified entity accepted in copy | yes | `copied_occurrence_does_not_accept_original_qualified_entity` |
-| entity lookup ignores snapshot | yes | `wrong_snapshot_qualification_is_rejected` |
-| unsupported becomes supported-empty | yes | `capability_not_produced_is_not_supported_empty` + discriminating controls |
-| incomplete becomes complete | yes | `unresolved_and_incomplete_do_not_establish_negative_calls` |
-| evidence reads mutable workspace | yes | `evidence_verifies_qualification_and_retained_closure` + historical workspace deletion |
-| wrong evidence revision accepted | yes | `evidence_verifies_qualification_and_retained_closure` |
-| comparison ambiguity arbitrarily collapsed | optional-service semantic test | transferable comparison case + native ambiguity regression |
+| historical facts follow latest | yes | strengthened `historical_reads_and_entity_membership_do_not_follow_latest` (core containment + conditional calls) |
+| historical capability follows latest | yes | same strengthened historical case |
+| fresh observations follow latest | yes | same strengthened historical case (fresh `observations` + successor locality) |
+| copy occurrence collapsed | yes | `exact_occurrence_is_not_content_equivalence` + `copied_occurrence_does_not_accept_original_qualified_entity` |
+| wrong occurrence entity accepted | yes | `copied_occurrence_does_not_accept_original_qualified_entity` |
+| wrong snapshot entity accepted | yes | `wrong_snapshot_qualification_is_rejected` |
+| unsupported → supported-empty | yes | `capability_not_produced_is_not_supported_empty` + discriminating controls |
+| incomplete → complete | yes | `unresolved_and_incomplete_do_not_establish_negative_calls` |
+| live-workspace evidence fallback | yes | `evidence_verifies_qualification_and_retained_closure` + historical workspace deletion |
+| wrong source revision | yes | `evidence_verifies_qualification_and_retained_closure` |
+| false outer containment ancestor | yes | `typed_mechanical_facts_preserve_roles_and_snapshot` (`module` vs `signature`) |
+| service-reported ambiguity collapsed | reject | transferable comparison case (when reported) + native ambiguity regression |
+| unsupported/refused correspondence | allowed if explicit | `correspondence_unsupported_is_valid` + `nonunique_refusal_is_valid` |
 
 The default gate includes the new cases. Existing focused spine/comparison,
 Phase 1 evidence and Phase 4 slice tests retain native-specific coverage,
@@ -646,15 +669,18 @@ Validation on this branch (counts overlap):
 ```text
 uv sync --locked --extra dev                         PASS
 npm ci --prefix frontend                            PASS
-new ProgramBackend conformance cases                 20 passed
+new ProgramBackend conformance cases                 22 passed
 focused comparison + Phase 1 evidence + Phase 4
-  + new conformance cases                            57 passed
-default repository gate (includes native TS spine)   156 passed
+  + new conformance cases                            59 passed
+default repository gate (includes native TS spine)   158 passed
 Core v1 acceptance command                           18 passed
-conformance with comparison disabled                 14 passed, 6 skipped
-conformance with discovery disabled                  19 passed, 1 skipped
-Mutant A (ignore snapshot + latest facts)            3 failed, 17 passed (caught)
-Mutant B (no envelope guard + latest facts)          4 failed, 16 passed (caught)
+conformance with comparison disabled                 14 passed, 8 skipped
+conformance with discovery disabled                  21 passed, 1 skipped
+Mutant A (ignore snapshot + latest facts)            3 failed, 19 passed (caught)
+Mutant B (no envelope guard + latest facts)          4 failed, 18 passed (caught)
+False-ancestor mutant (signature for module)         1 failed (typed_mechanical)
+Optional invocation/resolution NOT_PRODUCED          core history passes
+Correspondence UNSUPPORTED / nonunique refusal       transferable passes
 npm run build --prefix frontend                      PASS; no generated asset diff
 uv build                                            PASS; sdist and wheel
 git diff --check                                     PASS
@@ -665,7 +691,13 @@ Mutant A fails `wrong_snapshot_qualification_is_rejected`,
 `historical_reads_and_entity_membership_do_not_follow_latest` and
 `core_reads_do_not_require_comparison`. Mutant B additionally fails
 `copied_occurrence_does_not_accept_original_qualified_entity`. Both mutants
-passed the pre-closure 16-case suite; neither passes the 20-case suite.
+passed the pre-closure 16-case suite; neither passes the 22-case suite.
+The false-outer-ancestor mutant fails only
+`typed_mechanical_facts_preserve_roles_and_snapshot`. An optional-production
+backend (`invocation`/`resolution` `NOT_PRODUCED`) still passes core history,
+while latest-following mutants still fail through core containment/evidence.
+Honest `UNSUPPORTED` and `REFUSED_NONUNIQUE` comparison projections pass
+transferable conformance without producing correspondence claims.
 
 Focused command:
 

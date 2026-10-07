@@ -283,4 +283,26 @@ class NativeFixture:
         return {"old": self.serialize(old), "new": self.serialize(new),
                 "claims": claims, "changes": result.delta.manifestations,
                 "ambiguities": ambiguities, "compatibility": result.receipt.compatibility,
-                "incomparable": result.receipt.not_comparable_capabilities}
+                "incomparable": result.receipt.not_comparable_capabilities,
+                "correspondence_status": "PRODUCED"}
+
+    def compare_refused(self, old, new, reason="UNSUPPORTED"):
+        # Test-only honest-refusal projection: keeps native mechanical changes
+        # and compatibility, but declares correspondence unsupported/refused
+        # without fabricating claims. Validates that transferable conformance
+        # does not mandate native correspondence production.
+        if not self.comparison_supported:
+            return None
+        assert reason in ("UNSUPPORTED", "REFUSED_NONUNIQUE")
+        with self.open(old), self.open(new):
+            result = compare_spines(old.address, new.address)
+        limitations = {
+            "UNSUPPORTED": ["cross-snapshot correspondence not supported by this service"],
+            "REFUSED_NONUNIQUE": ["correspondence unresolved/refused due to nonunique candidates"],
+        }[reason]
+        return {"old": self.serialize(old), "new": self.serialize(new),
+                "claims": [], "changes": result.delta.manifestations,
+                "ambiguities": [], "compatibility": result.receipt.compatibility,
+                "incomparable": result.receipt.not_comparable_capabilities,
+                "correspondence_status": reason,
+                "correspondence_limitations": limitations}

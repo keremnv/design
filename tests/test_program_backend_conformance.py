@@ -63,6 +63,34 @@ def ancestor_chain(backend_read, entity, limit=6):
     return chain
 
 
+def assert_transferable_comparison(result, backend, old, new):
+    # Backend-neutral optional comparison honesty. Allows qualified
+    # correspondence OR explicit unsupported/refused correspondence, provided
+    # the service remains honest. Never mandates native matching decisions.
+    assert result["old"] == backend.serialize(old)
+    assert result["new"] == backend.serialize(new)
+    assert "compatibility" in result and "incomparable" in result
+    status = result.get("correspondence_status",
+                        "PRODUCED" if result.get("claims") else "UNSUPPORTED")
+    if status in ("UNSUPPORTED", "REFUSED_NONUNIQUE"):
+        assert result["claims"] == []
+        assert result.get("correspondence_limitations")
+        return status
+    for claim in result.get("claims", []):
+        if claim["old_entity"] is not None and claim["new_entity"] is not None:
+            assert claim["old_entity"] != claim["new_entity"]
+            assert backend.serialize(backend.occurrence_of(claim["old_entity"])) == result["old"]
+            assert backend.serialize(backend.occurrence_of(claim["new_entity"])) == result["new"]
+            assert claim["basis_class"] and claim["evidence"] and claim["limitations"]
+        else:
+            assert claim["basis_class"] and claim["evidence"]
+    for ambiguity in result.get("ambiguities", []):
+        assert len(set(ambiguity["candidate_entities"])) >= 2
+        for candidate in ambiguity["candidate_entities"]:
+            assert backend.serialize(backend.occurrence_of(candidate)) == result["new"]
+    return status
+
+
 def test_exact_occurrence_is_not_content_equivalence(backend):
     first = backend.produce("leaf")
     copy = backend.copy(first)
@@ -165,6 +193,8 @@ def test_historical_reads_and_entity_membership_do_not_follow_latest(backend):
         assert containment["snapshot"] == old_descriptor["snapshot"]
         invocation = old.facts("invocation")
         resolution = old.facts("resolution")
+        inv_produced = invocation["capability"]["status"] != "NOT_PRODUCED"
+        res_produced = resolution["capability"]["status"] != "NOT_PRODUCED"
         observations = old.observations(entity)
         assert observations
         material = [old.reconstruct(o) for o in observations]
@@ -188,8 +218,9 @@ def test_historical_reads_and_entity_membership_do_not_follow_latest(backend):
         other_material = [new.reconstruct(o) for o in other_observations]
         assert all(r["verified"] for r in other_material)
         assert other_observations != observations
-    # Deliberately distinguishable successor for fact/capability stability:
-    # relations has one invocation and one RESOLVED outcome, leaf has none.
+    # Deliberately distinguishable successor for core fact/capability
+    # stability (containment/observations/descriptor differ unconditionally).
+    # Invocation/resolution distinguishability is conditional on production.
     third = backend.produce("relations")
     with backend.open(third) as distinguished:
         distinguished_descriptor = distinguished.descriptor()
@@ -197,11 +228,13 @@ def test_historical_reads_and_entity_membership_do_not_follow_latest(backend):
         relations_entity = backend.select(distinguished, "target")
         relations_invocation = distinguished.facts("invocation")
         relations_resolution = distinguished.facts("resolution")
-        assert len(relations_invocation["rows"]) == 1
-        assert len(invocation["rows"] or []) == 0
-        assert relations_invocation["rows"] != (invocation["rows"] or [])
-        assert len(relations_resolution["rows"]) == 1
-        assert len(resolution["rows"] or []) == 0
+        if inv_produced and relations_invocation["capability"]["status"] != "NOT_PRODUCED":
+            assert len(relations_invocation["rows"]) == 1
+            assert len(invocation["rows"] or []) == 0
+            assert relations_invocation["rows"] != (invocation["rows"] or [])
+        if res_produced and relations_resolution["capability"]["status"] != "NOT_PRODUCED":
+            assert len(relations_resolution["rows"]) == 1
+            assert len(resolution["rows"] or []) == 0
         relations_containment = distinguished.facts("containment", relations_entity)
         assert relations_containment["rows"] != containment["rows"]
         assert relations_containment["snapshot"] == distinguished_descriptor["snapshot"]
@@ -219,9 +252,18 @@ def test_historical_reads_and_entity_membership_do_not_follow_latest(backend):
         assert reopened_containment == containment
         assert reopened_containment["snapshot"] == old_descriptor["snapshot"]
         assert reopened_containment["capability"] == containment["capability"]
-        assert reopened.facts("invocation") == invocation
-        assert reopened.facts("resolution") == resolution
-        assert reopened.facts("invocation")["capability"] == invocation["capability"]
+        reopened_invocation = reopened.facts("invocation")
+        reopened_resolution = reopened.facts("resolution")
+        if inv_produced:
+            assert reopened_invocation == invocation
+        else:
+            assert reopened_invocation["capability"]["status"] == "NOT_PRODUCED"
+            assert reopened_invocation["rows"] is None or reopened_invocation["rows"] == []
+        if res_produced:
+            assert reopened_resolution == resolution
+        else:
+            assert reopened_resolution["capability"]["status"] == "NOT_PRODUCED"
+            assert reopened_resolution["rows"] is None or reopened_resolution["rows"] == []
         # Fresh observation lookup must be historical, not latest.
         fresh = reopened.observations(entity)
         assert fresh == observations
@@ -309,13 +351,19 @@ def test_typed_mechanical_facts_preserve_roles_and_snapshot(backend):
         assert [(r["name"], r["type"]) for r in context["schema"]["roles"]] == [
             ("parent", "entity"), ("child", "entity")]
         # Bounded ancestor-context discriminator (Phase 4 warrant direction):
-        # selected entity -> containing source/module/context chain recoverable.
+        # selected callable -> source_unit -> module, with correct mechanical
+        # roles and direction. Rejects false outer ancestors that preserve
+        # shape, qualification, capability and length but change meaning.
         chain = ancestor_chain(read, target)
         assert chain[-1] == target
         assert len(chain) >= 3
         kinds = [read.inspect(e)["kind"] for e in chain]
         assert kinds[-1] == "callable"
-        assert "source_unit" in kinds[:-1]
+        assert kinds[-2] == "source_unit"
+        assert kinds[-3] == "module"
+        edges = {(r["parent"], r["child"]) for r in read.facts("containment")["rows"]}
+        assert (chain[-3], chain[-2]) in edges
+        assert (chain[-2], chain[-1]) in edges
         # No arbitrary graph traversal required; immediate chain suffices.
 
 
@@ -386,48 +434,67 @@ def test_optional_comparison_is_qualified_heuristic_and_read_only(backend):
 
 
 def test_optional_comparison_transferable_semantics_are_qualified_and_honest(backend):
-    # Transferable optional comparison semantics (backend-neutral): exact
-    # caller-qualified old/new, honest compatibility, exposed basis, no
-    # correspondence-into-identity collapse, no historical mutation. A valid
-    # future backend need not manufacture RENAME/HEURISTIC/CONTINUED.
+    # Backend-neutral optional conformance: qualified old/new, explicit
+    # compatibility/refusal, qualified changes if exposed, exposed basis if
+    # correspondence claimed, no identity collapse, preserved ambiguity if
+    # reported, no mutation. Does not mandate correspondence production.
     if not backend.comparison_supported:
         pytest.skip("optional comparison unsupported")
     old = backend.produce("leaf")
     before = backend.fingerprint(old)
     new = backend.produce("rename")
     newer_before = backend.fingerprint(new)
-    with backend.open(old) as read:
-        entity = selected(backend, read)
     result = backend.compare(old, new)
-    assert result["old"] == backend.serialize(old)
-    assert result["new"] == backend.serialize(new)
-    assert "compatibility" in result and "incomparable" in result
-    claim = next(c for c in result["claims"] if c["old_entity"] == entity)
-    assert claim["old_entity"] != claim["new_entity"]
-    assert backend.serialize(backend.occurrence_of(claim["old_entity"])) == result["old"]
-    assert backend.serialize(backend.occurrence_of(claim["new_entity"])) == result["new"]
-    assert claim["basis_class"] and claim["evidence"] and claim["limitations"]
+    assert_transferable_comparison(result, backend, old, new)
+    assert result["changes"]
     assert backend.compare(old, new) == result
     assert backend.fingerprint(old) == before
     assert backend.fingerprint(new) == newer_before
-    # Ambiguous input must preserve competing candidates when ambiguous.
+    # Ambiguous pair: if the service reports ambiguity it must preserve
+    # candidates; if it refuses nonunique matching that refusal is valid and
+    # covered by the nonunique-refusal case. Never mandate native ambiguity.
     ambiguous_new = backend.produce("ambiguous")
     ambiguous_result = backend.compare(old, ambiguous_new)
-    ambiguous = [r for r in ambiguous_result["ambiguities"] if r["old_entity"] == entity]
-    assert ambiguous
-    assert len(set(ambiguous[0]["candidate_entities"])) >= 2
-    for candidate in ambiguous[0]["candidate_entities"]:
-        assert backend.serialize(backend.occurrence_of(candidate)) == ambiguous_result["new"]
-    for c in ambiguous_result["claims"]:
-        if c["old_entity"] is not None and c["new_entity"] is not None:
-            assert c["old_entity"] != c["new_entity"]
+    assert_transferable_comparison(ambiguous_result, backend, old, ambiguous_new)
+    assert ambiguous_result["changes"]
+
+
+def test_optional_comparison_correspondence_unsupported_is_valid(backend):
+    # A service may report mechanical changes while declaring correspondence
+    # unsupported, without failing transferable conformance. It must not imply
+    # no change, same identity or no relevant difference.
+    if not backend.comparison_supported:
+        pytest.skip("optional comparison unsupported")
+    old = backend.produce("leaf")
+    before = backend.fingerprint(old)
+    new = backend.produce("rename")
+    newer_before = backend.fingerprint(new)
+    result = backend.compare_refused(old, new, "UNSUPPORTED")
+    assert assert_transferable_comparison(result, backend, old, new) == "UNSUPPORTED"
+    assert result["changes"]
+    assert backend.compare_refused(old, new, "UNSUPPORTED") == result
+    assert backend.fingerprint(old) == before
+    assert backend.fingerprint(new) == newer_before
+
+
+def test_optional_comparison_nonunique_refusal_is_valid(backend):
+    # A service may refuse nonunique correspondence instead of returning
+    # native-style ambiguity. If it does report ambiguity, multiple candidates
+    # must remain explicit with no arbitrary winner (checked by the helper).
+    if not backend.comparison_supported:
+        pytest.skip("optional comparison unsupported")
+    old = backend.produce("leaf")
+    new = backend.produce("ambiguous")
+    result = backend.compare_refused(old, new, "REFUSED_NONUNIQUE")
+    assert assert_transferable_comparison(result, backend, old, new) == "REFUSED_NONUNIQUE"
+    assert result["changes"]
+    assert result["ambiguities"] == []
 
 
 def test_optional_comparison_preserves_exact_occurrence_context_for_copies(backend):
-    # Native result need not duplicate full occurrence identity internally,
-    # provided invocation is over exact verified contexts and the result
-    # remains associated with that pair. Copies share snapshot/entity tokens
-    # and bytes but retain distinct caller-qualified occurrence context.
+    # Exact occurrence qualification is tested independently of correspondence
+    # production. Copies share snapshot/entity tokens and bytes but invocations
+    # remain associated with different exact old occurrences.
     if not backend.comparison_supported:
         pytest.skip("optional comparison unsupported")
     original = backend.produce("leaf")
@@ -436,19 +503,22 @@ def test_optional_comparison_preserves_exact_occurrence_context_for_copies(backe
     with backend.open(original) as a, backend.open(copy) as b:
         assert a.descriptor()["snapshot"] == b.descriptor()["snapshot"]
         assert_distinct_occurrences(a.descriptor(), b.descriptor())
-        original_entity = selected(backend, a)
-        copied_entity = selected(backend, b)
-        assert backend.native_token(original_entity) == backend.native_token(copied_entity)
+        assert backend.native_token(selected(backend, a)) == backend.native_token(selected(backend, b))
     first = backend.compare(original, new)
     second = backend.compare(copy, new)
+    assert_transferable_comparison(first, backend, original, new)
+    assert_transferable_comparison(second, backend, copy, new)
     assert first["old"] != second["old"]
     assert first["new"] == second["new"]
-    first_claim = next(c for c in first["claims"] if c["old_entity"] == original_entity)
-    second_claim = next(c for c in second["claims"] if c["old_entity"] == copied_entity)
-    assert first_claim["old_entity"] != second_claim["old_entity"]
-    assert backend.native_token(first_claim["old_entity"]) == backend.native_token(second_claim["old_entity"])
-    assert backend.serialize(backend.occurrence_of(first_claim["old_entity"])) == first["old"]
-    assert backend.serialize(backend.occurrence_of(second_claim["old_entity"])) == second["old"]
+    for result in (first, second):
+        for claim in result.get("claims", []):
+            if claim["old_entity"] is not None:
+                assert backend.serialize(backend.occurrence_of(claim["old_entity"])) == result["old"]
+    # Honest refusal preserves the same context distinction without claims.
+    refused_first = backend.compare_refused(original, new, "UNSUPPORTED")
+    refused_second = backend.compare_refused(copy, new, "UNSUPPORTED")
+    assert refused_first["old"] != refused_second["old"]
+    assert refused_first["new"] == refused_second["new"]
     # No persistent cross-snapshot identity is required.
 
 
