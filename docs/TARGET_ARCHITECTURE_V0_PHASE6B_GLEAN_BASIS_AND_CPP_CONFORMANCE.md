@@ -235,11 +235,26 @@ retained source store addresses/digests
 
 The source-store lookup location is a composition resolution detail; content
 identity and retention authority must not depend on an original workspace path.
-The test prototype uses an admitted record digest and separate blob-root/store
-resolution. It serializes/reopens the record without native PublicationRef or a
+The test prototype separates `open_consistent(candidate)` from
+`open_admitted(candidate, admitted_digest)`. Consistency opening checks the
+candidate's own derived metadata and confers no accepted-publication admission.
+Admission-qualified opening requires an independently retained digest; missing
+or mismatched qualification fails. The executable experiment models that trusted
+input with a separately saved `trusted-admission.json`, while the candidate
+record remains independently replaceable. Neither path proves integration with
+Ontology Author's accepted-publication system. Blob-root/store resolution is
+separate, and the record serializes/reopens without native PublicationRef or a
 program World clone. Metadata hashes in the DB bind the declared recipe/input
 record to the producer's exact finished index. Trusted indexing/admission must
 check these declarations; setting a property is not proof they are true.
+
+The admission falsifier reformats the serialized recipe without changing its
+normalized recipe digest or observed-state token. Its record digest changes.
+Consistency opening succeeds, admission opening without a trusted digest fails
+with `independent admission digest required`, and opening against the separately
+saved original digest fails with `admitted basis record mismatch`. The original
+record opens successfully against that same saved digest. This models the
+admission trust boundary, not an authority system or publication migration.
 
 **Composition decision:** retain selected evidence handles/material digests as
 bounded witnesses where semantic commitments depend on them. They permit exact
@@ -308,15 +323,40 @@ range dialect and normalized compilation path mapping, not merely source text.
 ## J. Entity identity and selected membership
 
 **Runtime-proven:** used typed selected FunctionDeclaration lookup;
-qualified tokens pair that local token with the exact basis occurrence/state.
+public local tokens are opaque hashable `(predicate, local_fact_id)` tuples.
+Qualified identity pairs the opened exact occurrence/state with that token.
+Dispatch admits only FunctionDeclaration, src.File and buck.TranslationUnit.4.
 Unknown/wrong-type lookup is distinguished from DB/query/schema/transport failure.
 No entity-universe enumeration is needed. Foreign qualified entities are rejected
 even when an integer is meaningful in another DB. Numeric collision is not a
 reason to require global entity IDs.
 
-The selected target's local fact ID was `1035` in both independently indexed P1
-DBs. Direct typed lookup succeeded in both; the occurrence-qualified token
-control rejected cross-DB substitution. P2 target was `1055`. A nonexistent ID
+The public `member` and `kind` helpers consume the actual endpoint tokens returned
+by context, with these independently checked results:
+
+| Returned P1 token | member | kind |
+| --- | --- | --- |
+| Translation-unit token (`buck.TranslationUnit.4`) | True | translation_unit |
+| File token (`src.File`) | True | source_unit |
+| Function token (`cxx1.FunctionDeclaration`) | True | callable |
+| Unknown, wrongly typed or unadmitted category | False | None |
+
+The containment rows preserve precisely these same tokens in parent/child roles.
+Unit/file membership and kind do not require declaration observations: this
+bounded recipe returns no observations for those members. A function-only
+membership or kind implementation fails the shared endpoint-closure assertions;
+reversing roles or dropping an endpoint's type also fails. Those dishonest reader
+substitutions are offline modeled controls, distinct from the real typed runtime
+queries and endpoint checks. No universal entity class or all-fact admission is
+introduced.
+
+In the initial run the selected target's local fact ID was `1035` in both
+independently indexed P1 DBs, and P2 target was `1055`. Fact allocation is not
+assumed deterministic: the closure probe requires and records an equal typed
+local token from the actual returned E1/E2 endpoint chains. These are selected
+fixture reads, not entity-universe enumeration. Direct typed lookup
+succeeds in both DBs, while occurrence-qualified substitution fails with
+`entity occurrence mismatch`. A nonexistent ID
 returned nonmembership; the valid file ID `1025` did not pass as a function.
 The experiment distinguishes the specific wrong-fact-type outcome from
 schema/query/DB failures, which remain explicit errors.
@@ -447,7 +487,8 @@ complete absence. Explicit family production is separate from storage lifecycle.
 ## P. Dishonest mapping and composition falsifiers
 
 **Runtime-proven and modeled composition evidence:** current C++ probe passed;
-14 additional offline prototype cases pass. Evidence levels below distinguish
+28 offline prototype cases pass (14 original basis cases plus 14 closure cases).
+Evidence levels below distinguish
 native execution from modeled stacked/pruned closure checks.
 
 | Substitution/failure | Required rejecting discriminator | Evidence level |
@@ -459,6 +500,8 @@ native execution from modeled stacked/pruned closure checks.
 | Wrong stored schema | Compare stored qualification before interpreting facts | Runtime-proven record mismatch; modeled wrong DB schema metadata |
 | Wrong input manifest/recipe | Admitted record digest and DB-bound input/recipe digests | Runtime-proven record/DB qualification; modeled altered DB metadata |
 | Foreign entity treated as local | Qualify typed local token with exact occurrence/state | Runtime-proven, including actual numeric ID collision |
+| Function-only membership/kind with typed parent endpoints | Check every actual returned endpoint through the public helpers | Runtime endpoint closure; modeled dishonest dispatch rejection |
+| Self-consistency promoted to independent admission | Require separately retained original record digest | Runtime metadata checks with modeled trusted admission; missing/mismatched pin rejected |
 | Wrong ancestor | Selected declaration/trace/file/unit joins and independent expected E1 context | Runtime-proven |
 | Valid E2 evidence for E1 | Independent expected full E1 manifestation rejects E2 material | Runtime-proven |
 | Wrong source revision/content | Basis/file/locator qualification plus retained and indexed digest checks | Runtime-proven |
@@ -479,7 +522,7 @@ no straightforward-adapter classification.
 | Exact occurrence open | Exact DB lookup | Namespace/Repo/GUID and retained availability | COMPOSITION_PROVEN (current runtime plus exact-store covenant) |
 | Observed-state token | Stable qualified indexed state | Input/recipe/schema record, separate from occurrence | COMPOSITION_PROVEN (current indexed inputs and historical read) |
 | Membership | Keyed typed fact lookup | Exact occurrence-qualified token | CURRENT_CPP_RUNTIME_PROVEN |
-| Adequate kind | FunctionDeclaration/CxxDeclKind | Language-specific normalization | CURRENT_CPP_RUNTIME_PROVEN |
+| Adequate kind | FunctionDeclaration/CxxDeclKind plus typed file/unit dispatch | Language-specific normalization | CURRENT_CPP_RUNTIME_PROVEN |
 | Scoped context | Declaration/trace/file/unit joins | Explicit ownership scope, no invented lexical tree | CURRENT_CPP_RUNTIME_PROVEN |
 | Entity evidence | Selected declaration range | Retained indexed source association | CURRENT_CPP_RUNTIME_PROVEN |
 | Historical reconstruction | Retained bytes; no native FileContent rows in this recipe | Source manifest/digest/extent verification | COMPOSITION_PROVEN (current DB association plus retained bytes after workspace deletion) |
@@ -638,7 +681,7 @@ falsifies ProgramBackend, and no frozen interface/core/Phase 5 test is changed.
 Stacked/pruned inputs, backup restore, broader C++ coverage and publication
 migration require separate evidence before expanding this bounded scope.
 
-**Runtime-proven validation record (2026-10-07 UTC / 2026-10-08 London):**
+**Initial runtime-proven validation record (2026-10-07 UTC / 2026-10-08 London):**
 
 - `uv sync --locked --extra dev`: passed.
 - `npm ci --prefix frontend`: passed; reported five existing audit findings;
@@ -693,3 +736,48 @@ probe verifies these before querying. Fresh probe runs use independent retained
 namespace/store directories, preserve the basis records and bounded witness,
 and deliberately destroy only their unpublished fixtures. Source cloning,
 dependency downloads and building are not part of the default pytest gate.
+
+## V. Final review closure (2026-10-08)
+
+**Newly executed on the existing fingerprinted runtime:** the complete updated
+C++ probe passed, including both closure controls and all earlier historical,
+input/evidence, capability and failure controls. The binaries were not rebuilt.
+Stored schema remains `66a80a62611346b34e2dcaba40d0d58b`.
+
+The successful closure store is
+`$HOME/.cache/design-phase6b-runtime/spike/deedaf9cd15c4e128aab182fb8168495`,
+under namespace `phase6b-retained-e6b5f0ff0092479da19c245b854d8291`:
+
+| Repo | GUID |
+| --- | --- |
+| phase6b/P1 | `86706e6f-96e9-45ff-b067-7d1810644441` |
+| phase6b/P1independent | `5a664ed2-3863-4449-9e0c-ce3c9c668069` |
+| phase6b/P2 | `35cf3507-08d7-4267-8756-c8b33c84579f` |
+| phase6b/P1independent (recreated unpublished control) | `90066cc6-1e67-41e1-871c-e01d763fbf72` |
+
+P1's actual returned tokens were `(buck.TranslationUnit.4, 1043)`,
+`(src.File, 1025)` and `(cxx1.FunctionDeclaration, 1035)`. Public membership
+returned True for all three, and kinds were translation_unit/source_unit/callable.
+The exact parent/child token rows and these results survived workspace deletion.
+The independent index had the same local translation-unit token but a different
+qualified occurrence; cross-occurrence substitution failed.
+
+The separately retained modeled admission digest was
+`d875306562c857685e9ccf8277d3daa8d23d8c429516230985c40061b79a45de`.
+The reformatted candidate passed consistency checks while missing and mismatched
+admission pins failed; original P1 opened against that saved pin. This is a model
+of independent admission, not accepted-publication integration. The missing-header
+control again recorded COMPLETE plus `src.IndexFailure` for absent_generated.h.
+
+An earlier closure attempt incorrectly required identical selected-function IDs
+across independent indexing. Actual fact allocation differed and that assertion
+failed. The final discriminator requires an actual equal typed endpoint from the
+bounded E1/E2 context chains, without assuming deterministic function IDs or
+enumerating the repository. The successful run above is a subsequent execution.
+
+**Closure validation:** 28 experimental tests passed (14 original + 14 closure);
+core acceptance passed 18; the unchanged default gate passed 208 (overlapping
+core coverage). Python compilation, shell syntax and `git diff --check` passed.
+The manual Glean probe and experimental suite remain outside default CI.
+Production contracts, native implementation and publication remain unchanged;
+Phase 6C is not implemented and the PR remains a draft, unmerged.

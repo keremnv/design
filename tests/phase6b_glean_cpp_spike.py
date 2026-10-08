@@ -16,10 +16,13 @@ import shutil
 import subprocess
 import uuid
 
-from tests.phase6b_glean_basis import DBRef, GleanBasis, Input, canonical, checked_blob, sha256, verify_basis
+from tests.phase6b_glean_basis import BasisFailure, DBRef, GleanBasis, Input, canonical, checked_blob, sha256, verify_basis
 
 COMMIT = "4e576957778b721f28cec21556066a02c3ed84d0"
 UNIT_PREDICATE = "buck.TranslationUnit.4"  # imported by current cxx1.5, not default query scope
+FUNCTION_PREDICATE = "cxx1.FunctionDeclaration"
+TOKEN_KINDS = {UNIT_PREDICATE: "translation_unit", "src.File": "source_unit",
+               FUNCTION_PREDICATE: "callable"}
 P1 = {
     "target.cpp": "/* é😀 */ int target(int x) {\r\n  return x + 1;\r\n}\r\n",
     "second.cpp": '#include "generated.h"\nint second(int x) { return x + generated_offset; }\n',
@@ -55,6 +58,33 @@ def rejected(operation):
     except (AssertionError, ValueError, RuntimeError, OSError):
         return
     raise AssertionError("dishonest qualification accepted")
+
+
+def admission_rejected(operation, message):
+    try:
+        operation()
+    except BasisFailure as exc:
+        require_equal(str(exc), message)
+        return
+    raise AssertionError("dishonest admission qualification accepted")
+
+
+def check_context_closure(probe, basis, context):
+    """Check the actual returned endpoints against independent fixture semantics."""
+    unit, file, function = context["unit"], context["file"], context["function"]
+    assert context["edges"] == ({"parent": unit, "child": file},
+                                {"parent": file, "child": function}), "containment endpoint/role mismatch"
+    results = []
+    for token, predicate, expected_kind in ((unit, UNIT_PREDICATE, "translation_unit"),
+                                            (file, "src.File", "source_unit"),
+                                            (function, FUNCTION_PREDICATE, "callable")):
+        assert token[0] == predicate, "containment endpoint type mismatch"
+        hash(token)  # opaque local Hashable, qualified by the opened occurrence
+        assert probe.member(basis, token), "containment endpoint is not a program member"
+        actual_kind = probe.kind(basis, token)
+        assert actual_kind == expected_kind, "containment endpoint kind mismatch"
+        results.append({"token": token, "is_member": True, "kind": actual_kind})
+    return tuple(results)
 
 
 class CppProbe:
@@ -111,9 +141,23 @@ class CppProbe:
                               read_only=True, wrong_fact_ok=wrong_fact_ok)
         return [] if output is None else [json.loads(row) for row in output.splitlines() if row]
 
-    def open(self, basis, admitted_digest=None):
+    def open_consistent(self, basis):
+        """Check candidate consistency only; this confers no publication admission."""
         namespace = json.loads((self.root / "namespace.json").read_text())
-        verify_basis(basis, admitted_digest or basis.record_digest, namespace,
+        verify_basis(basis, basis.record_digest, namespace,
+                     self.metadata, self.root / "blobs")
+        return basis
+
+    def open_admitted(self, basis, admitted_digest=None):
+        """Require a caller's independently retained admission digest.
+
+        The experiment models that trusted input; no Ontology Author accepted
+        publication integration is implemented here.
+        """
+        if not admitted_digest:
+            raise BasisFailure("independent admission digest required")
+        namespace = json.loads((self.root / "namespace.json").read_text())
+        verify_basis(basis, admitted_digest, namespace,
                      self.metadata, self.root / "blobs")
         return basis
 
@@ -163,7 +207,7 @@ class CppProbe:
         record = self.root / f"{name}.{basis.occurrence.guid}.basis.json"
         with record.open("x") as output:
             output.write(basis.to_json())
-        return self.open(basis)
+        return self.open_consistent(basis)
 
     def verify_indexed_inputs(self, basis):
         # Admission/independent input verification, not reader enumeration of
@@ -180,10 +224,14 @@ class CppProbe:
     def selected(self, basis, name):
         rows = self.query(basis, "cxx1.FunctionDeclaration { name = { name = { name = cxx1.Name " + json.dumps(name) + " } } }")
         assert len(rows) == 1
-        return rows[0]["id"]
+        return FUNCTION_PREDICATE, rows[0]["id"]
 
     def member(self, basis, entity):
-        return self.typed_member(basis, "cxx1.FunctionDeclaration", entity)
+        if (not isinstance(entity, tuple) or len(entity) != 2
+                or not isinstance(entity[0], str) or entity[0] not in TOKEN_KINDS
+                or type(entity[1]) is not int or entity[1] <= 0):
+            return False
+        return self.typed_member(basis, *entity)
 
     def typed_member(self, basis, predicate, entity):
         assert predicate in {"cxx1.FunctionDeclaration", "src.File", UNIT_PREDICATE}
@@ -191,26 +239,31 @@ class CppProbe:
         return len(rows) == 1 and rows[0]["id"] == entity
 
     def qualified_member(self, basis, origin, entity):
-        assert origin.occurrence == basis.occurrence and origin.schema_id == basis.schema_id
-        assert origin.observed_state == basis.observed_state
+        assert origin.occurrence == basis.occurrence, "entity occurrence mismatch"
+        assert origin.schema_id == basis.schema_id, "entity schema mismatch"
+        assert origin.observed_state == basis.observed_state, "entity observed-state mismatch"
         return self.member(basis, entity)
 
     def kind(self, basis, entity):
         if not self.member(basis, entity):
             return None
-        rows = self.query(basis, f"codemarkup.cxx.CxxDeclKind {{ decl = {{ function_ = ${entity} }} }}")
-        assert len(rows) == 1 and rows[0]["key"]["decl"]["function_"]["id"] == entity
+        predicate, local_id = entity
+        if predicate != FUNCTION_PREDICATE:
+            return TOKEN_KINDS[predicate]
+        rows = self.query(basis, f"codemarkup.cxx.CxxDeclKind {{ decl = {{ function_ = ${local_id} }} }}")
+        assert len(rows) == 1 and rows[0]["key"]["decl"]["function_"]["id"] == local_id
         assert rows[0]["key"]["kind"] == 13  # Function, declared SymbolKind ordinal
         return "callable"
 
     def context(self, basis, entity):
-        if not self.member(basis, entity):
+        if not self.member(basis, entity) or entity[0] != FUNCTION_PREDICATE:
             return {}
-        source = self.query(basis, f"cxx1.DeclarationSrcRange {{ decl = {{ function_ = ${entity} }} }}")
+        local_id = entity[1]
+        source = self.query(basis, f"cxx1.DeclarationSrcRange {{ decl = {{ function_ = ${local_id} }} }}")
         assert len(source) == 1
         file = source[0]["key"]["source"]["file"]
         units = self.query(basis, "cxx1.TranslationUnitTrace { trace = T } where "
-                           f"cxx1.DeclarationInTrace {{ decl = {{ function_ = ${entity} }}, trace = T }}")
+                           f"cxx1.DeclarationInTrace {{ decl = {{ function_ = ${local_id} }}, trace = T }}")
         # This fixture selects main-file globals, not header/multi-unit contexts.
         assert len(units) == 1
         key = units[0]["key"]
@@ -218,24 +271,28 @@ class CppProbe:
         assert key["trace"]["key"]["file"]["id"] == file["id"]
         assert self.typed_member(basis, "src.File", file["id"])
         assert self.typed_member(basis, UNIT_PREDICATE, key["tunit"]["id"])
-        unit = key["tunit"]["id"]
-        return {"unit": unit, "file": file["id"], "path": file["key"], "function": entity,
+        unit = (UNIT_PREDICATE, key["tunit"]["id"])
+        file_token = ("src.File", file["id"])
+        return {"unit": unit, "file": file_token, "path": file["key"], "function": entity,
                 "kinds": ("translation_unit", "source_unit", self.kind(basis, entity)),
-                "edges": ({"parent": (UNIT_PREDICATE, unit), "child": ("src.File", file["id"])},
-                          {"parent": ("src.File", file["id"]), "child": ("cxx1.FunctionDeclaration", entity)})}
+                "edges": ({"parent": unit, "child": file_token},
+                          {"parent": file_token, "child": entity})}
 
     def evidence(self, basis, entity):
-        rows = self.query(basis, f"cxx1.DeclarationSrcRange {{ decl = {{ function_ = ${entity} }} }}")
+        assert entity[0] == FUNCTION_PREDICATE
+        local_id = entity[1]
+        rows = self.query(basis, f"cxx1.DeclarationSrcRange {{ decl = {{ function_ = ${local_id} }} }}")
         assert len(rows) == 1
         key = rows[0]["key"]
-        assert key["decl"]["function_"]["id"] == entity
+        assert key["decl"]["function_"]["id"] == local_id
         loc = key["source"]
         file = loc["file"]
         item = next(item for item in basis.inputs if item.file == file["key"])
-        return Evidence(basis.record_digest, entity, file["id"], file["key"], canonical(loc).decode(), item.sha256)
+        return Evidence(basis.record_digest, local_id, file["id"], file["key"], canonical(loc).decode(), item.sha256)
 
     def observations(self, basis, entity):
-        return (self.evidence(basis, entity),) if self.member(basis, entity) else ()
+        return ((self.evidence(basis, entity),)
+                if self.member(basis, entity) and entity[0] == FUNCTION_PREDICATE else ())
 
     def invocations(self, basis, entity):
         assert self.capability(basis, "invocation")[0] == "NOT_PRODUCED"
@@ -246,9 +303,9 @@ class CppProbe:
         return ()
 
     def reconstruct(self, basis, evidence):
-        self.open(basis)
+        self.open_consistent(basis)  # byte/DB consistency does not establish admission
         assert evidence.basis_digest == basis.record_digest
-        assert evidence == self.evidence(basis, evidence.entity)
+        assert evidence == self.evidence(basis, (FUNCTION_PREDICATE, evidence.entity))
         item = next(item for item in basis.inputs if item.file == evidence.file)
         data = checked_blob(self.root / "blobs", item)
         loc = json.loads(evidence.range_json)
@@ -282,19 +339,45 @@ def main():
     args = parser.parse_args()
     probe = CppProbe(args.work.resolve(), args.container)
     p1 = probe.produce("P1", P1)
-    admitted_digest = p1.record_digest
+    # Model independent admission with a separately saved trusted record. This
+    # is not an Ontology Author accepted-publication integration.
+    trusted_record = probe.root / "trusted-admission.json"
+    with trusted_record.open("x") as output:
+        output.write(canonical({"record_digest": p1.record_digest}).decode())
+    admitted_digest = json.loads(trusted_record.read_text())["record_digest"]
+    candidate_record = json.loads(p1.to_json())
+    candidate_record["recipe_json"] = json.dumps(json.loads(p1.recipe_json), indent=2)
+    changed_candidate = GleanBasis.from_json(json.dumps(candidate_record))
+    assert changed_candidate.record_digest != admitted_digest
+    assert changed_candidate.recipe_digest == p1.recipe_digest
+    assert changed_candidate.observed_state == p1.observed_state
+    assert probe.open_consistent(changed_candidate) == changed_candidate
+    admission_rejected(lambda: probe.open_admitted(changed_candidate),
+                       "independent admission digest required")
+    admission_rejected(lambda: probe.open_admitted(changed_candidate, admitted_digest),
+                       "admitted basis record mismatch")
+    assert probe.open_admitted(p1, admitted_digest) == p1
     recorded_state = p1.observed_state
     e1, e2 = probe.selected(p1, "target"), probe.selected(p1, "second")
     assert probe.member(p1, e1) and probe.kind(p1, e1) == "callable"
-    definitions = probe.query(p1, f"cxx1.FunctionDefinition {{ declaration = ${e1} }}")
-    assert len(definitions) == 1 and definitions[0]["key"]["declaration"]["id"] == e1
-    assert not probe.member(p1, 999999999)
-    assert probe.kind(p1, 999999999) is None and probe.context(p1, 999999999) == {}
-    assert probe.observations(p1, 999999999) == ()
+    definitions = probe.query(p1, f"cxx1.FunctionDefinition {{ declaration = ${e1[1]} }}")
+    assert len(definitions) == 1 and definitions[0]["key"]["declaration"]["id"] == e1[1]
+    unknown = (FUNCTION_PREDICATE, 999999999)
+    assert not probe.member(p1, unknown)
+    assert probe.kind(p1, unknown) is None and probe.context(p1, unknown) == {}
+    assert probe.observations(p1, unknown) == ()
     assert probe.invocations(p1, e1) == () and probe.resolutions(p1, e1) == ()
     context = probe.context(p1, e1)
     assert context["path"] == "target.cpp" and context["kinds"] == ("translation_unit", "source_unit", "callable")
-    assert not probe.member(p1, context["file"]), "a file fact is not a function declaration"
+    assert context["function"] == e1
+    typed_closure = check_context_closure(probe, p1, context)
+    for wrong_type in ((FUNCTION_PREDICATE, context["file"][1]),
+                       ("src.File", e1[1]), ("src.IndexFailure", e1[1])):
+        assert not probe.member(p1, wrong_type)
+        assert probe.kind(p1, wrong_type) is None
+    # Being a program member need not imply available declaration evidence.
+    assert probe.observations(p1, context["unit"]) == ()
+    assert probe.observations(p1, context["file"]) == ()
     observation = probe.evidence(p1, e1)
     assert probe.observations(p1, e1) == (observation,)
     assert probe.reconstruct(p1, observation) == EXPECTED_FIRST
@@ -306,9 +389,11 @@ def main():
     other = probe.evidence(p1, e2)
     assert probe.reconstruct(p1, other) == EXPECTED_SECOND
     rejected(lambda: require_equal(probe.reconstruct(p1, other), EXPECTED_FIRST))
-    rejected(lambda: require_equal(probe.context(p1, e2), context))
+    other_context = probe.context(p1, e2)
+    assert other_context["path"] == "second.cpp"
+    rejected(lambda: require_equal(other_context, context))
     # Name span is separately established, not silently used for full declaration.
-    names = probe.query(p1, f"cxx1.DeclarationNameSpan {{ decl = {{ function_ = ${e1} }} }}")
+    names = probe.query(p1, f"cxx1.DeclarationNameSpan {{ decl = {{ function_ = ${e1[1]} }} }}")
     assert len(names) == 1 and names[0]["key"]["span"]["length"] == len("target")
     assert names[0]["key"]["file"]["id"] == observation.file_id
     name_span = names[0]["key"]["span"]
@@ -316,23 +401,39 @@ def main():
     assert source[name_span["start"]:name_span["start"] + name_span["length"]] == b"target"
     equivalent = probe.produce("P1independent", P1)
     equivalent_target = probe.selected(equivalent, "target")
-    if equivalent_target == e1:
-        assert probe.member(p1, e1) and probe.member(equivalent, e1)
+    assert probe.member(p1, e1) and probe.member(equivalent, equivalent_target)
+    equivalent_context = probe.context(equivalent, equivalent_target)
+    equivalent_other_context = probe.context(equivalent, probe.selected(equivalent, "second"))
+    independent_endpoints = {chain[role] for chain in (equivalent_context, equivalent_other_context)
+                             for role in ("unit", "file", "function")}
+    # Fact allocation need not make the selected function IDs deterministic.
+    # Require a real equal typed local token among the returned endpoints.
+    local_endpoints = [chain[role] for chain in (context, other_context)
+                       for role in ("unit", "file", "function")]
+    collisions = [token for token in local_endpoints
+                  if token in independent_endpoints]
+    assert collisions, "fixture no longer exercises typed local ID collision"
+    colliding_token = collisions[0]
+    assert probe.member(p1, colliding_token) and probe.member(equivalent, colliding_token)
     assert equivalent.input_state == p1.input_state
     assert equivalent.observed_state == p1.observed_state
     assert equivalent.occurrence != p1.occurrence and equivalent.occurrence.guid != p1.occurrence.guid
+    assert (p1.occurrence, e1) != (equivalent.occurrence, equivalent_target)
+    assert (p1.occurrence, colliding_token) != (equivalent.occurrence, colliding_token)
+    rejected(lambda: probe.qualified_member(equivalent, p1, colliding_token))
     rejected(lambda: probe.qualified_member(equivalent, p1, e1))
-    rejected(lambda: probe.open(replace(p1, occurrence=replace(p1.occurrence, guid=equivalent.occurrence.guid))))
+    rejected(lambda: probe.open_consistent(replace(p1, occurrence=replace(p1.occurrence, guid=equivalent.occurrence.guid))))
     p2 = probe.produce("P2", P2)
     assert p2.input_state != p1.input_state
-    rejected(lambda: probe.open(p2, admitted_digest))  # valid latest basis is not admitted P1
+    admission_rejected(lambda: probe.open_admitted(p2, admitted_digest),
+                       "admitted basis record mismatch")  # valid latest is not admitted P1
     target2 = probe.selected(p2, "target")
     assert probe.context(p2, target2)["path"] == "moved.cpp"
     assert "x + 41" in probe.reconstruct(p2, probe.evidence(p2, target2))
     assert probe.query(p1, 'cxx1.FunctionDeclaration { name = { name = { name = cxx1.Name "extra" } } }') == []
     rejected(lambda: probe.qualified_member(p1, p2, target2))
     rejected(lambda: probe.qualified_member(p1, replace(p1, inputs=p2.inputs), e1))
-    probe.open(p1)
+    probe.open_admitted(p1, admitted_digest)
     assert p1.observed_state == recorded_state
     assert probe.kind(p1, e1) == "callable" and probe.context(p1, e1) == context
     assert probe.evidence(p1, e1) == observation and probe.reconstruct(p1, observation) == EXPECTED_FIRST
@@ -344,7 +445,8 @@ def main():
     record = probe.root / f"P1.{p1.occurrence.guid}.basis.json"
     reopened = GleanBasis.from_json(record.read_text())
     assert reopened == p1
-    probe.open(reopened, admitted_digest)
+    probe.open_admitted(reopened, admitted_digest)
+    assert check_context_closure(probe, reopened, probe.context(reopened, e1)) == typed_closure
     probe.verify_indexed_inputs(reopened)  # independent check without original checkout
     retained_witness = json.loads(witness_path.read_text())
     assert retained_witness["entity_predicate"] == "cxx1.FunctionDeclaration"
@@ -354,18 +456,18 @@ def main():
     # Deliberately damage UNPUBLISHED experimental DBs only. Accepted deployment
     # history must forbid this; the exact opener must detect the resulting loss.
     probe.command("delete", "--db", equivalent.occurrence.repo)
-    rejected(lambda: probe.open(equivalent))
+    rejected(lambda: probe.open_consistent(equivalent))
     recreated = probe.produce("P1independent", P1)
     assert recreated.occurrence.guid != equivalent.occurrence.guid
     assert recreated.input_state == equivalent.input_state
-    rejected(lambda: probe.open(equivalent))
+    rejected(lambda: probe.open_consistent(equivalent))
     shutil.rmtree(probe.root / "P1independent")
     for altered in (replace(p1, schema_id="wrong-schema"), replace(p1, recipe_json='{"wrong":"recipe"}'),
                     replace(p1, inputs=p2.inputs), replace(p1, occurrence=replace(p1.occurrence, repo="phase6b/missing"))):
-        rejected(lambda altered=altered: probe.open(altered))
+        rejected(lambda altered=altered: probe.open_consistent(altered))
     saved_namespace = (probe.root / "namespace.json").read_text()
     (probe.root / "namespace.json").write_text('"other-store"')
-    rejected(lambda: probe.open(p1))
+    rejected(lambda: probe.open_consistent(p1))
     (probe.root / "namespace.json").write_text(saved_namespace)
     rejected(lambda: probe.reconstruct(p1, replace(observation, source_sha256=p2.inputs[0].sha256)))
     blob = probe.root / "blobs" / observation.source_sha256
@@ -413,8 +515,16 @@ def main():
     print(json.dumps({"result": "PASS", "glean_commit": COMMIT, "runtime": probe.runtime,
                       "schema_id": p1.schema_id, "store": str(probe.root),
                       "context": context, "full_declaration_material": EXPECTED_FIRST,
+                      "typed_membership_kind_closure": typed_closure,
+                      "admission_control": {"trusted_record": str(trusted_record),
+                                            "candidate_consistency": "PASS; no admission conferred",
+                                            "missing_digest": "independent admission digest required",
+                                            "changed_record": "admitted basis record mismatch",
+                                            "original_record": "PASS",
+                                            "scope": "modeled independent admission, not publication integration"},
                       "equal_source_different_occurrence": True, "history_after_P2": True,
-                      "selected_local_ids": {"P1": e1, "P1independent": equivalent_target, "P2": target2},
+                      "colliding_local_token": colliding_token,
+                      "selected_local_ids": {"P1": e1[1], "P1independent": equivalent_target[1], "P2": target2[1]},
                       "missing_include_control": failure_inventory,
                       "composition": "standalone retained exact DB + manifest/recipe + source blobs",
                       "not_proven": ["stacked/pruned runtime", "backup restore runtime", "general C++ coverage", "calls/resolution"]}, indent=2))
